@@ -2,125 +2,97 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreBookingRequest;
 use App\Models\Service;
 use App\Models\Staff;
 use App\Services\BookingService;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Carbon;
 
 class BookingController extends Controller
 {
-    public function create()
+    public function __construct(private BookingService $bookingService)
     {
-        $serviceLabelCol = $this->firstExistingColumn('services', [
-            'name',
-            'service_name',
-            'title',
-        ]);
+    }
 
-        $staffLabelCol = $this->firstExistingColumn('staff', [
-            'name',
-            'full_name',
-            'staff_name',
-            'display_name',
-        ]);
-
+    /**
+     * Public booking page.
+     * Route: GET / and GET /booking
+     */
+    public function index(Request $request)
+    {
         $services = Service::query()
-            ->select(['id', 'duration_minutes'])
-            ->selectRaw("`{$serviceLabelCol}` as label")
-            ->orderBy('label')
-            ->get();
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration_minutes']);
 
         $staff = Staff::query()
-            ->select(['id'])
-            ->selectRaw("`{$staffLabelCol}` as label")
-            ->orderBy('label')
-            ->get();
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'role_key']);
 
-        return view('booking.create', [
+        return view('booking.index', [
             'services' => $services,
             'staff' => $staff,
+            'today' => now()->format('Y-m-d'),
         ]);
     }
 
     /**
-     * Return time slots for a given date/service/staff.
-     * Query: ?date=YYYY-mm-dd&service_id=...&staff_id=... (optional)
+     * Slots endpoint used by the booking UI.
+     * Route: GET /booking/slots?date=YYYY-MM-DD&service_id=...&staff_id=...
      */
-    public function slots(Request $request, BookingService $bookingService)
+    public function slots(Request $request)
     {
         $validated = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
-            'service_id' => ['required', 'exists:services,id'],
-            'staff_id' => ['nullable', 'exists:staff,id'],
+            'service_id' => ['required', 'string', 'exists:services,id'],
+            'staff_id' => ['nullable', 'string', 'exists:staff,id'],
         ]);
 
-        $service = Service::query()->findOrFail($validated['service_id']);
-        $duration = (int) $service->duration_minutes;
+        $date = Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay();
 
-        // Clinic hours (adjust later in config)
-        $day = CarbonImmutable::createFromFormat('Y-m-d', $validated['date']);
-        $workStart = $day->setTime(9, 0);
-        $workEnd   = $day->setTime(17, 0);
-
-        // Slot step (15 min is typical)
-        $stepMinutes = 15;
-
-        $slots = [];
-        $lastPossibleStart = $workEnd->subMinutes($duration);
-
-        for ($t = $workStart; $t <= $lastPossibleStart; $t = $t->addMinutes($stepMinutes)) {
-            $start = $t;
-            $end = $t->addMinutes($duration);
-
-            $available = false;
-
-            if (!empty($validated['staff_id'])) {
-                $available = $bookingService->isStaffAvailable($validated['staff_id'], $start, $end);
-            } else {
-                // Any staff: if at least one staff is free, the slot is available
-                $available = $bookingService->pickAvailableStaffId($start, $end) !== null;
-            }
-
-            $slots[] = [
-                'time' => $start->format('H:i'),
-                'available' => $available,
-            ];
-        }
+        $slots = $this->bookingService->getAvailableSlots(
+            date: $date,
+            serviceId: $validated['service_id'],
+            staffId: $validated['staff_id'] ?? null
+        );
 
         return response()->json([
-            'duration_minutes' => $duration,
+            'date' => $validated['date'],
             'slots' => $slots,
         ]);
     }
 
-    public function store(StoreBookingRequest $request, BookingService $bookingService)
+    /**
+     * Create a booking.
+     * Route: POST /booking
+     */
+    public function store(Request $request)
     {
-        try {
-            $appt = $bookingService->book($request->validated());
+        $validated = $request->validate([
+            'service_id' => ['required', 'string', 'exists:services,id'],
+            'staff_id' => ['nullable', 'string', 'exists:staff,id'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'time' => ['required', 'date_format:H:i'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_phone' => ['required', 'string', 'max:50'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
 
-            return back()->with('success', sprintf(
-                'Booking confirmed! Appointment ID: %s',
-                $appt->id
-            ));
-        } catch (ValidationException $e) {
-            return back()
-                ->withErrors($e->errors())
-                ->withInput();
+        $result = $this->bookingService->bookFromPublicForm(
+            serviceId: $validated['service_id'],
+            staffId: $validated['staff_id'] ?? null,
+            date: $validated['date'],
+            time: $validated['time'],
+            customerName: $validated['customer_name'],
+            customerPhone: $validated['customer_phone'],
+            notes: $validated['notes'] ?? null,
+        );
+
+        if (!$result['ok']) {
+            return back()->withErrors(['time' => $result['message']])->withInput();
         }
-    }
 
-    private function firstExistingColumn(string $table, array $candidates): string
-    {
-        foreach ($candidates as $col) {
-            if (Schema::hasColumn($table, $col)) {
-                return $col;
-            }
-        }
-
-        abort(500, "No suitable label column found for table '{$table}'. Add one of: " . implode(', ', $candidates));
+        return redirect()->to('/booking')->with('success', 'Booking created.');
     }
 }
