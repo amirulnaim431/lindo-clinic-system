@@ -12,12 +12,21 @@ use App\Http\Controllers\App\StaffController;
 |--------------------------------------------------------------------------
 | Landing (dev phase)
 |--------------------------------------------------------------------------
-| Make staging land on login (internal demo).
-| Public booking remains /booking.
 */
 Route::get('/', function () {
     return redirect('/login');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Default dashboard route name (required by auth redirect)
+|--------------------------------------------------------------------------
+| Laravel auth (AuthenticatedSessionController) redirects to route('dashboard').
+| We keep this name and forward it to /app/dashboard.
+*/
+Route::get('/dashboard', function () {
+    return redirect('/app/dashboard');
+})->middleware(['auth'])->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------
