@@ -1,121 +1,146 @@
-<x-internal-layout :title="'Dashboard'" :subtitle="'Clinic Overview'">
-    <div class="flex flex-col gap-6">
+<x-app-layout>
+    <div class="py-6">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-        {{-- Date filter --}}
-        <form method="GET" class="flex flex-wrap items-end gap-3">
-            <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
-                <input
-                    type="date"
-                    name="date"
-                    value="{{ $date ?? now()->toDateString() }}"
-                    class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
-                >
-            </div>
+            @if (session('success'))
+                <div class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 text-sm">
+                    {{ session('success') }}
+                </div>
+            @endif
 
-            <button class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:opacity-90">
-                Apply
-            </button>
-
-            <a
-                href="{{ url()->current() }}"
-                class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50"
-            >
-                Reset
-            </a>
-        </form>
-
-        {{-- KPI cards --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div class="text-xs text-slate-500">Appointments Today</div>
-                <div class="text-3xl font-semibold mt-2">{{ $kpi['today_total'] ?? 0 }}</div>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div class="text-xs text-slate-500">Completed</div>
-                <div class="text-3xl font-semibold mt-2">{{ $kpi['today_completed'] ?? 0 }}</div>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div class="text-xs text-slate-500">Cancelled</div>
-                <div class="text-3xl font-semibold mt-2">{{ $kpi['today_cancelled'] ?? 0 }}</div>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div class="text-xs text-slate-500">Active Staff</div>
-                <div class="text-3xl font-semibold mt-2">{{ $kpi['active_staff'] ?? 0 }}</div>
-            </div>
-        </div>
-
-        {{-- Today Preview --}}
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <div class="text-sm font-semibold">Today Preview</div>
-                    <div class="text-xs text-slate-500">
-                        @php $role = auth()->user()->role ?? null; @endphp
-
-                        @if($role === 'staff')
-                            Your upcoming appointments
-                        @else
-                            All upcoming appointments
-                        @endif
-                    </div>
+                    <h1 class="text-2xl font-semibold text-slate-900">Dashboard</h1>
+                    <p class="text-sm text-slate-600">Operations overview for {{ $date }}</p>
                 </div>
 
-                {{-- IMPORTANT:
-                     Do NOT call route('app.appointments.index') because your routes are not defined on staging yet.
-                     Use a plain link for demo; you can wire it later once routes are stable.
-                --}}
-                <a
-                    href="/app/appointments?date={{ $date ?? now()->toDateString() }}"
-                    class="text-sm font-medium text-slate-900 hover:underline"
-                >
-                    View all →
-                </a>
+                <div class="flex items-center gap-2">
+                    <a href="/app/appointments?date={{ $date }}"
+                       class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                        Manage appointments
+                    </a>
+                    <a href="/app/calendar"
+                       class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                        Calendar
+                    </a>
+                </div>
             </div>
 
-            <div class="divide-y divide-slate-100">
-                @forelse(($myNext ?? []) as $a)
-                    <div class="px-5 py-4 flex items-center justify-between gap-4">
-                        <div class="min-w-0">
-                            <div class="text-sm font-medium truncate">
-                                {{ optional($a->start_at)->format('H:i') ?? '—' }}
-                                —
-                                {{ $a->customer?->name ?? '—' }}
-                            </div>
-                            <div class="text-xs text-slate-500 truncate">
-                                {{ $a->service?->name ?? '—' }}
-                            </div>
-                        </div>
-
-                        @php
-                            $statusVal = $a->status?->value ?? (is_string($a->status ?? null) ? $a->status : '');
-                            $statusText = $statusVal ? ucwords(str_replace('_',' ', $statusVal)) : '—';
-                        @endphp
-
-                        <div class="text-xs px-3 py-1 rounded-full border border-slate-200 text-slate-700">
-                            {{ $statusText }}
-                        </div>
+            {{-- Filters --}}
+            <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <form method="GET" action="/app/dashboard" class="flex flex-col gap-3 md:flex-row md:items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                        <input type="date" name="date" value="{{ $date }}"
+                               class="w-full rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400" />
                     </div>
-                @empty
-                    <div class="px-5 py-10 text-sm text-slate-500 text-center">
-                        No appointments found for this date.
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Staff</label>
+                        <select name="staff_id" class="w-full rounded-xl border-slate-300 text-sm">
+                            <option value="">All staff</option>
+                            @foreach($staffList as $s)
+                                <option value="{{ $s->id }}" @selected((string)$staffId === (string)$s->id)>
+                                    {{ $s->full_name }} ({{ $s->role }})
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
-                @endforelse
+
+                    <div class="flex items-center gap-2">
+                        <button type="submit"
+                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                            Apply
+                        </button>
+                        <a href="/app/dashboard"
+                           class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                            Reset
+                        </a>
+                    </div>
+                </form>
             </div>
-        </div>
 
-        {{-- Quick links (safe URLs, no named routes) --}}
-        <div class="flex flex-wrap gap-2">
-            <a href="/app/dashboard" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50">
-                Refresh dashboard
-            </a>
-            <a href="/app/appointments" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50">
-                Appointments
-            </a>
-        </div>
+            {{-- KPI --}}
+            <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500">Total</div>
+                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['total'] ?? 0 }}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500">Booked</div>
+                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['booked'] ?? 0 }}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500">Checked-in</div>
+                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['checked_in'] ?? 0 }}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500">Completed</div>
+                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['completed'] ?? 0 }}</div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500">Cancelled</div>
+                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['cancelled'] ?? 0 }}</div>
+                </div>
+            </div>
 
+            {{-- Upcoming list --}}
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="font-semibold text-slate-900">Schedule</div>
+                        <div class="text-sm text-slate-600">Appointments on {{ $date }}</div>
+                    </div>
+                    <a href="/app/appointments?date={{ $date }}"
+                       class="text-sm font-semibold text-slate-800 hover:text-slate-900">
+                        View all →
+                    </a>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-slate-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold">Time</th>
+                                <th class="px-4 py-3 text-left font-semibold">Customer</th>
+                                <th class="px-4 py-3 text-left font-semibold">Services</th>
+                                <th class="px-4 py-3 text-left font-semibold">Staff</th>
+                                <th class="px-4 py-3 text-left font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            @forelse($appointments as $g)
+                                @php
+                                    $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
+                                    $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
+                                    $currentStatus = is_object($g->status) ? $g->status->value : (string)$g->status;
+                                @endphp
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 text-slate-900">{{ optional($g->starts_at)->format('H:i') }}</td>
+                                    <td class="px-4 py-3 text-slate-900">
+                                        {{ $g->customer?->full_name ?? '-' }}
+                                        <div class="text-xs text-slate-500">{{ $g->customer?->phone ?? '' }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $servicesSummary }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $staffSummary }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                            {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_',' ', $currentStatus)) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-4 py-10 text-center text-slate-600">
+                                        No appointments for this date.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
     </div>
-</x-internal-layout>
+</x-app-layout>

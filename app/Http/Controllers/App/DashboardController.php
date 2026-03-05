@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
-use App\Models\Appointment;
-use App\Models\User;
+use App\Models\AppointmentGroup;
+use App\Models\Staff;
+use App\Enums\AppointmentStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -12,32 +13,43 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $date = Carbon::parse($request->get('date', now()->toDateString()))->startOfDay();
+        $date = $request->input('date') ?: now()->format('Y-m-d');
 
-        $todayAppointments = Appointment::query()
-            ->whereDate('start_at', $date->toDateString());
+        $staffId = $request->input('staff_id');
 
+        $staffList = Staff::query()
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'role']);
+
+        $query = AppointmentGroup::query()
+            ->with(['customer', 'items.staff', 'items.service'])
+            ->whereDate('starts_at', $date)
+            ->orderBy('starts_at');
+
+        if (!empty($staffId)) {
+            $query->whereHas('items', function ($q) use ($staffId) {
+                $q->where('staff_id', $staffId);
+            });
+        }
+
+        $appointments = $query->limit(50)->get();
+
+        // Simple KPI counts for the selected date
         $kpi = [
-            'today_total' => (clone $todayAppointments)->count(),
-            'today_completed' => (clone $todayAppointments)->where('status', 'completed')->count(),
-            'today_cancelled' => (clone $todayAppointments)->where('status', 'cancelled')->count(),
-            'active_staff' => User::query()->whereIn('role', ['staff', 'admin'])->count(),
+            'total' => (clone $query)->count(),
+            'booked' => (clone $query)->where('status', AppointmentStatus::Booked)->count(),
+            'checked_in' => (clone $query)->where('status', AppointmentStatus::CheckedIn)->count(),
+            'completed' => (clone $query)->where('status', AppointmentStatus::Completed)->count(),
+            'cancelled' => (clone $query)->where('status', AppointmentStatus::Cancelled)->count(),
         ];
 
-        // Staff view: show only their appointments list preview
-        $user = $request->user();
-        $myNext = Appointment::query()
-            ->with(['customer:id,name', 'service:id,name'])
-            ->when($user->role === 'staff', fn($q) => $q->where('staff_id', $user->id))
-            ->whereDate('start_at', $date->toDateString())
-            ->orderBy('start_at')
-            ->limit(6)
-            ->get();
-
         return view('app.dashboard', [
-            'date' => $date->toDateString(),
+            'date' => $date,
+            'staffId' => $staffId,
+            'staffList' => $staffList,
+            'appointments' => $appointments,
             'kpi' => $kpi,
-            'myNext' => $myNext,
         ]);
     }
 }
