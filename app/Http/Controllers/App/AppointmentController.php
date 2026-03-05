@@ -4,36 +4,43 @@ namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
+use App\Models\AppointmentItem;
+use App\Models\Customer;
 use App\Models\Service;
 use App\Models\Staff;
+use App\Enums\AppointmentStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AppointmentController extends Controller
 {
     public function index(Request $request)
     {
-        // 1) Filters used by your Blade
         $filters = [
             'date' => $request->input('date') ?: now()->format('Y-m-d'),
             'service_ids' => $request->input('service_ids', []),
             'staff_id' => $request->input('staff_id'),
+            'status' => $request->input('status'),
         ];
 
-        // Ensure service_ids is always array
         if (!is_array($filters['service_ids'])) {
             $filters['service_ids'] = [$filters['service_ids']];
         }
 
-        // 2) Services dropdown (you already seeded)
         $services = Service::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        // 3) Appointment list (bottom table)
+        $staffList = Staff::query()
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'role']);
+
         $appointmentGroupsQuery = AppointmentGroup::query()
-            ->with(['customer', 'items.staff'])
+            ->with(['customer', 'items.staff', 'items.service'])
             ->whereDate('starts_at', $filters['date'])
             ->orderBy('starts_at');
 
@@ -43,41 +50,27 @@ class AppointmentController extends Controller
             });
         }
 
-        $appointmentGroups = $appointmentGroupsQuery->paginate(20)->withQueryString();
+        if (!empty($filters['status'])) {
+            $appointmentGroupsQuery->where('status', $filters['status']);
+        }
 
-        // 4) Status options (your Blade calls label())
-        // If you already have an enum, keep it. If not, this still works.
-        $statusOptions = collect([
-            (object)['value' => 'booked', 'label' => fn() => 'Booked'],
-            (object)['value' => 'checked_in', 'label' => fn() => 'Checked In'],
-            (object)['value' => 'completed', 'label' => fn() => 'Completed'],
-            (object)['value' => 'cancelled', 'label' => fn() => 'Cancelled'],
-        ])->map(function ($o) {
-            return new class($o) {
-                public string $value;
-                private $lab;
-                public function __construct($o) { $this->value = $o->value; $this->lab = $o->label; }
-                public function label() { $fn = $this->lab; return $fn(); }
-            };
-        });
+        $appointmentGroups = $appointmentGroupsQuery
+            ->paginate(20)
+            ->withQueryString();
 
-        // 5) Availability engine (this is the missing piece)
+        // Availability (for the create form)
         $availability = null;
-
         if (!empty($filters['service_ids'])) {
             $selected = $services->whereIn('id', $filters['service_ids'])->values();
 
-            // Group by required role: doctor/nurse/beautician
+            // Group services by required role (DEV mapping for now)
             $requiredRoles = [];
             foreach ($selected as $svc) {
                 $role = $this->resolveRoleFromServiceName($svc->name);
-                if (!isset($requiredRoles[$role])) {
-                    $requiredRoles[$role] = ['services' => collect()];
-                }
+                $requiredRoles[$role] ??= ['services' => collect()];
                 $requiredRoles[$role]['services']->push($svc);
             }
 
-            // Build viable 1-hour slots 09:00–16:00 (end at 17:00)
             $date = Carbon::parse($filters['date']);
             $slotStart = $date->copy()->setTime(9, 0, 0);
             $slotEndLimit = $date->copy()->setTime(17, 0, 0);
@@ -93,15 +86,12 @@ class AppointmentController extends Controller
                 $slotOk = true;
 
                 foreach ($requiredRoles as $role => $info) {
-                    // DEV PHASE: "for first test should be all"
-                    // so we treat ALL active staff of that role as qualified.
                     $staff = Staff::query()
                         ->where('is_active', true)
                         ->where('role', $role)
-                        // availability check: overlap condition (correct)
                         ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
                             $q->where('starts_at', '<', $end)
-                              ->where('ends_at', '>', $start);
+                                ->where('ends_at', '>', $start);
                         })
                         ->orderBy('full_name')
                         ->get(['id', 'full_name']);
@@ -111,10 +101,10 @@ class AppointmentController extends Controller
                         break;
                     }
 
-                    $staffOptionsByRoleAndSlot[$role][$timeKey] = $staff->map(fn($s) => [
-                        'id' => (string)$s->id,
-                        'full_name' => $s->full_name,
-                    ])->values()->all();
+                    $staffOptionsByRoleAndSlot[$role][$timeKey] = $staff
+                        ->map(fn ($s) => ['id' => (string) $s->id, 'full_name' => $s->full_name])
+                        ->values()
+                        ->all();
                 }
 
                 if ($slotOk) {
@@ -125,19 +115,136 @@ class AppointmentController extends Controller
             }
 
             $availability = [
-                'requiredRoles' => $requiredRoles, // Blade expects: $availability['requiredRoles'] as $role => $info
-                'viableSlots' => $viableSlots,     // Blade expects: $availability['viableSlots']
-                'staffOptionsByRoleAndSlot' => $staffOptionsByRoleAndSlot, // JS uses this
+                'requiredRoles' => $requiredRoles,
+                'viableSlots' => $viableSlots,
+                'staffOptionsByRoleAndSlot' => $staffOptionsByRoleAndSlot,
             ];
         }
+
+        $statusOptions = AppointmentStatus::cases();
 
         return view('app.appointments.index', compact(
             'filters',
             'services',
+            'staffList',
             'availability',
             'appointmentGroups',
             'statusOptions'
         ));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'slot' => ['required', 'date_format:H:i'],
+            'service_ids' => ['required', 'array', 'min:1'],
+            'service_ids.*' => ['required', 'string', Rule::exists('services', 'id')],
+            'customer_full_name' => ['required', 'string', 'max:255'],
+            'customer_phone' => ['required', 'string', 'max:50'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $date = Carbon::parse($validated['date']);
+        $start = $date->copy()->setTimeFromTimeString($validated['slot'] . ':00');
+        $end = $start->copy()->addHour();
+
+        $selectedServices = Service::query()
+            ->whereIn('id', $validated['service_ids'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        if ($selectedServices->isEmpty()) {
+            return back()->withErrors(['service_ids' => 'Selected services are invalid or inactive.'])->withInput();
+        }
+
+        // Group by required role (same logic as availability)
+        $requiredRoles = [];
+        foreach ($selectedServices as $svc) {
+            $role = $this->resolveRoleFromServiceName($svc->name);
+            $requiredRoles[$role] ??= collect();
+            $requiredRoles[$role]->push($svc);
+        }
+
+        try {
+            DB::transaction(function () use ($validated, $start, $end, $requiredRoles, $selectedServices) {
+                $phone = trim($validated['customer_phone']);
+
+                $customer = Customer::query()->firstOrCreate(
+                    ['phone' => $phone],
+                    ['full_name' => $validated['customer_full_name']]
+                );
+
+                // If existing customer but name changed, keep latest (dev-friendly)
+                if ($customer->full_name !== $validated['customer_full_name']) {
+                    $customer->full_name = $validated['customer_full_name'];
+                    $customer->save();
+                }
+
+                // Re-check staff availability per required role (race-safe)
+                $pickedStaffByRole = [];
+
+                foreach ($requiredRoles as $role => $svcList) {
+                    $staff = Staff::query()
+                        ->where('is_active', true)
+                        ->where('role', $role)
+                        ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
+                            $q->where('starts_at', '<', $end)
+                                ->where('ends_at', '>', $start);
+                        })
+                        ->orderBy('full_name')
+                        ->first();
+
+                    if (!$staff) {
+                        throw new \RuntimeException("No available staff for role: {$role}");
+                    }
+
+                    $pickedStaffByRole[$role] = $staff;
+                }
+
+                $group = AppointmentGroup::query()->create([
+                    'customer_id' => $customer->id,
+                    'starts_at' => $start,
+                    'ends_at' => $end,
+                    'status' => AppointmentStatus::Booked,
+                    'source' => 'admin',
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+
+                foreach ($selectedServices as $svc) {
+                    $role = $this->resolveRoleFromServiceName($svc->name);
+                    $staff = $pickedStaffByRole[$role] ?? null;
+
+                    AppointmentItem::query()->create([
+                        'appointment_group_id' => $group->id,
+                        'service_id' => $svc->id,
+                        'staff_id' => $staff?->id,
+                        'required_role' => $role,
+                        'starts_at' => $start,
+                        'ends_at' => $end,
+                    ]);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['slot' => $e->getMessage()])->withInput();
+        }
+
+        return redirect()
+            ->to('/app/appointments?date=' . $validated['date'])
+            ->with('success', 'Appointment created.');
+    }
+
+    public function updateStatus(Request $request, AppointmentGroup $appointmentGroup)
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(AppointmentStatus::values())],
+        ]);
+
+        $appointmentGroup->status = $validated['status'];
+        $appointmentGroup->save();
+
+        return back()->with('success', 'Status updated.');
     }
 
     /**
@@ -150,7 +257,7 @@ class AppointmentController extends Controller
         if (str_contains($n, 'nail')) return 'beautician';
         if (str_contains($n, 'inject')) return 'nurse';
 
-        // liver detox / facial / consultation / weight loss -> doctor (dev phase)
+        // detox / facial / consultation / weight loss -> doctor (dev phase)
         return 'doctor';
     }
 }
