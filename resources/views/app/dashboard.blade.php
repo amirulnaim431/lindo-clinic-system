@@ -41,7 +41,7 @@
                             <option value="">All staff</option>
                             @foreach($staffList as $s)
                                 <option value="{{ $s->id }}" @selected((string)$staffId === (string)$s->id)>
-                                    {{ $s->full_name }} ({{ $s->role }})
+                                    {{ $s->full_name }} ({{ $s->role_key }})
                                 </option>
                             @endforeach
                         </select>
@@ -61,30 +61,25 @@
             </div>
 
             {{-- KPI --}}
-            <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
                 <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div class="text-xs font-semibold text-slate-500">Total</div>
                     <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['total'] ?? 0 }}</div>
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-xs font-semibold text-slate-500">Booked</div>
-                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['booked'] ?? 0 }}</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-xs font-semibold text-slate-500">Checked-in</div>
-                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['checked_in'] ?? 0 }}</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-xs font-semibold text-slate-500">Completed</div>
-                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['completed'] ?? 0 }}</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-xs font-semibold text-slate-500">Cancelled</div>
-                    <div class="mt-1 text-2xl font-semibold text-slate-900">{{ $kpi['cancelled'] ?? 0 }}</div>
-                </div>
+
+                @foreach($statusCases as $st)
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="text-xs font-semibold text-slate-500">
+                            {{ method_exists($st, 'label') ? $st->label() : ucfirst(str_replace('_',' ', $st->value)) }}
+                        </div>
+                        <div class="mt-1 text-2xl font-semibold text-slate-900">
+                            {{ $kpi['by_status'][$st->value] ?? 0 }}
+                        </div>
+                    </div>
+                @endforeach
             </div>
 
-            {{-- Upcoming list --}}
+            {{-- Schedule --}}
             <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div class="p-5 border-b border-slate-200 flex items-center justify-between">
                     <div>
@@ -125,7 +120,7 @@
                                     <td class="px-4 py-3 text-slate-700">{{ $staffSummary }}</td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                            {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_',' ', $currentStatus)) }}
+                                            {{ ucfirst(str_replace('_',' ', $currentStatus)) }}
                                         </span>
                                     </td>
                                 </tr>

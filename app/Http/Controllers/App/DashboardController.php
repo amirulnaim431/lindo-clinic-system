@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\Staff;
 use App\Enums\AppointmentStatus;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -14,34 +13,40 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $date = $request->input('date') ?: now()->format('Y-m-d');
-
         $staffId = $request->input('staff_id');
 
+        // staff table uses role_key in your project
         $staffList = Staff::query()
             ->where('is_active', true)
             ->orderBy('full_name')
-            ->get(['id', 'full_name', 'role']);
+            ->get(['id', 'full_name', 'role_key']);
 
-        $query = AppointmentGroup::query()
+        $baseQuery = AppointmentGroup::query()
             ->with(['customer', 'items.staff', 'items.service'])
-            ->whereDate('starts_at', $date)
-            ->orderBy('starts_at');
+            ->whereDate('starts_at', $date);
 
         if (!empty($staffId)) {
-            $query->whereHas('items', function ($q) use ($staffId) {
+            $baseQuery->whereHas('items', function ($q) use ($staffId) {
                 $q->where('staff_id', $staffId);
             });
         }
 
-        $appointments = $query->limit(50)->get();
+        $appointments = (clone $baseQuery)
+            ->orderBy('starts_at')
+            ->limit(50)
+            ->get();
 
-        // Simple KPI counts for the selected date
+        // Build KPI dynamically from enum cases (no hardcoded CheckedIn etc.)
+        $statusCases = AppointmentStatus::cases(); // works even if cases differ
+        $kpiByStatus = [];
+
+        foreach ($statusCases as $case) {
+            $kpiByStatus[$case->value] = (clone $baseQuery)->where('status', $case->value)->count();
+        }
+
         $kpi = [
-            'total' => (clone $query)->count(),
-            'booked' => (clone $query)->where('status', AppointmentStatus::Booked)->count(),
-            'checked_in' => (clone $query)->where('status', AppointmentStatus::CheckedIn)->count(),
-            'completed' => (clone $query)->where('status', AppointmentStatus::Completed)->count(),
-            'cancelled' => (clone $query)->where('status', AppointmentStatus::Cancelled)->count(),
+            'total' => (clone $baseQuery)->count(),
+            'by_status' => $kpiByStatus,
         ];
 
         return view('app.dashboard', [
@@ -50,6 +55,7 @@ class DashboardController extends Controller
             'staffList' => $staffList,
             'appointments' => $appointments,
             'kpi' => $kpi,
+            'statusCases' => $statusCases,
         ]);
     }
 }
