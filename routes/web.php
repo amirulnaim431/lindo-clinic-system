@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\BookingController;
@@ -30,30 +29,7 @@ Route::get('/dashboard', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Profile (Breeze-compatible placeholders)
-|--------------------------------------------------------------------------
-| You previously used lightweight routes to avoid missing views.
-*/
-Route::middleware(['auth'])
-    ->prefix('profile')
-    ->name('profile.')
-    ->group(function () {
-        Route::get('/', function () {
-            return response()->view('profile.edit', [], 200);
-        })->name('edit');
-
-        Route::patch('/', function (Request $request) {
-            return redirect()->route('profile.edit')->with('status', 'profile-updated');
-        })->name('update');
-
-        Route::delete('/', function () {
-            return redirect('/login');
-        })->name('destroy');
-    });
-
-/*
-|--------------------------------------------------------------------------
-| App area (Staff/Admin)
+| Internal app area (Staff/Admin)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'staff_or_admin'])
@@ -63,14 +39,16 @@ Route::middleware(['auth', 'staff_or_admin'])
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+        // Appointments
         Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
-        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store');
+        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store'); // ✅ this fixes your error
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
             ->name('appointments.status');
 
+        // Calendar
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 
-        // Staff CRUD
+        // Staff
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
