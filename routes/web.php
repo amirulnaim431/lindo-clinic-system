@@ -10,22 +10,23 @@ use App\Http\Controllers\App\StaffController;
 
 /*
 |--------------------------------------------------------------------------
-| Public booking
+| Landing (dev phase)
 |--------------------------------------------------------------------------
+| Make staging land on login (internal demo).
+| Public booking remains /booking.
 */
-Route::get('/', [BookingController::class, 'index'])->name('booking.index');
-Route::get('/booking', [BookingController::class, 'index'])->name('booking.create');
-Route::get('/booking/slots', [BookingController::class, 'slots'])->name('booking.slots');
-Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
+Route::get('/', function () {
+    return redirect('/login');
+});
 
 /*
 |--------------------------------------------------------------------------
-| Auth landing
+| Public booking
 |--------------------------------------------------------------------------
 */
-Route::get('/dashboard', function () {
-    return redirect('/app/dashboard');
-})->middleware(['auth'])->name('dashboard');
+Route::get('/booking', [BookingController::class, 'index'])->name('booking.index');
+Route::get('/booking/slots', [BookingController::class, 'slots'])->name('booking.slots');
+Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
 
 /*
 |--------------------------------------------------------------------------
@@ -39,16 +40,13 @@ Route::middleware(['auth', 'staff_or_admin'])
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Appointments
         Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
-        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store'); // ✅ this fixes your error
+        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store');
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
             ->name('appointments.status');
 
-        // Calendar
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 
-        // Staff
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
