@@ -34,10 +34,11 @@ class AppointmentController extends Controller
             ->orderBy('name')
             ->get();
 
+        // IMPORTANT: staff table column is role_key (not role)
         $staffList = Staff::query()
             ->where('is_active', true)
             ->orderBy('full_name')
-            ->get(['id', 'full_name', 'role']);
+            ->get(['id', 'full_name', 'role_key']);
 
         $appointmentGroupsQuery = AppointmentGroup::query()
             ->with(['customer', 'items.staff', 'items.service'])
@@ -58,6 +59,7 @@ class AppointmentController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        // Availability for create form
         $availability = null;
 
         if (!empty($filters['service_ids'])) {
@@ -65,9 +67,9 @@ class AppointmentController extends Controller
 
             $requiredRoles = [];
             foreach ($selected as $svc) {
-                $role = $this->resolveRoleFromServiceName($svc->name);
-                $requiredRoles[$role] ??= ['services' => collect()];
-                $requiredRoles[$role]['services']->push($svc);
+                $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
+                $requiredRoles[$roleKey] ??= ['services' => collect()];
+                $requiredRoles[$roleKey]['services']->push($svc);
             }
 
             $date = Carbon::parse($filters['date']);
@@ -84,10 +86,10 @@ class AppointmentController extends Controller
 
                 $slotOk = true;
 
-                foreach ($requiredRoles as $role => $info) {
+                foreach ($requiredRoles as $roleKey => $info) {
                     $staff = Staff::query()
                         ->where('is_active', true)
-                        ->where('role', $role)
+                        ->where('role_key', $roleKey)
                         ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
                             $q->where('starts_at', '<', $end)
                               ->where('ends_at', '>', $start);
@@ -100,7 +102,7 @@ class AppointmentController extends Controller
                         break;
                     }
 
-                    $staffOptionsByRoleAndSlot[$role][$timeKey] = $staff
+                    $staffOptionsByRoleAndSlot[$roleKey][$timeKey] = $staff
                         ->map(fn ($s) => ['id' => (string) $s->id, 'full_name' => $s->full_name])
                         ->values()
                         ->all();
@@ -158,15 +160,15 @@ class AppointmentController extends Controller
             return back()->withErrors(['service_ids' => 'Selected services are invalid or inactive.'])->withInput();
         }
 
-        $requiredRoles = [];
+        $requiredRoleKeys = [];
         foreach ($selectedServices as $svc) {
-            $role = $this->resolveRoleFromServiceName($svc->name);
-            $requiredRoles[$role] ??= collect();
-            $requiredRoles[$role]->push($svc);
+            $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
+            $requiredRoleKeys[$roleKey] ??= collect();
+            $requiredRoleKeys[$roleKey]->push($svc);
         }
 
         try {
-            DB::transaction(function () use ($validated, $start, $end, $selectedServices, $requiredRoles) {
+            DB::transaction(function () use ($validated, $start, $end, $selectedServices, $requiredRoleKeys) {
                 $phone = trim($validated['customer_phone']);
 
                 $customer = Customer::query()->firstOrCreate(
@@ -179,12 +181,13 @@ class AppointmentController extends Controller
                     $customer->save();
                 }
 
-                $pickedStaffByRole = [];
+                // Race-safe staff selection per role_key
+                $pickedStaffByRoleKey = [];
 
-                foreach ($requiredRoles as $role => $svcList) {
+                foreach ($requiredRoleKeys as $roleKey => $svcList) {
                     $staff = Staff::query()
                         ->where('is_active', true)
-                        ->where('role', $role)
+                        ->where('role_key', $roleKey)
                         ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
                             $q->where('starts_at', '<', $end)
                               ->where('ends_at', '>', $start);
@@ -193,10 +196,10 @@ class AppointmentController extends Controller
                         ->first();
 
                     if (!$staff) {
-                        throw new \RuntimeException("No available staff for role: {$role}");
+                        throw new \RuntimeException("No available staff for role: {$roleKey}");
                     }
 
-                    $pickedStaffByRole[$role] = $staff;
+                    $pickedStaffByRoleKey[$roleKey] = $staff;
                 }
 
                 $group = AppointmentGroup::query()->create([
@@ -209,14 +212,14 @@ class AppointmentController extends Controller
                 ]);
 
                 foreach ($selectedServices as $svc) {
-                    $role = $this->resolveRoleFromServiceName($svc->name);
-                    $staff = $pickedStaffByRole[$role] ?? null;
+                    $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
+                    $staff = $pickedStaffByRoleKey[$roleKey] ?? null;
 
                     AppointmentItem::query()->create([
                         'appointment_group_id' => $group->id,
                         'service_id' => $svc->id,
                         'staff_id' => $staff?->id,
-                        'required_role' => $role,
+                        'required_role' => $roleKey,
                         'starts_at' => $start,
                         'ends_at' => $end,
                     ]);
@@ -244,15 +247,18 @@ class AppointmentController extends Controller
     }
 
     /**
-     * DEV placeholder mapping (replace later with real service requirements table)
+     * Use the staff.role_key values that actually exist in your DB.
+     * (You previously added role_key with default 'therapist'.)
      */
-    private function resolveRoleFromServiceName(string $serviceName): string
+    private function resolveRoleKeyFromServiceName(string $serviceName): string
     {
         $n = strtolower($serviceName);
 
+        // If you use these role_keys in your staff table, keep them.
         if (str_contains($n, 'nail')) return 'beautician';
         if (str_contains($n, 'inject')) return 'nurse';
 
-        return 'doctor';
+        // Safe default that matches your migration default
+        return 'therapist';
     }
 }

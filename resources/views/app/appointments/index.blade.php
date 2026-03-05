@@ -139,7 +139,7 @@
                             <option value="">All staff</option>
                             @foreach($staffList as $s)
                                 <option value="{{ $s->id }}" @selected((string)$filters['staff_id'] === (string)$s->id)>
-                                    {{ $s->full_name }} ({{ $s->role }})
+                                    {{ $s->full_name }} ({{ $s->role_key }})
                                 </option>
                             @endforeach
                         </select>
