@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\ProfileController;
+
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\AppointmentController;
 use App\Http\Controllers\App\CalendarController;
@@ -21,12 +23,22 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 | Default dashboard route name (required by auth redirect)
 |--------------------------------------------------------------------------
-| Laravel auth (AuthenticatedSessionController) redirects to route('dashboard').
-| We keep this name and forward it to /app/dashboard.
+| Breeze login redirects to route('dashboard'), so we keep it.
 */
 Route::get('/dashboard', function () {
     return redirect('/app/dashboard');
 })->middleware(['auth'])->name('dashboard');
+
+/*
+|--------------------------------------------------------------------------
+| Breeze Profile routes (required by layouts/navigation.blade.php)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
 
 /*
 |--------------------------------------------------------------------------
