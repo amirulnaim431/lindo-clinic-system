@@ -58,12 +58,11 @@ class AppointmentController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // Availability (for the create form)
         $availability = null;
+
         if (!empty($filters['service_ids'])) {
             $selected = $services->whereIn('id', $filters['service_ids'])->values();
 
-            // Group services by required role (DEV mapping for now)
             $requiredRoles = [];
             foreach ($selected as $svc) {
                 $role = $this->resolveRoleFromServiceName($svc->name);
@@ -91,7 +90,7 @@ class AppointmentController extends Controller
                         ->where('role', $role)
                         ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
                             $q->where('starts_at', '<', $end)
-                                ->where('ends_at', '>', $start);
+                              ->where('ends_at', '>', $start);
                         })
                         ->orderBy('full_name')
                         ->get(['id', 'full_name']);
@@ -159,7 +158,6 @@ class AppointmentController extends Controller
             return back()->withErrors(['service_ids' => 'Selected services are invalid or inactive.'])->withInput();
         }
 
-        // Group by required role (same logic as availability)
         $requiredRoles = [];
         foreach ($selectedServices as $svc) {
             $role = $this->resolveRoleFromServiceName($svc->name);
@@ -168,7 +166,7 @@ class AppointmentController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($validated, $start, $end, $requiredRoles, $selectedServices) {
+            DB::transaction(function () use ($validated, $start, $end, $selectedServices, $requiredRoles) {
                 $phone = trim($validated['customer_phone']);
 
                 $customer = Customer::query()->firstOrCreate(
@@ -176,13 +174,11 @@ class AppointmentController extends Controller
                     ['full_name' => $validated['customer_full_name']]
                 );
 
-                // If existing customer but name changed, keep latest (dev-friendly)
                 if ($customer->full_name !== $validated['customer_full_name']) {
                     $customer->full_name = $validated['customer_full_name'];
                     $customer->save();
                 }
 
-                // Re-check staff availability per required role (race-safe)
                 $pickedStaffByRole = [];
 
                 foreach ($requiredRoles as $role => $svcList) {
@@ -191,7 +187,7 @@ class AppointmentController extends Controller
                         ->where('role', $role)
                         ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
                             $q->where('starts_at', '<', $end)
-                                ->where('ends_at', '>', $start);
+                              ->where('ends_at', '>', $start);
                         })
                         ->orderBy('full_name')
                         ->first();
@@ -257,7 +253,6 @@ class AppointmentController extends Controller
         if (str_contains($n, 'nail')) return 'beautician';
         if (str_contains($n, 'inject')) return 'nurse';
 
-        // detox / facial / consultation / weight loss -> doctor (dev phase)
         return 'doctor';
     }
 }

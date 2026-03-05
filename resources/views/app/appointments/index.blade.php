@@ -112,7 +112,7 @@
                                     </div>
 
                                     <div class="md:col-span-4 text-xs text-slate-600">
-                                        Clicking a slot will book a 1-hour appointment and auto-assign the first available staff per required role (dev behavior).
+                                        Clicking a slot books a 1-hour appointment and auto-assigns the first available staff per required role (dev behavior).
                                     </div>
                                 </form>
                             @endif
@@ -148,7 +148,7 @@
                             <option value="">All statuses</option>
                             @foreach($statusOptions as $st)
                                 <option value="{{ $st->value }}" @selected((string)$filters['status'] === (string)$st->value)>
-                                    {{ $st->label() }}
+                                    {{ method_exists($st, 'label') ? $st->label() : $st->value }}
                                 </option>
                             @endforeach
                         </select>
@@ -177,6 +177,7 @@
                                 @php
                                     $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
                                     $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
+                                    $currentStatus = is_object($g->status) ? $g->status->value : (string)$g->status;
                                 @endphp
                                 <tr class="hover:bg-slate-50">
                                     <td class="px-4 py-3 text-slate-900">
@@ -186,28 +187,26 @@
                                         {{ $g->customer?->full_name ?? '-' }}
                                         <div class="text-xs text-slate-500">{{ $g->customer?->phone ?? '' }}</div>
                                     </td>
-                                    <td class="px-4 py-3 text-slate-700">
-                                        {{ $servicesSummary }}
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-700">
-                                        {{ $staffSummary }}
-                                    </td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $servicesSummary }}</td>
+                                    <td class="px-4 py-3 text-slate-700">{{ $staffSummary }}</td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                            {{ $g->status?->label() ?? (is_string($g->status) ? ucfirst($g->status) : '-') }}
+                                            {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_',' ', $currentStatus)) }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-3">
                                         <form method="POST" action="{{ route('app.appointments.status', $g->id) }}" class="flex items-center gap-2">
                                             @csrf
                                             @method('PATCH')
+
                                             <select name="status" class="rounded-xl border-slate-300 text-sm">
                                                 @foreach($statusOptions as $st)
-                                                    <option value="{{ $st->value }}" @selected((string)($g->status?->value ?? $g->status) === (string)$st->value)>
-                                                        {{ $st->label() }}
+                                                    <option value="{{ $st->value }}" @selected($currentStatus === $st->value)>
+                                                        {{ method_exists($st, 'label') ? $st->label() : $st->value }}
                                                     </option>
                                                 @endforeach
                                             </select>
+
                                             <button type="submit"
                                                 class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
                                                 Update
