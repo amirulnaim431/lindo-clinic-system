@@ -7,74 +7,55 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
-    <div class="min-h-screen md:flex">
-        {{-- Desktop Sidebar --}}
-        <aside class="hidden md:flex md:w-72 md:flex-col md:border-r md:border-slate-200 md:bg-white md:fixed md:inset-y-0 md:left-0">
-            <div class="flex h-16 items-center gap-3 border-b border-slate-200 px-6">
-                <a href="{{ route('app.dashboard') }}" class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+<body class="app-shell">
+    <div class="app-frame">
+        <aside class="app-sidebar">
+            <div class="app-sidebar__brand">
+                <a href="{{ route('app.dashboard') }}" class="app-brand">
+                    <div class="app-brand__logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L12 3l9 4.5M4.5 8.25V16.5L12 21l7.5-4.5V8.25M12 21V12M3 7.5l9 4.5 9-4.5" />
                         </svg>
                     </div>
-
                     <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Lindo Clinic</div>
-                        <div class="text-base font-bold text-slate-900">Internal System</div>
+                        <div class="app-brand__eyebrow">Lindo Clinic</div>
+                        <div class="app-brand__title">Staff Operations</div>
                     </div>
                 </a>
             </div>
 
-            <div class="px-4 py-5">
-                <div class="space-y-1">
-                    <a href="{{ route('app.dashboard') }}"
-                       class="@if(request()->routeIs('app.dashboard')) bg-slate-900 text-white shadow-sm @else text-slate-700 hover:bg-slate-100 @endif flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition">
-                        Dashboard
-                    </a>
+            <nav class="app-sidebar__nav">
+                <a href="{{ route('app.dashboard') }}" class="app-nav-link {{ request()->routeIs('app.dashboard') ? 'is-active' : '' }}">
+                    Dashboard
+                </a>
 
-                    <a href="{{ route('app.appointments.index') }}"
-                       class="@if(request()->routeIs('app.appointments.*')) bg-slate-900 text-white shadow-sm @else text-slate-700 hover:bg-slate-100 @endif flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition">
-                        Appointments
-                    </a>
+                <a href="{{ route('app.appointments.index') }}" class="app-nav-link {{ request()->routeIs('app.appointments.*') ? 'is-active' : '' }}">
+                    Appointments
+                </a>
 
-                    <a href="{{ route('app.staff.index') }}"
-                       class="@if(request()->routeIs('app.staff.*')) bg-slate-900 text-white shadow-sm @else text-slate-700 hover:bg-slate-100 @endif flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition">
-                        Staff
-                    </a>
+                <a href="{{ route('app.staff.index') }}" class="app-nav-link {{ request()->routeIs('app.staff.*') ? 'is-active' : '' }}">
+                    Staff
+                </a>
 
-                    <a href="{{ route('app.calendar') }}"
-                       class="@if(request()->routeIs('app.calendar')) bg-slate-900 text-white shadow-sm @else text-slate-700 hover:bg-slate-100 @endif flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition">
-                        Calendar
-                    </a>
-                </div>
+                <a href="{{ route('app.calendar') }}" class="app-nav-link {{ request()->routeIs('app.calendar') ? 'is-active' : '' }}">
+                    Calendar
+                </a>
+            </nav>
 
-                <div class="mt-8">
-                    <div class="mb-3 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Coming next
-                    </div>
-                    <div class="px-3 text-sm text-slate-600">
-                        Customers · Reports · Settings
-                    </div>
-                </div>
-            </div>
+            <div class="app-sidebar__footer">
+                <div class="app-user-card">
+                    <div class="app-user-card__label">Signed in as</div>
+                    <div class="app-user-card__name">{{ Auth::user()->name }}</div>
+                    <div class="app-user-card__email">{{ Auth::user()->email }}</div>
 
-            <div class="mt-auto border-t border-slate-200 p-4">
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Signed in as</div>
-                    <div class="mt-2 text-sm font-semibold text-slate-900">{{ Auth::user()->name }}</div>
-                    <div class="mt-1 text-sm text-slate-600 break-all">{{ Auth::user()->email }}</div>
-
-                    <div class="mt-4 flex flex-col gap-2">
-                        <a href="{{ route('profile.edit') }}"
-                           class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition">
+                    <div class="app-user-card__actions">
+                        <a href="{{ route('profile.edit') }}" class="btn btn-secondary w-full">
                             Profile
                         </a>
 
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit"
-                                    class="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition">
+                            <button type="submit" class="btn btn-primary w-full">
                                 Log Out
                             </button>
                         </form>
@@ -83,44 +64,25 @@
             </div>
         </aside>
 
-        {{-- Main Content --}}
-        <div class="flex min-h-screen flex-1 flex-col md:ml-72">
-            <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-                <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <div class="flex items-center gap-3">
-                        <a href="{{ route('app.dashboard') }}" class="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L12 3l9 4.5M4.5 8.25V16.5L12 21l7.5-4.5V8.25M12 21V12M3 7.5l9 4.5 9-4.5" />
-                            </svg>
-                        </a>
-
-                        <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Lindo Clinic</div>
-                            <div class="text-sm font-semibold text-slate-900">Staff Operations</div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <div class="hidden sm:block text-right">
-                            <div class="text-sm font-semibold text-slate-900">{{ Auth::user()->name }}</div>
-                            <div class="text-xs text-slate-500">{{ Auth::user()->email }}</div>
-                        </div>
-
-                        <a href="{{ route('profile.edit') }}"
-                           class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition">
-                            Profile
-                        </a>
-                    </div>
+        <div class="app-main">
+            <header class="app-topbar">
+                <div>
+                    <div class="app-topbar__eyebrow">Lindo Clinic</div>
+                    <div class="app-topbar__title">Internal System</div>
                 </div>
+
+                <a href="{{ route('profile.edit') }}" class="btn btn-secondary">
+                    Profile
+                </a>
             </header>
 
             @isset($header)
-                <div class="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
+                <div class="app-header-slot">
                     {{ $header }}
                 </div>
             @endisset
 
-            <main class="flex-1">
+            <main class="app-content">
                 {{ $slot }}
             </main>
         </div>
