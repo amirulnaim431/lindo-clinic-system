@@ -22,10 +22,10 @@
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900">Appointments</h1>
                     <p class="mt-1 text-sm text-slate-600">
-                        Phase 1 scheduling uses fixed 1-hour slots from 09:00 to 17:00.
+                        Phase 1 uses 1-hour concurrent booking windows from 09:00 to 17:00.
                     </p>
                     <p class="mt-1 text-sm text-slate-500">
-                        Slot availability is based on available staff for the selected service role.
+                        Select one or more services. Only slots with valid staff combinations will be shown.
                     </p>
                 </div>
 
@@ -43,7 +43,7 @@
                         <div class="border-b border-slate-200 px-6 py-5">
                             <h2 class="text-lg font-semibold text-slate-900">Create appointment</h2>
                             <p class="mt-1 text-sm text-slate-600">
-                                Select a date and service, check available slots, then book.
+                                Choose date and services, then pick a valid staff combination.
                             </p>
                         </div>
 
@@ -62,30 +62,26 @@
 
                                 <div>
                                     <div class="mb-2 flex items-center justify-between gap-3">
-                                        <label for="service_ids" class="block text-sm font-medium text-slate-700">Services</label>
-                                        <span class="text-xs text-slate-500">Multi-select allowed</span>
+                                        <label class="block text-sm font-medium text-slate-700">Services</label>
+                                        <span class="text-xs text-slate-500">Select all services needed in the same 1-hour slot</span>
                                     </div>
 
-                                    <select
-                                        id="service_ids"
-                                        name="service_ids[]"
-                                        multiple
-                                        size="6"
-                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
-                                    >
+                                    <div class="grid gap-3 sm:grid-cols-2">
                                         @foreach($services as $svc)
-                                            <option
-                                                value="{{ $svc->id }}"
-                                                @selected(in_array($svc->id, $filters['service_ids'] ?? []))
-                                            >
-                                                {{ $svc->name }}
-                                            </option>
+                                            <label class="cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    name="service_ids[]"
+                                                    value="{{ $svc->id }}"
+                                                    class="peer sr-only"
+                                                    @checked(in_array($svc->id, $filters['service_ids'] ?? []))
+                                                >
+                                                <div class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white hover:border-slate-400">
+                                                    {{ $svc->name }}
+                                                </div>
+                                            </label>
                                         @endforeach
-                                    </select>
-
-                                    <p class="mt-2 text-xs text-slate-500">
-                                        Hold Ctrl / Command to select multiple services.
-                                    </p>
+                                    </div>
                                 </div>
 
                                 <div class="flex flex-wrap gap-3">
@@ -93,7 +89,7 @@
                                         type="submit"
                                         class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
                                     >
-                                        Check slots
+                                        Check availability
                                     </button>
 
                                     <a
@@ -107,18 +103,48 @@
 
                             <div class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-slate-900">Available slots</h3>
+                                    <h3 class="text-sm font-semibold text-slate-900">Eligibility & availability</h3>
                                     <p class="mt-1 text-xs text-slate-500">
-                                        Slots shown here have at least one available staff member for the selected service role.
+                                        Slots only appear when every selected service can be covered by a different available staff member.
                                     </p>
                                 </div>
 
                                 @if(!empty($availability))
-                                    @if(empty($availability['viableSlots']))
-                                        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                                            No slots available for the selected services on this date.
+                                    @if(!empty($availability['services_without_eligible_staff']))
+                                        <div class="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                                            No active eligible staff assigned for:
+                                            <span class="font-semibold">{{ implode(', ', $availability['services_without_eligible_staff']) }}</span>
                                         </div>
-                                    @else
+                                    @endif
+
+                                    <div class="mb-5 space-y-3">
+                                        @foreach($availability['selected_services'] as $serviceSummary)
+                                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                <div class="text-sm font-semibold text-slate-900">{{ $serviceSummary['name'] }}</div>
+                                                <div class="mt-1 text-xs text-slate-500">Eligible staff</div>
+
+                                                @if(empty($serviceSummary['eligible_staff']))
+                                                    <div class="mt-2 text-sm text-rose-600">No active staff assigned.</div>
+                                                @else
+                                                    <div class="mt-2 flex flex-wrap gap-2">
+                                                        @foreach($serviceSummary['eligible_staff'] as $staff)
+                                                            <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                                                                {{ $staff['full_name'] }} ({{ $staff['role_key'] }})
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    @if(!empty($availability['fully_booked_message']))
+                                        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                            {{ $availability['fully_booked_message'] }}
+                                        </div>
+                                    @endif
+
+                                    @if(!empty($availability['viable_slots']))
                                         <form method="POST" action="{{ route('app.appointments.store') }}" class="space-y-5">
                                             @csrf
                                             <input type="hidden" name="date" value="{{ $filters['date'] ?? now()->toDateString() }}">
@@ -127,21 +153,45 @@
                                                 <input type="hidden" name="service_ids[]" value="{{ $sid }}">
                                             @endforeach
 
-                                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                                @foreach($availability['viableSlots'] as $slot)
-                                                    <label class="cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            name="slot"
-                                                            value="{{ $slot }}"
-                                                            class="peer sr-only"
-                                                            @checked(old('slot') === $slot)
-                                                        >
-                                                        <div class="flex h-14 items-center justify-center rounded-2xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white hover:border-slate-400">
-                                                            {{ $slot }}
-                                                        </div>
-                                                    </label>
-                                                @endforeach
+                                            <div>
+                                                <div class="mb-3 flex items-center justify-between gap-3">
+                                                    <h3 class="text-sm font-semibold text-slate-900">Available slots</h3>
+                                                    <span class="text-xs text-slate-500">Choose slot first</span>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                                    @foreach($availability['viable_slots'] as $slot)
+                                                        <label class="cursor-pointer">
+                                                            <input
+                                                                type="radio"
+                                                                name="slot"
+                                                                value="{{ $slot }}"
+                                                                class="peer slot-radio sr-only"
+                                                                @checked(old('slot') === $slot)
+                                                            >
+                                                            <div class="flex h-14 items-center justify-center rounded-2xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white hover:border-slate-400">
+                                                                {{ $slot }}
+                                                            </div>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label for="selected_combination" class="mb-2 block text-sm font-medium text-slate-700">
+                                                    Staff combination
+                                                </label>
+                                                <select
+                                                    id="selected_combination"
+                                                    name="selected_combination"
+                                                    class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                                    required
+                                                >
+                                                    <option value="">Select a slot first</option>
+                                                </select>
+                                                <p id="combination_help" class="mt-2 text-xs text-slate-500">
+                                                    For VIP/VVIP cases, front desk can choose the preferred valid combination.
+                                                </p>
                                             </div>
 
                                             <div class="grid gap-5">
@@ -181,7 +231,7 @@
                                             </div>
 
                                             <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
-                                                Clicking Book Appointment creates a 1-hour appointment and auto-assigns the first available staff based on the selected service role.
+                                                All selected services will be booked in the same 1-hour slot. The selected staff combination must remain valid at booking time.
                                             </div>
 
                                             <div class="flex justify-end">
@@ -196,7 +246,7 @@
                                     @endif
                                 @else
                                     <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-                                        Select a date and at least one service, then click <span class="font-semibold text-slate-700">Check slots</span>.
+                                        Select a date and one or more services, then click <span class="font-semibold text-slate-700">Check availability</span>.
                                     </div>
                                 @endif
                             </div>
@@ -265,10 +315,6 @@
                                 </div>
 
                                 <div class="flex items-end">
-                                    @foreach(($filters['service_ids'] ?? []) as $sid)
-                                        <input type="hidden" name="service_ids[]" value="{{ $sid }}">
-                                    @endforeach
-
                                     <button
                                         type="submit"
                                         class="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition"
@@ -308,12 +354,8 @@
                                                     <div class="font-medium text-slate-900">{{ $g->customer?->full_name ?? '-' }}</div>
                                                     <div class="mt-1 text-xs text-slate-500">{{ $g->customer?->phone ?? '' }}</div>
                                                 </td>
-                                                <td class="px-4 py-4 text-slate-700">
-                                                    {{ $servicesSummary }}
-                                                </td>
-                                                <td class="px-4 py-4 text-slate-700">
-                                                    {{ $staffSummary }}
-                                                </td>
+                                                <td class="px-4 py-4 text-slate-700">{{ $servicesSummary }}</td>
+                                                <td class="px-4 py-4 text-slate-700">{{ $staffSummary }}</td>
                                                 <td class="px-4 py-4">
                                                     <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                                                         {{ $currentStatusLabel }}
@@ -370,4 +412,56 @@
             </div>
         </div>
     </div>
+
+    @if(!empty($availability['slots']))
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const slotDetails = @json($availability['slots']);
+                const combinationSelect = document.getElementById('selected_combination');
+                const helpText = document.getElementById('combination_help');
+                const radios = document.querySelectorAll('.slot-radio');
+
+                function updateCombinationOptions() {
+                    if (!combinationSelect) return;
+
+                    const selectedSlot = document.querySelector('.slot-radio:checked');
+
+                    combinationSelect.innerHTML = '';
+
+                    if (!selectedSlot) {
+                        combinationSelect.innerHTML = '<option value="">Select a slot first</option>';
+                        helpText.textContent = 'For VIP/VVIP cases, front desk can choose the preferred valid combination.';
+                        return;
+                    }
+
+                    const slotKey = selectedSlot.value;
+                    const combinations = (slotDetails[slotKey] && slotDetails[slotKey].combinations) ? slotDetails[slotKey].combinations : [];
+
+                    if (!combinations.length) {
+                        combinationSelect.innerHTML = '<option value="">No valid combinations for this slot</option>';
+                        helpText.textContent = 'Please choose another slot.';
+                        return;
+                    }
+
+                    combinations.forEach(function (combo, index) {
+                        const option = document.createElement('option');
+                        option.value = combo.payload;
+                        option.textContent = combo.label;
+                        if (index === 0) {
+                            option.selected = true;
+                        }
+                        combinationSelect.appendChild(option);
+                    });
+
+                    helpText.textContent = combinations.length + ' valid combination(s) available for ' + slotKey + '.';
+                }
+
+                radios.forEach(function (radio) {
+                    radio.addEventListener('change', updateCombinationOptions);
+                });
+
+                updateCombinationOptions();
+            });
+        </script>
+    @endif
 </x-app-layout>

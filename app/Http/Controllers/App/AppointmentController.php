@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\App;
 
+use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\Staff;
-use App\Enums\AppointmentStatus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -34,7 +35,6 @@ class AppointmentController extends Controller
             ->orderBy('name')
             ->get();
 
-        // IMPORTANT: staff table column is role_key (not role)
         $staffList = Staff::query()
             ->where('is_active', true)
             ->orderBy('full_name')
@@ -59,67 +59,24 @@ class AppointmentController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // Availability for create form
         $availability = null;
 
         if (!empty($filters['service_ids'])) {
-            $selected = $services->whereIn('id', $filters['service_ids'])->values();
+            $selectedServices = Service::query()
+                ->with(['staff' => function ($q) {
+                    $q->where('is_active', true)->orderBy('full_name');
+                }])
+                ->whereIn('id', $filters['service_ids'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
 
-            $requiredRoles = [];
-            foreach ($selected as $svc) {
-                $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
-                $requiredRoles[$roleKey] ??= ['services' => collect()];
-                $requiredRoles[$roleKey]['services']->push($svc);
+            if ($selectedServices->isNotEmpty()) {
+                $availability = $this->buildAvailability(
+                    $selectedServices,
+                    Carbon::parse($filters['date'])
+                );
             }
-
-            $date = Carbon::parse($filters['date']);
-            $slotStart = $date->copy()->setTime(9, 0, 0);
-            $slotEndLimit = $date->copy()->setTime(17, 0, 0);
-
-            $viableSlots = [];
-            $staffOptionsByRoleAndSlot = [];
-
-            while ($slotStart->copy()->addHour()->lte($slotEndLimit)) {
-                $start = $slotStart->copy();
-                $end = $slotStart->copy()->addHour();
-                $timeKey = $start->format('H:i');
-
-                $slotOk = true;
-
-                foreach ($requiredRoles as $roleKey => $info) {
-                    $staff = Staff::query()
-                        ->where('is_active', true)
-                        ->where('role_key', $roleKey)
-                        ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
-                            $q->where('starts_at', '<', $end)
-                              ->where('ends_at', '>', $start);
-                        })
-                        ->orderBy('full_name')
-                        ->get(['id', 'full_name']);
-
-                    if ($staff->isEmpty()) {
-                        $slotOk = false;
-                        break;
-                    }
-
-                    $staffOptionsByRoleAndSlot[$roleKey][$timeKey] = $staff
-                        ->map(fn ($s) => ['id' => (string) $s->id, 'full_name' => $s->full_name])
-                        ->values()
-                        ->all();
-                }
-
-                if ($slotOk) {
-                    $viableSlots[] = $timeKey;
-                }
-
-                $slotStart->addHour();
-            }
-
-            $availability = [
-                'requiredRoles' => $requiredRoles,
-                'viableSlots' => $viableSlots,
-                'staffOptionsByRoleAndSlot' => $staffOptionsByRoleAndSlot,
-            ];
         }
 
         $statusOptions = AppointmentStatus::cases();
@@ -141,6 +98,7 @@ class AppointmentController extends Controller
             'slot' => ['required', 'date_format:H:i'],
             'service_ids' => ['required', 'array', 'min:1'],
             'service_ids.*' => ['required', 'string', Rule::exists('services', 'id')],
+            'selected_combination' => ['required', 'string'],
             'customer_full_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -151,83 +109,122 @@ class AppointmentController extends Controller
         $end = $start->copy()->addHour();
 
         $selectedServices = Service::query()
+            ->with(['staff' => function ($q) {
+                $q->where('is_active', true)->orderBy('full_name');
+            }])
             ->whereIn('id', $validated['service_ids'])
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        if ($selectedServices->isEmpty()) {
-            return back()->withErrors(['service_ids' => 'Selected services are invalid or inactive.'])->withInput();
+        if ($selectedServices->count() !== count($validated['service_ids'])) {
+            return back()
+                ->withErrors(['service_ids' => 'One or more selected services are invalid or inactive.'])
+                ->withInput();
         }
 
-        $requiredRoleKeys = [];
-        foreach ($selectedServices as $svc) {
-            $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
-            $requiredRoleKeys[$roleKey] ??= collect();
-            $requiredRoleKeys[$roleKey]->push($svc);
+        $decodedCombination = json_decode($validated['selected_combination'], true);
+
+        if (!is_array($decodedCombination)) {
+            return back()
+                ->withErrors(['selected_combination' => 'Invalid staff combination selected.'])
+                ->withInput();
         }
 
-        try {
-            DB::transaction(function () use ($validated, $start, $end, $selectedServices, $requiredRoleKeys) {
-                $phone = trim($validated['customer_phone']);
+        $selectedServiceIds = $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
+        $combinationServiceIds = collect(array_keys($decodedCombination))->map(fn ($id) => (string) $id)->values()->all();
 
-                $customer = Customer::query()->firstOrCreate(
-                    ['phone' => $phone],
-                    ['full_name' => $validated['customer_full_name']]
-                );
+        sort($selectedServiceIds);
+        sort($combinationServiceIds);
 
-                if ($customer->full_name !== $validated['customer_full_name']) {
-                    $customer->full_name = $validated['customer_full_name'];
-                    $customer->save();
-                }
+        if ($selectedServiceIds !== $combinationServiceIds) {
+            return back()
+                ->withErrors(['selected_combination' => 'Selected staff combination does not match the chosen services.'])
+                ->withInput();
+        }
 
-                // Race-safe staff selection per role_key
-                $pickedStaffByRoleKey = [];
+        $chosenStaffIds = array_values($decodedCombination);
 
-                foreach ($requiredRoleKeys as $roleKey => $svcList) {
-                    $staff = Staff::query()
-                        ->where('is_active', true)
-                        ->where('role_key', $roleKey)
-                        ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
-                            $q->where('starts_at', '<', $end)
-                              ->where('ends_at', '>', $start);
-                        })
-                        ->orderBy('full_name')
-                        ->first();
+        if (count($chosenStaffIds) !== count(array_unique($chosenStaffIds))) {
+            return back()
+                ->withErrors(['selected_combination' => 'The same staff member cannot be assigned to multiple concurrent services.'])
+                ->withInput();
+        }
 
-                    if (!$staff) {
-                        throw new \RuntimeException("No available staff for role: {$roleKey}");
-                    }
+        $serviceStaffMap = [];
+        foreach ($selectedServices as $service) {
+            $serviceId = (string) $service->id;
+            $staffId = $decodedCombination[$serviceId] ?? null;
 
-                    $pickedStaffByRoleKey[$roleKey] = $staff;
-                }
+            if (!$staffId) {
+                return back()
+                    ->withErrors(['selected_combination' => "Missing staff selection for {$service->name}."])
+                    ->withInput();
+            }
 
-                $group = AppointmentGroup::query()->create([
-                    'customer_id' => $customer->id,
+            $staff = $service->staff()
+                ->where('staff.id', $staffId)
+                ->where('staff.is_active', true)
+                ->first(['staff.id', 'staff.full_name', 'staff.role_key']);
+
+            if (!$staff) {
+                return back()
+                    ->withErrors(['selected_combination' => "Selected staff is not eligible for {$service->name}."])
+                    ->withInput();
+            }
+
+            $hasConflict = Staff::query()
+                ->whereKey($staff->id)
+                ->whereHas('appointmentItems', function ($q) use ($start, $end) {
+                    $q->where('starts_at', '<', $end)
+                        ->where('ends_at', '>', $start);
+                })
+                ->exists();
+
+            if ($hasConflict) {
+                return back()
+                    ->withErrors(['slot' => "{$staff->full_name} is no longer available for {$validated['slot']}. Please choose another slot/combination."])
+                    ->withInput();
+            }
+
+            $serviceStaffMap[$serviceId] = $staff;
+        }
+
+        DB::transaction(function () use ($validated, $start, $end, $selectedServices, $serviceStaffMap) {
+            $phone = trim($validated['customer_phone']);
+
+            $customer = Customer::query()->firstOrCreate(
+                ['phone' => $phone],
+                ['full_name' => $validated['customer_full_name']]
+            );
+
+            if ($customer->full_name !== $validated['customer_full_name']) {
+                $customer->full_name = $validated['customer_full_name'];
+                $customer->save();
+            }
+
+            $group = AppointmentGroup::query()->create([
+                'customer_id' => $customer->id,
+                'starts_at' => $start,
+                'ends_at' => $end,
+                'status' => AppointmentStatus::Booked,
+                'source' => 'admin',
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            foreach ($selectedServices as $service) {
+                $assignedStaff = $serviceStaffMap[(string) $service->id];
+
+                AppointmentItem::query()->create([
+                    'appointment_group_id' => $group->id,
+                    'service_id' => $service->id,
+                    'staff_id' => $assignedStaff->id,
+                    'required_role' => $assignedStaff->role_key,
                     'starts_at' => $start,
                     'ends_at' => $end,
-                    'status' => AppointmentStatus::Booked,
-                    'source' => 'admin',
-                    'notes' => $validated['notes'] ?? null,
                 ]);
-
-                foreach ($selectedServices as $svc) {
-                    $roleKey = $this->resolveRoleKeyFromServiceName($svc->name);
-                    $staff = $pickedStaffByRoleKey[$roleKey] ?? null;
-
-                    AppointmentItem::query()->create([
-                        'appointment_group_id' => $group->id,
-                        'service_id' => $svc->id,
-                        'staff_id' => $staff?->id,
-                        'required_role' => $roleKey,
-                        'starts_at' => $start,
-                        'ends_at' => $end,
-                    ]);
-                }
-            });
-        } catch (\RuntimeException $e) {
-            return back()->withErrors(['slot' => $e->getMessage()])->withInput();
-        }
+            }
+        });
 
         return redirect()
             ->to('/app/appointments?date=' . $validated['date'])
@@ -246,19 +243,148 @@ class AppointmentController extends Controller
         return back()->with('success', 'Status updated.');
     }
 
-    /**
-     * Use the staff.role_key values that actually exist in your DB.
-     * (You previously added role_key with default 'therapist'.)
-     */
-    private function resolveRoleKeyFromServiceName(string $serviceName): string
+    private function buildAvailability(Collection $selectedServices, Carbon $date): array
     {
-        $n = strtolower($serviceName);
+        $servicesSummary = $selectedServices->map(function ($service) {
+            return [
+                'id' => (string) $service->id,
+                'name' => $service->name,
+                'eligible_staff' => $service->staff
+                    ->where('is_active', true)
+                    ->map(fn ($staff) => [
+                        'id' => (string) $staff->id,
+                        'full_name' => $staff->full_name,
+                        'role_key' => $staff->role_key,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        })->values()->all();
 
-        // If you use these role_keys in your staff table, keep them.
-        if (str_contains($n, 'nail')) return 'beautician';
-        if (str_contains($n, 'inject')) return 'nurse';
+        $servicesWithoutEligibleStaff = collect($servicesSummary)
+            ->filter(fn ($service) => empty($service['eligible_staff']))
+            ->map(fn ($service) => $service['name'])
+            ->values()
+            ->all();
 
-        // Safe default that matches your migration default
-        return 'therapist';
+        $slotStart = $date->copy()->setTime(9, 0, 0);
+        $slotEndLimit = $date->copy()->setTime(17, 0, 0);
+
+        $slots = [];
+        $viableSlots = [];
+
+        while ($slotStart->copy()->addHour()->lte($slotEndLimit)) {
+            $start = $slotStart->copy();
+            $end = $slotStart->copy()->addHour();
+            $timeKey = $start->format('H:i');
+
+            $availableStaffByService = [];
+            $serviceDebug = [];
+
+            foreach ($selectedServices as $service) {
+                $availableStaff = $service->staff()
+                    ->where('staff.is_active', true)
+                    ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
+                        $q->where('starts_at', '<', $end)
+                            ->where('ends_at', '>', $start);
+                    })
+                    ->orderBy('staff.full_name')
+                    ->get(['staff.id', 'staff.full_name', 'staff.role_key'])
+                    ->map(fn ($staff) => [
+                        'id' => (string) $staff->id,
+                        'full_name' => $staff->full_name,
+                        'role_key' => $staff->role_key,
+                    ])
+                    ->values()
+                    ->all();
+
+                $availableStaffByService[(string) $service->id] = [
+                    'service_name' => $service->name,
+                    'staff' => $availableStaff,
+                ];
+
+                $serviceDebug[] = [
+                    'service_name' => $service->name,
+                    'available_count' => count($availableStaff),
+                ];
+            }
+
+            $combinations = $this->generateValidCombinations($availableStaffByService);
+
+            $slots[$timeKey] = [
+                'combinations' => $combinations,
+                'service_debug' => $serviceDebug,
+            ];
+
+            if (!empty($combinations)) {
+                $viableSlots[] = $timeKey;
+            }
+
+            $slotStart->addHour();
+        }
+
+        $fullyBookedMessage = null;
+        if (empty($viableSlots) && empty($servicesWithoutEligibleStaff)) {
+            $fullyBookedMessage = 'All eligible staff are fully booked for the selected service combination on this date.';
+        }
+
+        return [
+            'selected_services' => $servicesSummary,
+            'services_without_eligible_staff' => $servicesWithoutEligibleStaff,
+            'viable_slots' => $viableSlots,
+            'slots' => $slots,
+            'fully_booked_message' => $fullyBookedMessage,
+        ];
+    }
+
+    private function generateValidCombinations(array $availableStaffByService, int $limit = 50): array
+    {
+        $serviceIds = array_keys($availableStaffByService);
+        $results = [];
+
+        $walk = function (int $index, array $pickedStaffIds, array $staffMap, array $parts) use (
+            &$walk,
+            &$results,
+            $serviceIds,
+            $availableStaffByService,
+            $limit
+        ) {
+            if (count($results) >= $limit) {
+                return;
+            }
+
+            if ($index >= count($serviceIds)) {
+                $results[] = [
+                    'label' => implode(' · ', $parts),
+                    'payload' => json_encode($staffMap),
+                ];
+                return;
+            }
+
+            $serviceId = $serviceIds[$index];
+            $serviceName = $availableStaffByService[$serviceId]['service_name'];
+            $staffOptions = $availableStaffByService[$serviceId]['staff'];
+
+            foreach ($staffOptions as $staff) {
+                if (in_array($staff['id'], $pickedStaffIds, true)) {
+                    continue;
+                }
+
+                $nextPicked = $pickedStaffIds;
+                $nextPicked[] = $staff['id'];
+
+                $nextStaffMap = $staffMap;
+                $nextStaffMap[$serviceId] = $staff['id'];
+
+                $nextParts = $parts;
+                $nextParts[] = $serviceName . ': ' . $staff['full_name'];
+
+                $walk($index + 1, $nextPicked, $nextStaffMap, $nextParts);
+            }
+        };
+
+        $walk(0, [], [], []);
+
+        return $results;
     }
 }
