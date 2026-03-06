@@ -12,6 +12,7 @@ class AppointmentItem extends Model
     use SoftDeletes, HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -25,21 +26,21 @@ class AppointmentItem extends Model
 
     protected $casts = [
         'starts_at' => 'datetime',
-        'ends_at'   => 'datetime',
+        'ends_at' => 'datetime',
     ];
 
     public function group(): BelongsTo
     {
-        return $this->belongsTo(App\Models\AppointmentGroup::class, 'appointment_group_id');
+        return $this->belongsTo(AppointmentGroup::class, 'appointment_group_id');
     }
 
     public function service(): BelongsTo
     {
-        return $this->belongsTo(App\Models\Service::class, 'service_id');
+        return $this->belongsTo(Service::class, 'service_id');
     }
 
     public function staff(): BelongsTo
     {
-        return $this->belongsTo(App\Models\Staff::class, 'staff_id');
+        return $this->belongsTo(Staff::class, 'staff_id');
     }
 }
