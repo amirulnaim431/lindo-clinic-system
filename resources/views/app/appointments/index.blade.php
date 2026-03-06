@@ -1,17 +1,16 @@
 <x-app-layout>
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-
+    <div class="md:ml-72 min-h-screen bg-slate-50">
+        <div class="px-4 py-6 sm:px-6 lg:px-8">
             @if (session('success'))
-                <div class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 text-sm">
+                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     {{ session('success') }}
                 </div>
             @endif
 
             @if ($errors->any())
-                <div class="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900 text-sm">
-                    <div class="font-semibold mb-1">Fix the following:</div>
-                    <ul class="list-disc ml-5">
+                <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    <div class="mb-2 font-semibold">Fix the following:</div>
+                    <ul class="list-disc pl-5 space-y-1">
                         @foreach ($errors->all() as $e)
                             <li>{{ $e }}</li>
                         @endforeach
@@ -19,217 +18,355 @@
                 </div>
             @endif
 
-            <div class="mb-6 flex items-center justify-between">
+            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <h1 class="text-2xl font-semibold text-slate-900">Appointments</h1>
-                    <p class="text-sm text-slate-600">Dev phase: 1-hour slots (09:00–17:00)</p>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-900">Appointments</h1>
+                    <p class="mt-1 text-sm text-slate-600">
+                        Phase 1 scheduling uses fixed 1-hour slots from 09:00 to 17:00.
+                    </p>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Slot availability is based on available staff for the selected service role.
+                    </p>
                 </div>
-                <a href="/app/dashboard" class="text-sm font-medium text-slate-700 hover:text-slate-900">
-                    ← Back to Dashboard
-                </a>
+
+                <div class="flex items-center gap-3">
+                    <a href="{{ route('app.dashboard') }}"
+                       class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition">
+                        ← Back to Dashboard
+                    </a>
+                </div>
             </div>
 
-            {{-- CREATE APPOINTMENT --}}
-            <div class="mb-6 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div class="p-5 border-b border-slate-200">
-                    <div class="font-semibold text-slate-900">Create appointment</div>
-                    <div class="text-sm text-slate-600">Pick services, check slots, then click a slot to book.</div>
+            <div class="grid gap-6 xl:grid-cols-12">
+                {{-- LEFT: CREATE / BOOK --}}
+                <div class="xl:col-span-5">
+                    <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-200 px-6 py-5">
+                            <h2 class="text-lg font-semibold text-slate-900">Create appointment</h2>
+                            <p class="mt-1 text-sm text-slate-600">
+                                Select a date and service, check available slots, then book.
+                            </p>
+                        </div>
+
+                        <div class="px-6 py-6">
+                            <form method="GET" action="{{ route('app.appointments.index') }}" class="space-y-5">
+                                <div>
+                                    <label for="date" class="mb-2 block text-sm font-medium text-slate-700">Date</label>
+                                    <input
+                                        id="date"
+                                        name="date"
+                                        type="date"
+                                        value="{{ $filters['date'] ?? now()->toDateString() }}"
+                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                    >
+                                </div>
+
+                                <div>
+                                    <div class="mb-2 flex items-center justify-between gap-3">
+                                        <label for="service_ids" class="block text-sm font-medium text-slate-700">Services</label>
+                                        <span class="text-xs text-slate-500">Multi-select allowed</span>
+                                    </div>
+
+                                    <select
+                                        id="service_ids"
+                                        name="service_ids[]"
+                                        multiple
+                                        size="6"
+                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                    >
+                                        @foreach($services as $svc)
+                                            <option
+                                                value="{{ $svc->id }}"
+                                                @selected(in_array($svc->id, $filters['service_ids'] ?? []))
+                                            >
+                                                {{ $svc->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    <p class="mt-2 text-xs text-slate-500">
+                                        Hold Ctrl / Command to select multiple services.
+                                    </p>
+                                </div>
+
+                                <div class="flex flex-wrap gap-3">
+                                    <button
+                                        type="submit"
+                                        class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
+                                    >
+                                        Check slots
+                                    </button>
+
+                                    <a
+                                        href="{{ route('app.appointments.index', ['date' => $filters['date'] ?? now()->toDateString()]) }}"
+                                        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition"
+                                    >
+                                        Clear
+                                    </a>
+                                </div>
+                            </form>
+
+                            <div class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="mb-4 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-slate-900">Available slots</h3>
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            Slots shown here have at least one available staff member for the selected service role.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                @if(!empty($availability))
+                                    @if(empty($availability['viableSlots']))
+                                        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                            No slots available for the selected services on this date.
+                                        </div>
+                                    @else
+                                        <form method="POST" action="{{ route('app.appointments.store') }}" class="space-y-5">
+                                            @csrf
+                                            <input type="hidden" name="date" value="{{ $filters['date'] ?? now()->toDateString() }}">
+
+                                            @foreach(($filters['service_ids'] ?? []) as $sid)
+                                                <input type="hidden" name="service_ids[]" value="{{ $sid }}">
+                                            @endforeach
+
+                                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                                @foreach($availability['viableSlots'] as $slot)
+                                                    <label class="cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="slot"
+                                                            value="{{ $slot }}"
+                                                            class="peer sr-only"
+                                                            @checked(old('slot') === $slot)
+                                                        >
+                                                        <div class="flex h-14 items-center justify-center rounded-2xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white hover:border-slate-400">
+                                                            {{ $slot }}
+                                                        </div>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+
+                                            <div class="grid gap-5">
+                                                <div>
+                                                    <label for="customer_full_name" class="mb-2 block text-sm font-medium text-slate-700">Customer name</label>
+                                                    <input
+                                                        id="customer_full_name"
+                                                        name="customer_full_name"
+                                                        type="text"
+                                                        value="{{ old('customer_full_name') }}"
+                                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                                        required
+                                                    >
+                                                </div>
+
+                                                <div>
+                                                    <label for="customer_phone" class="mb-2 block text-sm font-medium text-slate-700">Customer phone</label>
+                                                    <input
+                                                        id="customer_phone"
+                                                        name="customer_phone"
+                                                        type="text"
+                                                        value="{{ old('customer_phone') }}"
+                                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                                        required
+                                                    >
+                                                </div>
+
+                                                <div>
+                                                    <label for="notes" class="mb-2 block text-sm font-medium text-slate-700">Notes (optional)</label>
+                                                    <textarea
+                                                        id="notes"
+                                                        name="notes"
+                                                        rows="4"
+                                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                                    >{{ old('notes') }}</textarea>
+                                                </div>
+                                            </div>
+
+                                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+                                                Clicking Book Appointment creates a 1-hour appointment and auto-assigns the first available staff based on the selected service role.
+                                            </div>
+
+                                            <div class="flex justify-end">
+                                                <button
+                                                    type="submit"
+                                                    class="inline-flex items-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition"
+                                                >
+                                                    Book Appointment
+                                                </button>
+                                            </div>
+                                        </form>
+                                    @endif
+                                @else
+                                    <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                                        Select a date and at least one service, then click <span class="font-semibold text-slate-700">Check slots</span>.
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="p-5">
-                    <form method="GET" action="/app/appointments" class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                            <input type="date" name="date" value="{{ $filters['date'] ?? now()->format('Y-m-d') }}"
-                                class="w-full rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400" />
+                {{-- RIGHT: APPOINTMENT LIST --}}
+                <div class="xl:col-span-7">
+                    <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-200 px-6 py-5">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h2 class="text-lg font-semibold text-slate-900">Daily schedule</h2>
+                                    <p class="mt-1 text-sm text-slate-600">
+                                        Showing {{ $filters['date'] ?? now()->toDateString() }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Services (multi-select)</label>
-                            <select name="service_ids[]" multiple
-                                class="w-full h-28 rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400">
-                                @foreach($services as $svc)
-                                    <option value="{{ $svc->id }}"
-                                        @selected(in_array((string)$svc->id, $filters['service_ids'] ?? []))>
-                                        {{ $svc->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <div class="mt-1 text-xs text-slate-500">Hold Ctrl / Command to select multiple.</div>
-                        </div>
+                        <div class="px-6 py-6">
+                            <form method="GET" action="{{ route('app.appointments.index') }}" class="mb-6 grid gap-4 lg:grid-cols-4">
+                                <div>
+                                    <label for="filter_date" class="mb-2 block text-sm font-medium text-slate-700">Date</label>
+                                    <input
+                                        id="filter_date"
+                                        name="date"
+                                        type="date"
+                                        value="{{ $filters['date'] ?? now()->toDateString() }}"
+                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                    >
+                                </div>
 
-                        <div class="flex items-end gap-2">
-                            <button type="submit"
-                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                                Check slots
-                            </button>
-                            <a href="/app/appointments?date={{ $filters['date'] ?? now()->format('Y-m-d') }}"
-                                class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
-                                Clear
-                            </a>
-                        </div>
-                    </form>
+                                <div>
+                                    <label for="staff_id" class="mb-2 block text-sm font-medium text-slate-700">Staff</label>
+                                    <select
+                                        id="staff_id"
+                                        name="staff_id"
+                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                    >
+                                        <option value="">All staff</option>
+                                        @foreach($staffList as $s)
+                                            <option value="{{ $s->id }}" @selected(($filters['staff_id'] ?? null) == $s->id)>
+                                                {{ $s->full_name }} ({{ $s->role_key }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
 
-                    @if(!empty($availability))
-                        <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div class="font-semibold text-slate-900 mb-2">Available slots</div>
+                                <div>
+                                    <label for="status" class="mb-2 block text-sm font-medium text-slate-700">Status</label>
+                                    <select
+                                        id="status"
+                                        name="status"
+                                        class="block w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                    >
+                                        <option value="">All statuses</option>
+                                        @foreach($statusOptions as $st)
+                                            <option
+                                                value="{{ is_object($st) ? $st->value : $st }}"
+                                                @selected(($filters['status'] ?? null) == (is_object($st) ? $st->value : $st))
+                                            >
+                                                {{ method_exists($st, 'label') ? $st->label() : $st->value }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
 
-                            @if(empty($availability['viableSlots']))
-                                <div class="text-sm text-slate-700">No slots available for selected services.</div>
-                            @else
-                                <form method="POST" action="{{ route('app.appointments.store') }}" class="grid grid-cols-1 gap-3 md:grid-cols-4">
-                                    @csrf
-                                    <input type="hidden" name="date" value="{{ $filters['date'] }}" />
+                                <div class="flex items-end">
                                     @foreach(($filters['service_ids'] ?? []) as $sid)
-                                        <input type="hidden" name="service_ids[]" value="{{ $sid }}" />
+                                        <input type="hidden" name="service_ids[]" value="{{ $sid }}">
                                     @endforeach
 
-                                    <div class="md:col-span-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                        @foreach($availability['viableSlots'] as $slot)
-                                            <button type="submit" name="slot" value="{{ $slot }}"
-                                                class="rounded-xl bg-white border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-                                                {{ $slot }}
-                                            </button>
-                                        @endforeach
-                                    </div>
+                                    <button
+                                        type="submit"
+                                        class="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition"
+                                    >
+                                        Apply Filters
+                                    </button>
+                                </div>
+                            </form>
 
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Customer name</label>
-                                        <input type="text" name="customer_full_name" value="{{ old('customer_full_name') }}"
-                                            class="w-full rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400" />
-                                    </div>
+                            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Time</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Customer</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Services</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Assigned staff</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200 bg-white">
+                                        @forelse($appointmentGroups as $g)
+                                            @php
+                                                $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
+                                                $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
+                                                $currentStatus = is_object($g->status) ? $g->status->value : (string) $g->status;
+                                            @endphp
+                                            <tr class="align-top">
+                                                <td class="px-4 py-4 font-semibold text-slate-900 whitespace-nowrap">
+                                                    {{ optional($g->starts_at)->format('H:i') }}
+                                                </td>
+                                                <td class="px-4 py-4">
+                                                    <div class="font-medium text-slate-900">{{ $g->customer?->full_name ?? '-' }}</div>
+                                                    <div class="mt-1 text-xs text-slate-500">{{ $g->customer?->phone ?? '' }}</div>
+                                                </td>
+                                                <td class="px-4 py-4 text-slate-700">
+                                                    {{ $servicesSummary }}
+                                                </td>
+                                                <td class="px-4 py-4 text-slate-700">
+                                                    {{ $staffSummary }}
+                                                </td>
+                                                <td class="px-4 py-4">
+                                                    <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                                                        {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_', ' ', $currentStatus)) }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-4">
+                                                    <form method="POST" action="{{ route('app.appointments.status', $g) }}" class="flex flex-col gap-2 sm:flex-row">
+                                                        @csrf
+                                                        @method('PATCH')
 
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Customer phone</label>
-                                        <input type="text" name="customer_phone" value="{{ old('customer_phone') }}"
-                                            class="w-full rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400" />
-                                    </div>
+                                                        <select
+                                                            name="status"
+                                                            class="rounded-xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
+                                                        >
+                                                            @foreach($statusOptions as $st)
+                                                                <option
+                                                                    value="{{ is_object($st) ? $st->value : $st }}"
+                                                                    @selected($currentStatus === (is_object($st) ? $st->value : $st))
+                                                                >
+                                                                    {{ method_exists($st, 'label') ? $st->label() : $st->value }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
 
-                                    <div class="md:col-span-4">
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Notes (optional)</label>
-                                        <textarea name="notes" rows="2"
-                                            class="w-full rounded-xl border-slate-300 focus:border-slate-400 focus:ring-slate-400">{{ old('notes') }}</textarea>
-                                    </div>
+                                                        <button
+                                                            type="submit"
+                                                            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition"
+                                                        >
+                                                            Update
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">
+                                                    No appointments found for this date/filter.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                    <div class="md:col-span-4 text-xs text-slate-600">
-                                        Clicking a slot books a 1-hour appointment and auto-assigns the first available staff per required role (dev behavior).
-                                    </div>
-                                </form>
-                            @endif
+                            <div class="mt-6">
+                                {{ $appointmentGroups->links() }}
+                            </div>
                         </div>
-                    @endif
-                </div>
-            </div>
-
-            {{-- LIST + FILTERS --}}
-            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div class="p-5 border-b border-slate-200 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <div class="font-semibold text-slate-900">Appointments</div>
-                        <div class="text-sm text-slate-600">Showing {{ $filters['date'] ?? now()->toDateString() }}</div>
                     </div>
-
-                    <form method="GET" action="/app/appointments" class="flex flex-col gap-2 md:flex-row md:items-center">
-                        <input type="hidden" name="date" value="{{ $filters['date'] ?? now()->toDateString() }}" />
-                        @foreach(($filters['service_ids'] ?? []) as $sid)
-                            <input type="hidden" name="service_ids[]" value="{{ $sid }}" />
-                        @endforeach
-
-                        <select name="staff_id" class="rounded-xl border-slate-300 text-sm">
-                            <option value="">All staff</option>
-                            @foreach($staffList as $s)
-                                <option value="{{ $s->id }}" @selected((string)$filters['staff_id'] === (string)$s->id)>
-                                    {{ $s->full_name }} ({{ $s->role_key }})
-                                </option>
-                            @endforeach
-                        </select>
-
-                        <select name="status" class="rounded-xl border-slate-300 text-sm">
-                            <option value="">All statuses</option>
-                            @foreach($statusOptions as $st)
-                                <option value="{{ $st->value }}" @selected((string)$filters['status'] === (string)$st->value)>
-                                    {{ method_exists($st, 'label') ? $st->label() : $st->value }}
-                                </option>
-                            @endforeach
-                        </select>
-
-                        <button type="submit"
-                            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                            Filter
-                        </button>
-                    </form>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-slate-50 text-slate-700">
-                            <tr>
-                                <th class="px-4 py-3 text-left font-semibold">Time</th>
-                                <th class="px-4 py-3 text-left font-semibold">Customer</th>
-                                <th class="px-4 py-3 text-left font-semibold">Services</th>
-                                <th class="px-4 py-3 text-left font-semibold">Assigned staff</th>
-                                <th class="px-4 py-3 text-left font-semibold">Status</th>
-                                <th class="px-4 py-3 text-left font-semibold">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200">
-                            @forelse($appointmentGroups as $g)
-                                @php
-                                    $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
-                                    $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
-                                    $currentStatus = is_object($g->status) ? $g->status->value : (string)$g->status;
-                                @endphp
-                                <tr class="hover:bg-slate-50">
-                                    <td class="px-4 py-3 text-slate-900">
-                                        {{ optional($g->starts_at)->format('H:i') }}
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-900">
-                                        {{ $g->customer?->full_name ?? '-' }}
-                                        <div class="text-xs text-slate-500">{{ $g->customer?->phone ?? '' }}</div>
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-700">{{ $servicesSummary }}</td>
-                                    <td class="px-4 py-3 text-slate-700">{{ $staffSummary }}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                            {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_',' ', $currentStatus)) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <form method="POST" action="{{ route('app.appointments.status', $g->id) }}" class="flex items-center gap-2">
-                                            @csrf
-                                            @method('PATCH')
-
-                                            <select name="status" class="rounded-xl border-slate-300 text-sm">
-                                                @foreach($statusOptions as $st)
-                                                    <option value="{{ $st->value }}" @selected($currentStatus === $st->value)>
-                                                        {{ method_exists($st, 'label') ? $st->label() : $st->value }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-
-                                            <button type="submit"
-                                                class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
-                                                Update
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-slate-600">
-                                        No appointments found.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="p-4">
-                    {{ $appointmentGroups->links() }}
                 </div>
             </div>
-
         </div>
     </div>
 </x-app-layout>
