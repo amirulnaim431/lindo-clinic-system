@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="md:ml-72 min-h-screen bg-slate-50">
+    <div class="min-h-screen bg-slate-50">
         <div class="px-4 py-6 sm:px-6 lg:px-8">
             @if (session('success'))
                 <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -38,7 +38,6 @@
             </div>
 
             <div class="grid gap-6 xl:grid-cols-12">
-                {{-- LEFT: CREATE / BOOK --}}
                 <div class="xl:col-span-5">
                     <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-6 py-5">
@@ -107,13 +106,11 @@
                             </form>
 
                             <div class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div class="mb-4 flex items-center justify-between gap-3">
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-slate-900">Available slots</h3>
-                                        <p class="mt-1 text-xs text-slate-500">
-                                            Slots shown here have at least one available staff member for the selected service role.
-                                        </p>
-                                    </div>
+                                <div class="mb-4">
+                                    <h3 class="text-sm font-semibold text-slate-900">Available slots</h3>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Slots shown here have at least one available staff member for the selected service role.
+                                    </p>
                                 </div>
 
                                 @if(!empty($availability))
@@ -207,18 +204,13 @@
                     </div>
                 </div>
 
-                {{-- RIGHT: APPOINTMENT LIST --}}
                 <div class="xl:col-span-7">
                     <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-6 py-5">
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">Daily schedule</h2>
-                                    <p class="mt-1 text-sm text-slate-600">
-                                        Showing {{ $filters['date'] ?? now()->toDateString() }}
-                                    </p>
-                                </div>
-                            </div>
+                            <h2 class="text-lg font-semibold text-slate-900">Daily schedule</h2>
+                            <p class="mt-1 text-sm text-slate-600">
+                                Showing {{ $filters['date'] ?? now()->toDateString() }}
+                            </p>
                         </div>
 
                         <div class="px-6 py-6">
@@ -259,11 +251,14 @@
                                     >
                                         <option value="">All statuses</option>
                                         @foreach($statusOptions as $st)
-                                            <option
-                                                value="{{ is_object($st) ? $st->value : $st }}"
-                                                @selected(($filters['status'] ?? null) == (is_object($st) ? $st->value : $st))
-                                            >
-                                                {{ method_exists($st, 'label') ? $st->label() : $st->value }}
+                                            @php
+                                                $statusValue = is_object($st) ? $st->value : $st;
+                                                $statusLabel = is_object($st) && method_exists($st, 'label')
+                                                    ? $st->label()
+                                                    : ucfirst(str_replace('_', ' ', $statusValue));
+                                            @endphp
+                                            <option value="{{ $statusValue }}" @selected(($filters['status'] ?? null) == $statusValue)>
+                                                {{ $statusLabel }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -301,6 +296,9 @@
                                                 $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
                                                 $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
                                                 $currentStatus = is_object($g->status) ? $g->status->value : (string) $g->status;
+                                                $currentStatusLabel = is_object($g->status) && method_exists($g->status, 'label')
+                                                    ? $g->status->label()
+                                                    : ucfirst(str_replace('_', ' ', $currentStatus));
                                             @endphp
                                             <tr class="align-top">
                                                 <td class="px-4 py-4 font-semibold text-slate-900 whitespace-nowrap">
@@ -318,7 +316,7 @@
                                                 </td>
                                                 <td class="px-4 py-4">
                                                     <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                                                        {{ is_object($g->status) && method_exists($g->status, 'label') ? $g->status->label() : ucfirst(str_replace('_', ' ', $currentStatus)) }}
+                                                        {{ $currentStatusLabel }}
                                                     </span>
                                                 </td>
                                                 <td class="px-4 py-4">
@@ -331,11 +329,14 @@
                                                             class="rounded-xl border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500"
                                                         >
                                                             @foreach($statusOptions as $st)
-                                                                <option
-                                                                    value="{{ is_object($st) ? $st->value : $st }}"
-                                                                    @selected($currentStatus === (is_object($st) ? $st->value : $st))
-                                                                >
-                                                                    {{ method_exists($st, 'label') ? $st->label() : $st->value }}
+                                                                @php
+                                                                    $statusValue = is_object($st) ? $st->value : $st;
+                                                                    $statusLabel = is_object($st) && method_exists($st, 'label')
+                                                                        ? $st->label()
+                                                                        : ucfirst(str_replace('_', ' ', $statusValue));
+                                                                @endphp
+                                                                <option value="{{ $statusValue }}" @selected($currentStatus === $statusValue)>
+                                                                    {{ $statusLabel }}
                                                                 </option>
                                                             @endforeach
                                                         </select>
