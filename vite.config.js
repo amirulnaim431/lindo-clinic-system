@@ -9,7 +9,6 @@ export default defineConfig({
     }),
   ],
 
-  // Important on Windows/IIS/Plesk so Vite doesn't try to crawl outside app root
   server: {
     origin: 'http://localhost',
   },
@@ -18,10 +17,5 @@ export default defineConfig({
     outDir: 'public/build',
     manifest: true,
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        app: 'resources/js/app.js',
-      },
-    },
   },
 });
