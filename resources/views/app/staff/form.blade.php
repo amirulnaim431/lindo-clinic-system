@@ -50,7 +50,7 @@
                             name="full_name"
                             type="text"
                             value="{{ old('full_name', $staff->full_name) }}"
-                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
                             required
                         >
                     </div>
@@ -62,7 +62,7 @@
                         <select
                             id="role"
                             name="role"
-                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
                             required
                         >
                             @foreach($roles as $key => $label)
@@ -80,7 +80,7 @@
                             type="checkbox"
                             name="is_active"
                             value="1"
-                            class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                            class="h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-300"
                             @checked(old('is_active', $staff->is_active) ? true : false)
                         >
                         <span class="text-sm font-medium text-slate-800">Active staff</span>
@@ -105,31 +105,45 @@
                                     $isSelected = in_array((string) $service->id, $selectedServiceIds, true);
                                 @endphp
 
-                                <label class="cursor-pointer rounded-2xl border transition {{ $isSelected ? 'border-slate-900 bg-slate-900 text-white shadow-md' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm' }}">
+                                <label class="block cursor-pointer">
                                     <input
                                         type="checkbox"
                                         name="service_ids[]"
                                         value="{{ $service->id }}"
-                                        class="sr-only"
+                                        class="peer sr-only"
                                         {{ $isSelected ? 'checked' : '' }}
                                     >
 
-                                    <div class="p-4">
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition
+                                                hover:border-rose-300 hover:shadow
+                                                peer-checked:border-rose-300 peer-checked:bg-rose-50 peer-checked:ring-2 peer-checked:ring-rose-200">
                                         <div class="flex items-start justify-between gap-3">
                                             <div>
-                                                <div class="text-sm font-semibold {{ $isSelected ? 'text-white' : 'text-slate-900' }}">
+                                                <div class="text-sm font-semibold text-slate-900 peer-checked:text-rose-900">
                                                     {{ $service->name }}
                                                 </div>
 
                                                 @if(!empty($service->description))
-                                                    <div class="mt-1 text-xs {{ $isSelected ? 'text-slate-200' : 'text-slate-500' }}">
+                                                    <div class="mt-1 text-xs text-slate-500">
                                                         {{ $service->description }}
                                                     </div>
                                                 @endif
                                             </div>
 
-                                            <div class="rounded-xl px-2.5 py-1 text-[11px] font-semibold {{ $isSelected ? 'border border-white/20 bg-white/10 text-white' : 'bg-slate-100 text-slate-600' }}">
+                                            <div class="rounded-xl bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition
+                                                        peer-checked:bg-rose-100 peer-checked:text-rose-800">
                                                 {{ (int) ($service->duration_minutes ?? 60) }} mins
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-3 flex items-center justify-between">
+                                            <div class="text-xs text-slate-500 peer-checked:text-rose-700">
+                                                Click to assign service
+                                            </div>
+
+                                            <div class="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition
+                                                        peer-checked:border-rose-300 peer-checked:bg-white peer-checked:text-rose-700">
+                                                {{ $isSelected ? 'Selected' : 'Available' }}
                                             </div>
                                         </div>
                                     </div>

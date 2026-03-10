@@ -67,7 +67,7 @@ class StaffController extends Controller
             'role' => ['required', 'string', 'max:50'],
             'is_active' => ['nullable'],
             'service_ids' => ['nullable', 'array'],
-            'service_ids.*' => ['integer', 'exists:services,id'],
+            'service_ids.*' => ['string', 'exists:services,id'],
         ]);
 
         $staff = Staff::create([
@@ -112,7 +112,7 @@ class StaffController extends Controller
             'role' => ['required', 'string', 'max:50'],
             'is_active' => ['nullable'],
             'service_ids' => ['nullable', 'array'],
-            'service_ids.*' => ['integer', 'exists:services,id'],
+            'service_ids.*' => ['string', 'exists:services,id'],
         ]);
 
         $staff->update([
