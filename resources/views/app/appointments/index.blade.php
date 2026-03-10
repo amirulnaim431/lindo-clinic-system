@@ -21,6 +21,16 @@
             'cancelled' => 'bg-rose-100 text-rose-800 border-rose-200',
             'no_show' => 'bg-slate-200 text-slate-700 border-slate-300',
         ];
+
+        $availabilityAction = \Illuminate\Support\Facades\Route::has('app.appointments.availability')
+            ? route('app.appointments.availability')
+            : url('/app/appointments/availability');
+
+        $storeAction = \Illuminate\Support\Facades\Route::has('app.appointments.store')
+            ? route('app.appointments.store')
+            : url('/app/appointments');
+
+        $statusRouteNameExists = \Illuminate\Support\Facades\Route::has('app.appointments.status');
     @endphp
 
     @if (session('success'))
@@ -41,7 +51,6 @@
     @endif
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {{-- LEFT: BOOKING FLOW --}}
         <div class="xl:col-span-7 space-y-6">
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-6 py-5">
@@ -59,7 +68,7 @@
                 </div>
 
                 <div class="px-6 py-6">
-                    <form method="POST" action="{{ route('app.appointments.availability') }}" class="space-y-6">
+                    <form method="POST" action="{{ $availabilityAction }}" class="space-y-6">
                         @csrf
 
                         <div>
@@ -163,7 +172,6 @@
                 </div>
             </div>
 
-            {{-- AVAILABILITY RESULTS --}}
             @if ($availabilityData)
                 <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div class="border-b border-slate-200 px-6 py-5">
@@ -185,7 +193,6 @@
                     </div>
 
                     <div class="px-6 py-6 space-y-6">
-                        {{-- SELECTED SERVICES SUMMARY --}}
                         <div>
                             <div class="mb-3 text-sm font-semibold text-slate-800">Selected Services</div>
 
@@ -232,12 +239,11 @@
                             @endif
                         </div>
 
-                        {{-- SLOT BUTTONS --}}
                         <div>
                             <div class="mb-3 text-sm font-semibold text-slate-800">Choose Time Slot</div>
 
                             @if (count($availableSlots))
-                                <form method="POST" action="{{ route('app.appointments.store') }}" class="space-y-5">
+                                <form method="POST" action="{{ $storeAction }}" class="space-y-5">
                                     @csrf
 
                                     @foreach ($selectedServiceIds as $serviceId)
@@ -294,9 +300,6 @@
                                                 placeholder="Enter customer name"
                                                 required
                                             >
-                                            @error('customer_name')
-                                                <div class="mt-2 text-sm text-rose-600">{{ $message }}</div>
-                                            @enderror
                                         </div>
 
                                         <div>
@@ -312,9 +315,6 @@
                                                 placeholder="e.g. 60123456789"
                                                 required
                                             >
-                                            @error('customer_phone')
-                                                <div class="mt-2 text-sm text-rose-600">{{ $message }}</div>
-                                            @enderror
                                         </div>
                                     </div>
 
@@ -329,9 +329,6 @@
                                             class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
                                             placeholder="Extra notes, preferences, reminders..."
                                         >{{ old('notes') }}</textarea>
-                                        @error('notes')
-                                            <div class="mt-2 text-sm text-rose-600">{{ $message }}</div>
-                                        @enderror
                                     </div>
 
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -359,7 +356,6 @@
             @endif
         </div>
 
-        {{-- RIGHT: TODAY / RECENT APPOINTMENTS --}}
         <div class="xl:col-span-5 space-y-6">
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-6 py-5">
@@ -382,6 +378,10 @@
                                 ?? '—';
                             $serviceName = $appointment->service?->name ?? 'Service';
                             $staffName = $appointment->staff?->name ?? 'Unassigned';
+
+                            $statusAction = $statusRouteNameExists
+                                ? route('app.appointments.status', $appointment)
+                                : url('/app/appointments/' . $appointment->id . '/status');
                         @endphp
 
                         <div class="px-6 py-5">
@@ -417,7 +417,7 @@
                                 </div>
 
                                 <div class="w-full sm:w-44">
-                                    <form method="POST" action="{{ route('app.appointments.status', $appointment) }}">
+                                    <form method="POST" action="{{ $statusAction }}">
                                         @csrf
                                         @method('PATCH')
 
@@ -448,26 +448,6 @@
                             </div>
                         </div>
                     @endforelse
-                </div>
-            </div>
-
-            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-sm">
-                <div class="px-6 py-6">
-                    <h3 class="text-lg font-semibold">How this flow works</h3>
-                    <div class="mt-4 space-y-3 text-sm text-slate-200">
-                        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            1. Choose one or more services.
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            2. Pick a date and check live availability.
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            3. The system only offers slots where eligible staff are free.
-                        </div>
-                        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            4. Select a slot, fill in customer details, and create the appointment.
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
