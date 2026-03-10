@@ -8,7 +8,12 @@
             'status' => null,
         ];
 
-        $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->all();
+        $selectedServiceIds = collect($filters['service_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
         $selectedDate = $filters['date'] ?? now()->format('Y-m-d');
 
         $appointmentGroups = $appointmentGroups ?? collect();
@@ -25,6 +30,22 @@
             'cancelled' => 'bg-rose-100 text-rose-800 border-rose-200',
             'no_show' => 'bg-slate-200 text-slate-700 border-slate-300',
         ];
+
+        $slotOptions = [];
+        if (!empty($availability['viable_slots'])) {
+            foreach ($availability['viable_slots'] as $slotTime) {
+                $slotData = $availability['slots'][$slotTime] ?? [];
+                $combinations = $slotData['combinations'] ?? [];
+
+                $slotOptions[] = [
+                    'time' => $slotTime,
+                    'combinations' => $combinations,
+                    'first_payload' => $combinations[0]['payload'] ?? '',
+                    'first_label' => $combinations[0]['label'] ?? '',
+                    'count' => count($combinations),
+                ];
+            }
+        }
     @endphp
 
     <style>
@@ -75,6 +96,46 @@
         .appointment-service-card.is-selected .appointment-service-muted {
             color: #9a5c52;
         }
+
+        .slot-pill {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border-radius: 9999px;
+            min-height: 52px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 600;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            transition: all 0.18s ease;
+        }
+
+        .slot-pill:hover {
+            border-color: #e7b7b0;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .slot-pill.is-selected {
+            border-color: #d6a39a;
+            background: linear-gradient(180deg, #fff8f6 0%, #fff1ee 100%);
+            box-shadow: 0 0 0 3px rgba(214, 163, 154, 0.20);
+            color: #7c3f35;
+        }
+
+        .slot-pill-sub {
+            display: block;
+            margin-top: 0.2rem;
+            font-size: 11px;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        .slot-pill.is-selected .slot-pill-sub {
+            color: #9a5c52;
+        }
     </style>
 
     @if (session('success'))
@@ -96,17 +157,18 @@
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div class="xl:col-span-7 space-y-6">
+
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-6 py-5">
                     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Check Availability</h2>
                             <p class="mt-1 text-sm text-slate-500">
-                                Select one or more services and a date. The system will only show slots where every selected service can be covered by a different eligible staff member.
+                                Select one or more services and a date. Then choose a time bubble and complete one booking form below.
                             </p>
                         </div>
                         <div class="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">
-                            1-hour concurrent booking flow
+                            Compact booking flow
                         </div>
                     </div>
                 </div>
@@ -140,16 +202,21 @@
                                                         <div class="appointment-service-title text-sm font-semibold text-slate-900">
                                                             {{ $service->name }}
                                                         </div>
+                                                        @if(!empty($service->description))
+                                                            <div class="mt-1 text-xs text-slate-500">
+                                                                {{ $service->description }}
+                                                            </div>
+                                                        @endif
                                                     </div>
 
                                                     <div class="appointment-service-badge">
-                                                        Service
+                                                        {{ (int) ($service->duration_minutes ?? 60) }} mins
                                                     </div>
                                                 </div>
 
                                                 <div class="mt-3 flex items-center justify-between">
                                                     <div class="appointment-service-muted text-xs text-slate-500">
-                                                        Click to include in availability check
+                                                        Click to include
                                                     </div>
 
                                                     <div class="appointment-service-badge appointment-service-status">
@@ -185,7 +252,7 @@
                             <div class="flex items-end gap-3">
                                 <button
                                     type="submit"
-                                    class="inline-flex w-full items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                    class="inline-flex w-full items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                                     style="background-color:#0f172a;color:#ffffff;border-color:#0f172a;"
                                 >
                                     Check Availability
@@ -208,7 +275,7 @@
                     <div class="border-b border-slate-200 px-6 py-5">
                         <h3 class="text-lg font-semibold text-slate-900">Eligibility & Availability</h3>
                         <p class="mt-1 text-sm text-slate-500">
-                            Slots only appear when every selected service can be covered by a different available staff member.
+                            Choose one time bubble. Then the booking form appears once below.
                         </p>
                     </div>
 
@@ -253,109 +320,137 @@
                             </div>
                         @endif
 
-                        @if(!empty($availability['viable_slots']))
+                        @if(count($slotOptions))
                             <div class="space-y-4">
                                 <div>
-                                    <h4 class="text-sm font-semibold text-slate-800">Available slots</h4>
-                                    <p class="mt-1 text-xs text-slate-500">Choose a slot, then choose one valid staff combination for that slot.</p>
+                                    <h4 class="text-sm font-semibold text-slate-800">Choose Time</h4>
+                                    <p class="mt-1 text-xs text-slate-500">Click a bubble from 9 AM to 5 PM. One booking form appears below.</p>
                                 </div>
 
-                                @foreach($availability['viable_slots'] as $slotTime)
-                                    @php
-                                        $slotData = $availability['slots'][$slotTime] ?? [];
-                                        $combinations = $slotData['combinations'] ?? [];
-                                    @endphp
+                                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                                    @foreach($slotOptions as $slot)
+                                        <button
+                                            type="button"
+                                            class="slot-select-button text-left"
+                                            data-slot-time="{{ $slot['time'] }}"
+                                            data-first-payload="{{ $slot['first_payload'] }}"
+                                            data-combinations='@json($slot['combinations'])'
+                                        >
+                                            <div class="slot-pill">
+                                                <div>
+                                                    <div>{{ $slot['time'] }}</div>
+                                                    <span class="slot-pill-sub">
+                                                        {{ $slot['count'] }} combo{{ $slot['count'] === 1 ? '' : 's' }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    @endforeach
+                                </div>
 
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <div class="mb-4 flex items-center justify-between">
-                                            <div class="text-base font-semibold text-slate-900">{{ $slotTime }}</div>
-                                            <div class="text-xs text-slate-500">
-                                                {{ count($combinations) }} valid combination{{ count($combinations) === 1 ? '' : 's' }}
+                                <div
+                                    id="selected-slot-card"
+                                    class="hidden rounded-3xl border border-slate-200 bg-slate-50 p-5"
+                                >
+                                    <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <h5 class="text-base font-semibold text-slate-900">Create Appointment</h5>
+                                            <p class="mt-1 text-sm text-slate-500">
+                                                Selected time:
+                                                <span id="selected-slot-time-label" class="font-semibold text-slate-800">—</span>
+                                            </p>
+                                        </div>
+
+                                        <div class="rounded-2xl bg-white px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200">
+                                            One form only
+                                        </div>
+                                    </div>
+
+                                    <form method="POST" action="{{ route('app.appointments.store') }}" class="space-y-4">
+                                        @csrf
+
+                                        <input type="hidden" name="date" value="{{ $selectedDate }}">
+                                        <input type="hidden" name="slot" id="selected-slot-input" value="">
+                                        <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
+
+                                        @foreach($selectedServiceIds as $sid)
+                                            <input type="hidden" name="service_ids[]" value="{{ $sid }}">
+                                        @endforeach
+
+                                        <div>
+                                            <label for="selected_combination_select" class="mb-2 block text-sm font-semibold text-slate-800">
+                                                Staff Combination
+                                            </label>
+                                            <select
+                                                id="selected_combination_select"
+                                                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                                required
+                                            >
+                                            </select>
+                                            <p class="mt-2 text-xs text-slate-500">
+                                                If more than one valid combination exists for this slot, choose the one you want to use.
+                                            </p>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div>
+                                                <label for="customer_full_name" class="mb-2 block text-sm font-semibold text-slate-800">
+                                                    Customer Name
+                                                </label>
+                                                <input
+                                                    id="customer_full_name"
+                                                    type="text"
+                                                    name="customer_full_name"
+                                                    value="{{ old('customer_full_name') }}"
+                                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                                    required
+                                                >
+                                            </div>
+
+                                            <div>
+                                                <label for="customer_phone" class="mb-2 block text-sm font-semibold text-slate-800">
+                                                    Customer Phone
+                                                </label>
+                                                <input
+                                                    id="customer_phone"
+                                                    type="text"
+                                                    name="customer_phone"
+                                                    value="{{ old('customer_phone') }}"
+                                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                                    required
+                                                >
                                             </div>
                                         </div>
 
-                                        <form method="POST" action="{{ route('app.appointments.store') }}" class="space-y-4">
-                                            @csrf
+                                        <div>
+                                            <label for="notes" class="mb-2 block text-sm font-semibold text-slate-800">
+                                                Notes
+                                            </label>
+                                            <textarea
+                                                id="notes"
+                                                name="notes"
+                                                rows="3"
+                                                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                            >{{ old('notes') }}</textarea>
+                                        </div>
 
-                                            <input type="hidden" name="date" value="{{ $selectedDate }}">
-                                            <input type="hidden" name="slot" value="{{ $slotTime }}">
+                                        <div class="flex justify-end">
+                                            <button
+                                                type="submit"
+                                                class="inline-flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                                                style="background-color:#0f172a;color:#ffffff;border-color:#0f172a;"
+                                            >
+                                                Create Appointment
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        @endif
 
-                                            @foreach($selectedServiceIds as $sid)
-                                                <input type="hidden" name="service_ids[]" value="{{ $sid }}">
-                                            @endforeach
-
-                                            <div>
-                                                <label class="mb-2 block text-sm font-semibold text-slate-800">
-                                                    Staff combination
-                                                </label>
-                                                <div class="space-y-2">
-                                                    @foreach($combinations as $index => $combo)
-                                                        <label class="block cursor-pointer rounded-2xl border border-slate-200 bg-white p-3 hover:border-rose-300">
-                                                            <input
-                                                                type="radio"
-                                                                name="selected_combination"
-                                                                value="{{ $combo['payload'] }}"
-                                                                class="mr-2"
-                                                                {{ $index === 0 ? 'checked' : '' }}
-                                                                required
-                                                            >
-                                                            <span class="text-sm text-slate-800">{{ $combo['label'] }}</span>
-                                                        </label>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-
-                                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <div>
-                                                    <label class="mb-2 block text-sm font-semibold text-slate-800">
-                                                        Customer Name
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="customer_full_name"
-                                                        value="{{ old('customer_full_name') }}"
-                                                        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                                                        required
-                                                    >
-                                                </div>
-
-                                                <div>
-                                                    <label class="mb-2 block text-sm font-semibold text-slate-800">
-                                                        Customer Phone
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="customer_phone"
-                                                        value="{{ old('customer_phone') }}"
-                                                        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                                                        required
-                                                    >
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label class="mb-2 block text-sm font-semibold text-slate-800">
-                                                    Notes
-                                                </label>
-                                                <textarea
-                                                    name="notes"
-                                                    rows="3"
-                                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                                                >{{ old('notes') }}</textarea>
-                                            </div>
-
-                                            <div class="flex justify-end">
-                                                <button
-                                                    type="submit"
-                                                    class="inline-flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-                                                    style="background-color:#0f172a;color:#ffffff;border-color:#0f172a;"
-                                                >
-                                                    Create Appointment
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                @endforeach
+                        @if(!count($slotOptions) && empty($availability['services_without_eligible_staff']) && empty($availability['fully_booked_message']))
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                                No available slots found for the selected date.
                             </div>
                         @endif
                     </div>
@@ -460,9 +555,9 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const checkboxes = document.querySelectorAll('.appointment-service-checkbox');
+            const serviceCheckboxes = document.querySelectorAll('.appointment-service-checkbox');
 
-            const refreshCardState = (checkbox) => {
+            const refreshServiceCardState = (checkbox) => {
                 const card = checkbox.closest('label')?.querySelector('.appointment-service-card');
                 if (!card) return;
 
@@ -474,12 +569,77 @@
                 }
             };
 
-            checkboxes.forEach((checkbox) => {
-                refreshCardState(checkbox);
+            serviceCheckboxes.forEach((checkbox) => {
+                refreshServiceCardState(checkbox);
+
                 checkbox.addEventListener('change', function () {
-                    refreshCardState(this);
+                    refreshServiceCardState(this);
+                });
+            });
+
+            const slotButtons = document.querySelectorAll('.slot-select-button');
+            const slotCard = document.getElementById('selected-slot-card');
+            const slotTimeLabel = document.getElementById('selected-slot-time-label');
+            const slotInput = document.getElementById('selected-slot-input');
+            const comboInput = document.getElementById('selected-combination-input');
+            const comboSelect = document.getElementById('selected_combination_select');
+
+            const clearSlotSelection = () => {
+                slotButtons.forEach((btn) => {
+                    const pill = btn.querySelector('.slot-pill');
+                    if (pill) pill.classList.remove('is-selected');
+                });
+            };
+
+            const setCombinations = (combinations) => {
+                if (!comboSelect) return;
+
+                comboSelect.innerHTML = '';
+
+                combinations.forEach((combo, index) => {
+                    const option = document.createElement('option');
+                    option.value = combo.payload || '';
+                    option.textContent = combo.label || `Combination ${index + 1}`;
+                    comboSelect.appendChild(option);
+                });
+
+                comboInput.value = comboSelect.value || '';
+            };
+
+            if (comboSelect) {
+                comboSelect.addEventListener('change', function () {
+                    comboInput.value = this.value || '';
+                });
+            }
+
+            slotButtons.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    const time = this.dataset.slotTime || '';
+                    let combinations = [];
+
+                    try {
+                        combinations = JSON.parse(this.dataset.combinations || '[]');
+                    } catch (e) {
+                        combinations = [];
+                    }
+
+                    clearSlotSelection();
+
+                    const pill = this.querySelector('.slot-pill');
+                    if (pill) pill.classList.add('is-selected');
+
+                    if (slotCard) slotCard.classList.remove('hidden');
+                    if (slotTimeLabel) slotTimeLabel.textContent = time || '—';
+                    if (slotInput) slotInput.value = time || '';
+
+                    setCombinations(combinations);
+
+                    if (slotCard) {
+                        slotCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 });
             });
         });
     </script>
+
 </x-internal-layout>
