@@ -210,14 +210,13 @@ class AppointmentController extends Controller
             }
 
             $group = AppointmentGroup::query()->create([
-                'customer_id' => $customer->id,
-                'starts_at' => $start,
-                'ends_at' => $end,
-                'status' => AppointmentStatus::Booked,
-                'source' => 'admin',
-                'notes' => $validated['notes'] ?? null,
-                'services_summary' => $selectedServices->pluck('name')->implode(', '),
-            ]);
+    'customer_id' => $customer->id,
+    'starts_at' => $start,
+    'ends_at' => $end,
+    'status' => AppointmentStatus::Booked,
+    'source' => 'admin',
+    'notes' => $validated['notes'] ?? null,
+]);
 
             foreach ($selectedServices as $service) {
                 $assignedStaff = $resolvedAssignments[(string) $service->id];
