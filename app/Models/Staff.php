@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
 
 class Staff extends Model
 {
-    use SoftDeletes, HasUlids;
+    use HasUlids;
+
+    protected $table = 'staff';
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -25,13 +27,11 @@ class Staff extends Model
 
     public function services()
     {
-        return $this->belongsToMany(Service::class, 'staff_services', 'staff_id', 'service_id');
+        return $this->belongsToMany(Service::class, 'staff_services', 'staff_id', 'service_id')
+            ->using(StaffService::class)
+            ->withTimestamps();
     }
 
-    /**
-     * Appointment items assigned to this staff member.
-     * This must exist because AppointmentController uses whereDoesntHave('appointmentItems').
-     */
     public function appointmentItems()
     {
         return $this->hasMany(AppointmentItem::class, 'staff_id');

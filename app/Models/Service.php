@@ -2,18 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
 
 class Service extends Model
 {
-    use SoftDeletes, HasUlids;
+    use HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
-    protected $fillable = ['name', 'duration_minutes', 'price', 'is_active'];
+    protected $fillable = [
+        'name',
+        'description',
+        'duration_minutes',
+        'price',
+        'is_active',
+    ];
 
     protected $casts = [
         'duration_minutes' => 'integer',
@@ -28,6 +34,8 @@ class Service extends Model
 
     public function staff()
     {
-        return $this->belongsToMany(Staff::class, 'staff_services', 'service_id', 'staff_id');
+        return $this->belongsToMany(Staff::class, 'staff_services', 'service_id', 'staff_id')
+            ->using(StaffService::class)
+            ->withTimestamps();
     }
 }
