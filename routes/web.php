@@ -1,37 +1,25 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\BookingController;
-use App\Http\Controllers\ProfileController;
-
-use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\AppointmentController;
 use App\Http\Controllers\App\CalendarController;
+use App\Http\Controllers\App\CustomerImportController;
+use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\StaffController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Landing (dev phase)
-|--------------------------------------------------------------------------
-*/
 Route::get('/', function () {
-    return redirect('/login');
+    return redirect()->route('booking.index');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Default dashboard route name (required by auth redirect)
-|--------------------------------------------------------------------------
-| Breeze login redirects to route('dashboard'), so we keep it.
-*/
-Route::get('/dashboard', function () {
-    return redirect('/app/dashboard');
-})->middleware(['auth'])->name('dashboard');
+Route::middleware(['auth'])->get('/dashboard', function () {
+    return redirect()->route('app.dashboard');
+})->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------
-| Breeze Profile routes (required by layouts/navigation.blade.php)
+| Breeze Profile routes
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
@@ -58,7 +46,6 @@ Route::middleware(['auth', 'staff_or_admin'])
     ->prefix('app')
     ->name('app.')
     ->group(function () {
-
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
@@ -73,6 +60,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
         Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
         Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+
+        Route::get('/customers/import', [CustomerImportController::class, 'index'])->name('customers.import.index');
+        Route::post('/customers/import', [CustomerImportController::class, 'store'])->name('customers.import.store');
     });
 
 require __DIR__ . '/auth.php';
