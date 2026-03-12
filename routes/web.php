@@ -75,3 +75,5 @@ Route::middleware(['auth', 'staff_or_admin'])
     });
 
 require __DIR__ . '/auth.php';
+
+##DOASOLUTIONS
