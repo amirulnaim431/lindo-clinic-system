@@ -80,6 +80,12 @@ class CustomerImportController extends Controller
 
                 if (! $customer) {
                     $customer = new Customer();
+
+                    // Defensive ULID assignment for staging/runtime consistency.
+                    if (blank($customer->id)) {
+                        $customer->id = (string) Str::ulid();
+                    }
+
                     $summary['created']++;
                 } else {
                     $summary['updated']++;
