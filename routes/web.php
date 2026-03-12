@@ -2,15 +2,21 @@
 
 use App\Http\Controllers\App\AppointmentController;
 use App\Http\Controllers\App\CalendarController;
+use App\Http\Controllers\App\CustomerController;
 use App\Http\Controllers\App\CustomerImportController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\StaffController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route('booking.index');
+    if (Auth::check()) {
+        return redirect()->route('app.dashboard');
+    }
+
+    return redirect()->route('login');
 });
 
 Route::middleware(['auth'])->get('/dashboard', function () {
@@ -63,6 +69,9 @@ Route::middleware(['auth', 'staff_or_admin'])
 
         Route::get('/customers/import', [CustomerImportController::class, 'index'])->name('customers.import.index');
         Route::post('/customers/import', [CustomerImportController::class, 'store'])->name('customers.import.store');
+
+        Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     });
 
 require __DIR__ . '/auth.php';
