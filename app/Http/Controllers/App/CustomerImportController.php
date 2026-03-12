@@ -11,8 +11,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use ZipArchive;
 use SimpleXMLElement;
+use ZipArchive;
 
 class CustomerImportController extends Controller
 {
@@ -81,7 +81,6 @@ class CustomerImportController extends Controller
                 if (! $customer) {
                     $customer = new Customer();
 
-                    // Defensive ULID assignment for staging/runtime consistency.
                     if (blank($customer->id)) {
                         $customer->id = (string) Str::ulid();
                     }
@@ -91,12 +90,16 @@ class CustomerImportController extends Controller
                     $summary['updated']++;
                 }
 
-                $payload = $this->buildPayload($normalized, $customer);
+                [$payload, $payloadIssues] = $this->buildPayload($normalized, $customer, $lineNumber);
 
                 $customer->fill($payload);
                 $customer->save();
 
                 $summary['processed']++;
+
+                foreach ($payloadIssues as $issue) {
+                    $summary['issues'][] = $issue;
+                }
 
                 $rowIssues = $this->detectRowIssues($normalized, $lineNumber);
                 foreach ($rowIssues as $issue) {
@@ -113,7 +116,7 @@ class CustomerImportController extends Controller
             ]);
         }
 
-        $summary['issues'] = array_slice($summary['issues'], 0, 50);
+        $summary['issues'] = array_slice($summary['issues'], 0, 100);
 
         return redirect()
             ->route('app.customers.import.index')
@@ -196,6 +199,7 @@ class CustomerImportController extends Controller
 
         foreach ($sheet->sheetData->row as $rowNode) {
             $cells = [];
+
             foreach ($rowNode->c as $cell) {
                 $ref = (string) $cell['r'];
                 $columnLetters = preg_replace('/\d+/', '', $ref);
@@ -334,7 +338,7 @@ class CustomerImportController extends Controller
         return null;
     }
 
-    private function buildPayload(array $row, Customer $customer): array
+    private function buildPayload(array $row, Customer $customer, int $lineNumber): array
     {
         $fields = [
             'full_name',
@@ -361,10 +365,27 @@ class CustomerImportController extends Controller
         ];
 
         $payload = [];
+        $issues = [];
 
         foreach ($fields as $field) {
             $incoming = $row[$field] ?? null;
             $existing = $customer->{$field} ?? null;
+
+            if ($field === 'phone') {
+                if ($this->isPlaceholderPhone($incoming)) {
+                    $issues[] = "Row {$lineNumber}: phone '{$incoming}' treated as blank because it looks like a placeholder.";
+                    $incoming = null;
+                }
+
+                if (filled($incoming)) {
+                    $phoneOwner = Customer::where('phone', $incoming)->first();
+
+                    if ($phoneOwner && $phoneOwner->id !== $customer->id) {
+                        $issues[] = "Row {$lineNumber}: phone '{$incoming}' already belongs to another customer, so phone was not overwritten.";
+                        $incoming = $existing;
+                    }
+                }
+            }
 
             if ($this->hasMeaningfulValue($incoming)) {
                 $payload[$field] = $incoming;
@@ -379,7 +400,7 @@ class CustomerImportController extends Controller
             $payload[$field] = $existing;
         }
 
-        return $payload;
+        return [$payload, $issues];
     }
 
     private function detectRowIssues(array $row, int $lineNumber): array
@@ -391,11 +412,49 @@ class CustomerImportController extends Controller
             $issues[] = "Row {$lineNumber}: phone looks suspicious ({$phone}).";
         }
 
+        if ($this->isPlaceholderPhone($phone)) {
+            $issues[] = "Row {$lineNumber}: phone '{$phone}' looks like a dummy or placeholder number.";
+        }
+
         if (blank($row['phone'] ?? null) && blank($row['ic_passport'] ?? null)) {
             $issues[] = "Row {$lineNumber}: neither phone nor ic_passport is present.";
         }
 
         return $issues;
+    }
+
+    private function isPlaceholderPhone(?string $phone): bool
+    {
+        if (blank($phone)) {
+            return false;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        if ($digits === '') {
+            return true;
+        }
+
+        $knownBad = [
+            '01',
+            '0123456789',
+            '0111111111',
+            '0100000000',
+            '0000000000',
+            '9999999999',
+            '123456789',
+            '1234567890',
+        ];
+
+        if (in_array($digits, $knownBad, true)) {
+            return true;
+        }
+
+        if (preg_match('/^(\d)\1{7,}$/', $digits)) {
+            return true;
+        }
+
+        return false;
     }
 
     private function isCompletelyEmpty(array $row): bool
