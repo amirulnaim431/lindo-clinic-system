@@ -142,6 +142,87 @@
             flex: 0 0 auto;
         }
 
+        .app-nav__group{
+            display: grid;
+            gap: 6px;
+        }
+
+        .app-nav__group-head{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            transition: .18s ease;
+        }
+
+        .app-nav__group-head.is-active{
+            background: rgba(255,255,255,0.06);
+            color: #ffffff;
+            border-color: rgba(255,255,255,0.06);
+        }
+
+        .app-nav__group-badge{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            background: rgba(255,255,255,0.10);
+            color: inherit;
+        }
+
+        .app-nav__subnav{
+            display: grid;
+            gap: 6px;
+            padding-left: 18px;
+            border-left: 1px solid rgba(255,255,255,0.08);
+            margin-left: 14px;
+        }
+
+        .app-nav__sublink{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid transparent;
+            transition: .18s ease;
+        }
+
+        .app-nav__sublink:hover{
+            background: rgba(255,255,255,0.05);
+            color: #ffffff;
+            border-color: rgba(255,255,255,0.06);
+        }
+
+        .app-nav__sublink.is-active{
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .app-nav__subdot{
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: currentColor;
+            opacity: .7;
+            flex: 0 0 auto;
+        }
+
         .app-sidebar__footer{
             margin-top: auto;
             padding: 18px 16px 22px;
@@ -544,6 +625,8 @@
                 ? route($name, $params)
                 : $fallback;
         };
+
+        $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
     @endphp
 
     <div class="app-shell">
@@ -551,7 +634,7 @@
             <div class="app-brand">
                 <div class="app-brand__eyebrow">Lindo Clinic</div>
                 <div class="app-brand__title">Internal System</div>
-                <div class="app-brand__subtitle">Operations, appointments, staff and clinic workflow</div>
+                <div class="app-brand__subtitle">Operations, customer CRM, staff and clinic workflow</div>
             </div>
 
             <nav class="app-nav">
@@ -574,6 +657,30 @@
                     <span class="app-nav__dot"></span>
                     <span>Calendar</span>
                 </a>
+
+                <div class="app-nav__group">
+                    <div class="app-nav__group-head {{ $customersNavActive ? 'is-active' : '' }}">
+                        <span style="display:flex; align-items:center; gap:12px;">
+                            <span class="app-nav__dot"></span>
+                            <span>Customers</span>
+                        </span>
+                        <span class="app-nav__group-badge">2</span>
+                    </div>
+
+                    <div class="app-nav__subnav">
+                        <a href="{{ $r('app.customers.index') }}"
+                           class="app-nav__sublink {{ $is('app.customers.index') || $is('app.customers.show') ? 'is-active' : '' }}">
+                            <span class="app-nav__subdot"></span>
+                            <span>Customer List</span>
+                        </a>
+
+                        <a href="{{ $r('app.customers.import.index') }}"
+                           class="app-nav__sublink {{ $is('app.customers.import.*') ? 'is-active' : '' }}">
+                            <span class="app-nav__subdot"></span>
+                            <span>Import Customers</span>
+                        </a>
+                    </div>
+                </div>
 
                 <a href="{{ $r('app.staff.index') }}"
                    class="app-nav__link {{ $is('app.staff.*') ? 'is-active' : '' }}">
