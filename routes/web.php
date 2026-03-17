@@ -8,18 +8,17 @@ use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\StaffController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    if (Auth::check()) {
+    if (auth()->check()) {
         return redirect()->route('app.dashboard');
     }
 
     return redirect()->route('login');
 });
 
-Route::middleware(['auth'])->get('/dashboard', function () {
+Route::middleware('auth')->get('/dashboard', function () {
     return redirect()->route('app.dashboard');
 })->name('dashboard');
 
@@ -28,6 +27,7 @@ Route::middleware(['auth'])->get('/dashboard', function () {
 | Breeze Profile routes
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -39,6 +39,7 @@ Route::middleware('auth')->group(function () {
 | Public booking
 |--------------------------------------------------------------------------
 */
+
 Route::get('/booking', [BookingController::class, 'index'])->name('booking.index');
 Route::get('/booking/slots', [BookingController::class, 'slots'])->name('booking.slots');
 Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
@@ -48,6 +49,7 @@ Route::post('/booking', [BookingController::class, 'store'])->name('booking.stor
 | Internal app area (Staff/Admin)
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'staff_or_admin'])
     ->prefix('app')
     ->name('app.')
@@ -72,8 +74,8 @@ Route::middleware(['auth', 'staff_or_admin'])
 
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
+        Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     });
 
-require __DIR__ . '/auth.php';
-
-##DOASOLUTIONS
+require __DIR__.'/auth.php';

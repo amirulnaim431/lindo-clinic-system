@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\App\UpdateCustomerRequest;
 use App\Models\Customer;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -77,6 +79,33 @@ class CustomerController extends Controller
             'upcomingAppointments' => $upcomingAppointments,
             'appointmentHistory' => $appointmentHistory,
         ]);
+    }
+
+    public function edit(Customer $customer): View
+    {
+        $this->ensureAdmin();
+
+        return view('app.customers.edit', [
+            'customer' => $customer,
+        ]);
+    }
+
+    public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $customer->update($request->validated());
+
+        return redirect()
+            ->route('app.customers.show', $customer)
+            ->with('success', 'Customer profile updated successfully.');
+    }
+
+    protected function ensureAdmin(): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user && method_exists($user, 'isAdmin') && $user->isAdmin(), 403, 'Unauthorized.');
     }
 
     /**

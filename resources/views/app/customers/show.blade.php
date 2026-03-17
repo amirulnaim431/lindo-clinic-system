@@ -28,9 +28,17 @@
                 default => 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200',
             };
         };
+
+        $canEditCustomer = auth()->user() && method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin();
     @endphp
 
     <div class="space-y-6">
+        @if (session('success'))
+            <div class="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <p class="text-sm font-semibold text-emerald-800">{{ session('success') }}</p>
+            </div>
+        @endif
+
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <a
@@ -68,15 +76,26 @@
                 </div>
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-2 lg:w-[28rem]">
-                <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming appointments</p>
-                    <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $upcomingAppointments->count() }}</p>
-                </div>
+            <div class="flex flex-col gap-3 lg:items-end">
+                @if($canEditCustomer)
+                    <a
+                        href="{{ route('app.customers.edit', $customer) }}"
+                        class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                    >
+                        Edit Customer
+                    </a>
+                @endif
 
-                <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Appointment history</p>
-                    <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $appointmentHistory->count() }}</p>
+                <div class="grid gap-3 sm:grid-cols-2 lg:w-[28rem]">
+                    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming appointments</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $upcomingAppointments->count() }}</p>
+                    </div>
+
+                    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Appointment history</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $appointmentHistory->count() }}</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,6 +155,11 @@
                             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Occupation</p>
                             <p class="mt-2 text-sm text-slate-900">{{ $customer->occupation ?: '—' }}</p>
                         </div>
+
+                        <div class="md:col-span-2">
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Address</p>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">{{ $customer->address ?: '—' }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -162,7 +186,7 @@
 
                         <div class="md:col-span-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Allergies</p>
-                            <p class="mt-2 text-sm leading-6 text-slate-900">{{ $customer->allergies ?: '—' }}</p>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">{{ $customer->allergies ?: '—' }}</p>
                         </div>
                     </div>
                 </div>
@@ -349,7 +373,7 @@
 
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Notes</p>
-                        <p class="mt-2 text-sm leading-6 text-slate-900">
+                        <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">
                             {{ $customer->notes ?: 'No administrative notes recorded.' }}
                         </p>
                     </div>
