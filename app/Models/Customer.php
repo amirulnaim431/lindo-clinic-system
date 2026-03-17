@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
+    use HasFactory;
     use HasUlids;
     use SoftDeletes;
 
@@ -34,7 +36,6 @@ class Customer extends Model
         'current_package',
         'current_package_since',
         'notes',
-        'legacy_code',
     ];
 
     protected $casts = [
@@ -55,7 +56,8 @@ class Customer extends Model
 
     public function appointmentGroups(): HasMany
     {
-        return $this->hasMany(AppointmentGroup::class)->latest('appointment_date');
+        return $this->hasMany(AppointmentGroup::class, 'customer_id')
+            ->latest('starts_at');
     }
 
     public function appointmentItems(): HasManyThrough
