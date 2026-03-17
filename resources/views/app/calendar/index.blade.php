@@ -1,11 +1,15 @@
-<x-layouts.internal :title="$title" :subtitle="$subtitle">
+<x-layouts.internal
+    :title="$title"
+    :subtitle="$subtitle"
+>
     @php
         $queryBase = request()->except(['week']);
         $statusOptions = [
-            'pending' => 'Pending',
+            'booked' => 'Booked',
             'confirmed' => 'Confirmed',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
+            'checked_in' => 'Checked In',
             'no_show' => 'No Show',
         ];
     @endphp
@@ -197,7 +201,7 @@
                                     ></button>
                                 @endforeach
 
-                                @forelse($dayEvents as $event)
+                                @foreach($dayEvents as $event)
                                     <button
                                         type="button"
                                         class="calendar-event-btn absolute left-2 right-2 z-10 overflow-hidden rounded-2xl border px-3 py-2 text-left shadow-sm transition {{ $event['color_card'] }}"
@@ -232,8 +236,7 @@
                                             <span>{{ $event['status_label'] }}</span>
                                         </div>
                                     </button>
-                                @empty
-                                @endforelse
+                                @endforeach
                             </div>
                         @endforeach
                     </div>
@@ -242,34 +245,19 @@
         </section>
     </div>
 
-    <div
-        id="calendar-detail-modal"
-        class="fixed inset-0 z-50 hidden"
-        aria-hidden="true"
-    >
+    <div id="calendar-detail-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
         <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"></div>
 
         <div class="relative flex min-h-full items-center justify-center p-4">
             <div class="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                     <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Appointment Detail
-                        </div>
-                        <h3 id="modal-customer-name" class="mt-1 text-2xl font-semibold text-slate-900">
-                            —
-                        </h3>
-                        <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">
-                            —
-                        </p>
+                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Appointment Detail</div>
+                        <h3 id="modal-customer-name" class="mt-1 text-2xl font-semibold text-slate-900">—</h3>
+                        <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">—</p>
                     </div>
 
-                    <button
-                        type="button"
-                        id="calendar-detail-close-top"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
-                        aria-label="Close"
-                    >
+                    <button type="button" id="calendar-detail-close-top" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" aria-label="Close">
                         ✕
                     </button>
                 </div>
@@ -315,20 +303,13 @@
                             <form id="modal-status-form" method="POST" action="#" class="mt-3 flex gap-2">
                                 @csrf
                                 @method('PATCH')
-                                <select
-                                    id="modal-status-select"
-                                    name="status"
-                                    class="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                                >
+                                <select id="modal-status-select" name="status" class="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200">
                                     @foreach($statusOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
 
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                                >
+                                <button type="submit" class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
                                     Update
                                 </button>
                             </form>
@@ -343,28 +324,16 @@
 
                 <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex flex-wrap gap-3">
-                        <a
-                            id="modal-manage-link"
-                            href="#"
-                            class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                        >
+                        <a id="modal-manage-link" href="#" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                             Manage Day
                         </a>
 
-                        <a
-                            id="modal-add-link"
-                            href="#"
-                            class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                        >
+                        <a id="modal-add-link" href="#" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                             Add New Appointment
                         </a>
                     </div>
 
-                    <button
-                        type="button"
-                        id="calendar-detail-close-bottom"
-                        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                    >
+                    <button type="button" id="calendar-detail-close-bottom" class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
                         Close
                     </button>
                 </div>
@@ -372,34 +341,21 @@
         </div>
     </div>
 
-    <div
-        id="calendar-slot-modal"
-        class="fixed inset-0 z-50 hidden"
-        aria-hidden="true"
-    >
+    <div id="calendar-slot-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
         <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"></div>
 
         <div class="relative flex min-h-full items-center justify-center p-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                     <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            New Appointment
-                        </div>
-                        <h3 id="slot-modal-title" class="mt-1 text-2xl font-semibold text-slate-900">
-                            Selected Time Slot
-                        </h3>
+                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">New Appointment</div>
+                        <h3 id="slot-modal-title" class="mt-1 text-2xl font-semibold text-slate-900">Selected Time Slot</h3>
                         <p class="mt-2 text-sm text-slate-500">
                             Continue to the appointment desk to create a booking for this selected day and time.
                         </p>
                     </div>
 
-                    <button
-                        type="button"
-                        id="calendar-slot-close-top"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
-                        aria-label="Close"
-                    >
+                    <button type="button" id="calendar-slot-close-top" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" aria-label="Close">
                         ✕
                     </button>
                 </div>
@@ -412,19 +368,11 @@
                 </div>
 
                 <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <a
-                        id="slot-modal-open-link"
-                        href="#"
-                        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                    >
+                    <a id="slot-modal-open-link" href="#" class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
                         Open Appointment Desk
                     </a>
 
-                    <button
-                        type="button"
-                        id="calendar-slot-close-bottom"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
+                    <button type="button" id="calendar-slot-close-bottom" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                         Cancel
                     </button>
                 </div>
@@ -479,7 +427,7 @@
                 const addLink = document.getElementById('modal-add-link');
 
                 if (statusForm) statusForm.action = eventData.status_url || '#';
-                if (statusSelect) statusSelect.value = eventData.status_value || 'pending';
+                if (statusSelect) statusSelect.value = eventData.status_value || 'booked';
                 if (manageLink) manageLink.href = eventData.manage_url || '#';
                 if (addLink) addLink.href = eventData.manage_url || '#';
 
