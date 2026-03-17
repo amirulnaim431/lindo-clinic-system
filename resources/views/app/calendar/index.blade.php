@@ -1,140 +1,412 @@
-<x-internal-layout :title="'Calendar'" :subtitle="'Week View'">
-
+<x-layouts.internal :title="$title" :subtitle="$subtitle">
     @php
-        // Count appointments per day for header
-        $dayCounts = [];
-        for ($i=0; $i<7; $i++) {
-            $k = $start->copy()->addDays($i)->toDateString();
-            $dayCounts[$k] = ($appointmentsByDay[$k] ?? collect())->count();
-        }
+        $queryBase = request()->except(['week']);
     @endphp
 
-    <div class="flex flex-col gap-6">
-
-        {{-- Header + Controls --}}
-        <div class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-                <div class="text-lg font-semibold">
-                    {{ $start->format('d M') }} – {{ $end->format('d M Y') }}
+    <div class="space-y-6">
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        Calendar Window
+                    </div>
+                    <h2 class="mt-1 text-2xl font-semibold text-slate-900">
+                        {{ $weekStart->format('d M') }} – {{ $weekEnd->format('d M Y') }}
+                    </h2>
+                    <p class="mt-2 text-sm text-slate-500">
+                        Operational calendar view for clinic working days only. Monday and Sunday are hidden from this view.
+                    </p>
                 </div>
-                <div class="text-sm text-slate-500">Weekly schedule overview</div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <a
+                        href="{{ route('app.calendar', array_merge($queryBase, ['week' => $previousWeek])) }}"
+                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        ← Previous
+                    </a>
+
+                    <a
+                        href="{{ route('app.calendar', array_merge(request()->except(['week', 'staff_id']), ['week' => $currentWeek])) }}"
+                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        This Week
+                    </a>
+
+                    <a
+                        href="{{ route('app.calendar', array_merge($queryBase, ['week' => $nextWeek])) }}"
+                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        Next →
+                    </a>
+                </div>
             </div>
 
-            <div class="flex flex-wrap items-end gap-2">
-                <a href="{{ route('app.calendar', ['week' => $start->copy()->subWeek()->toDateString(), 'staff_id' => $staffId]) }}"
-                   class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50">
-                    ← Previous
-                </a>
+            <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-3">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            Visible Days
+                        </div>
+                        <div class="mt-2 text-2xl font-semibold text-slate-900">
+                            {{ $days->count() }}
+                        </div>
+                        <div class="mt-1 text-sm text-slate-500">
+                            Tue to Sat
+                        </div>
+                    </div>
 
-                <a href="{{ route('app.calendar', ['week' => now()->toDateString(), 'staff_id' => $staffId]) }}"
-                   class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50">
-                    This Week
-                </a>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            Total Appointments
+                        </div>
+                        <div class="mt-2 text-2xl font-semibold text-slate-900">
+                            {{ $totalAppointments }}
+                        </div>
+                        <div class="mt-1 text-sm text-slate-500">
+                            In current calendar window
+                        </div>
+                    </div>
 
-                <a href="{{ route('app.calendar', ['week' => $start->copy()->addWeek()->toDateString(), 'staff_id' => $staffId]) }}"
-                   class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm hover:bg-slate-50">
-                    Next →
-                </a>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            Mode
+                        </div>
+                        <div class="mt-2 text-base font-semibold text-slate-900">
+                            Operational Weekly View
+                        </div>
+                        <div class="mt-1 text-sm text-slate-500">
+                            Customer, service, doctor/staff, and schedule in one place
+                        </div>
+                    </div>
+                </div>
 
-                @if(!$isStaffUser)
-                    <form method="GET" action="{{ route('app.calendar') }}" class="flex items-end gap-2 ml-2">
-                        <input type="hidden" name="week" value="{{ $start->toDateString() }}">
-                        <select name="staff_id" class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm min-w-56">
+                <form method="GET" action="{{ route('app.calendar') }}" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="text-sm font-semibold text-slate-900">
+                        Filter calendar
+                    </div>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Narrow the calendar by assigned staff while keeping the same week view.
+                    </p>
+
+                    <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+
+                    <div class="mt-4">
+                        <label for="staff_id" class="mb-2 block text-sm font-medium text-slate-700">
+                            Assigned staff
+                        </label>
+                        <select
+                            id="staff_id"
+                            name="staff_id"
+                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                        >
                             <option value="">All staff</option>
-                            @foreach($staffList as $s)
-                                <option value="{{ $s->id }}" @selected((string)$staffId === (string)$s->id)>
-                                    {{ $s->full_name }}
+                            @foreach($staffList as $staff)
+                                <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>
+                                    {{ $staff->full_name }}@if($staff->role_key) ({{ $staff->role_key }}) @endif
                                 </option>
                             @endforeach
                         </select>
-                        <button class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm hover:opacity-90">
-                            Filter
+                    </div>
+
+                    <div class="mt-4 flex gap-3">
+                        <button
+                            type="submit"
+                            class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                        >
+                            Apply Filter
                         </button>
-                    </form>
-                @endif
+
+                        <a
+                            href="{{ route('app.calendar', ['week' => $weekStart->toDateString()]) }}"
+                            class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+                        >
+                            Clear
+                        </a>
+                    </div>
+                </form>
             </div>
-        </div>
+        </section>
 
-        {{-- Calendar Table --}}
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="min-w-[1200px] w-full text-sm table-fixed">
-                    <thead class="bg-slate-50 text-slate-600">
-                    <tr>
-                        <th class="w-24 text-left font-semibold px-4 py-3 border-b border-slate-200 align-middle">
-                            Time
-                        </th>
+        <section class="grid gap-4 xl:grid-cols-5">
+            @foreach($days as $day)
+                @php
+                    $dayEvents = $eventsByDay[$day['date']] ?? collect();
+                @endphp
 
-                        @for($i=0; $i<7; $i++)
-                            @php
-                                $d = $start->copy()->addDays($i);
-                                $k = $d->toDateString();
-                                $count = $dayCounts[$k] ?? 0;
-                            @endphp
-                            <th class="text-center font-semibold px-4 py-3 border-b border-slate-200 align-middle">
-                                <div class="leading-tight">{{ $d->format('D') }}</div>
-                                <div class="text-xs font-normal text-slate-500 leading-tight">{{ $d->format('d M') }}</div>
-                                <div class="mt-1 inline-flex text-[11px] px-2 py-0.5 rounded-full border border-slate-200 bg-white text-slate-700">
-                                    {{ $count }} appt
+                <div class="flex min-h-[520px] flex-col rounded-3xl border border-slate-200 bg-white shadow-sm">
+                    <div class="border-b border-slate-200 px-5 py-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    {{ $day['full_label'] }}
                                 </div>
-                            </th>
-                        @endfor
-                    </tr>
-                    </thead>
+                                <div class="mt-1 text-lg font-semibold text-slate-900">
+                                    {{ $day['display_date'] }}
+                                </div>
+                            </div>
 
-                    <tbody>
-                    @foreach($hours as $h)
-                        @php $label = str_pad($h, 2, '0', STR_PAD_LEFT).':00'; @endphp
-                        <tr class="align-top">
-                            <td class="w-24 px-4 py-3 border-b border-slate-100 text-slate-600 font-medium">
-                                {{ $label }}
-                            </td>
+                            <div class="flex items-center gap-2">
+                                @if($day['is_today'])
+                                    <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                        Today
+                                    </span>
+                                @endif
 
-                            @for($i=0; $i<7; $i++)
-                                @php
-                                    $dateKey = $start->copy()->addDays($i)->toDateString();
-                                    $items = ($appointmentsByDay[$dateKey] ?? collect())
-                                        ->filter(fn($a) => (int)$a->starts_at->format('H') === (int)$h);
-                                @endphp
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                                    {{ $dayEvents->count() }} appt
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
-                                <td class="px-3 py-2 border-b border-slate-100">
-                                    <div class="min-h-[56px] flex flex-col gap-2">
-                                        @foreach($items as $a)
-                                            @php
-                                                $statusVal = $a->status?->value ?? '';
-                                                $statusText = $statusVal ? ucwords(str_replace('_',' ', $statusVal)) : '—';
-
-                                                $statusColor = match($statusVal) {
-                                                    'completed' => 'bg-emerald-50 border-emerald-200 text-emerald-800',
-                                                    'cancelled' => 'bg-rose-50 border-rose-200 text-rose-800',
-                                                    default => 'bg-blue-50 border-blue-200 text-blue-800'
-                                                };
-                                            @endphp
-
-                                            <div class="rounded-xl border px-3 py-2 {{ $statusColor }}">
-                                                <div class="text-xs font-semibold truncate">
-                                                    {{ $a->customer?->full_name ?? '—' }}
-                                                </div>
-                                                <div class="text-[11px] opacity-80 truncate">
-                                                    {{ $a->service?->name ?? '—' }}
-                                                </div>
-                                                <div class="text-[10px] opacity-70 mt-1">
-                                                    {{ $a->starts_at->format('H:i') }}–{{ $a->ends_at->format('H:i') }}
-                                                    <span class="ml-2">({{ $statusText }})</span>
-                                                </div>
+                    <div class="flex-1 space-y-3 px-4 py-4">
+                        @forelse($dayEvents as $event)
+                            <button
+                                type="button"
+                                class="calendar-event-btn block w-full rounded-2xl border p-4 text-left shadow-sm transition {{ $event['color_card'] }}"
+                                data-event='@json($event)'
+                            >
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="h-2.5 w-2.5 rounded-full {{ $event['color_dot'] }}"></span>
+                                            <div class="truncate text-sm font-semibold">
+                                                {{ $event['service_summary'] }}
                                             </div>
-                                        @endforeach
-                                    </div>
-                                </td>
-                            @endfor
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                                        </div>
 
+                                        <div class="mt-2 text-sm font-medium text-slate-800">
+                                            {{ $event['customer_name'] }}
+                                        </div>
+
+                                        <div class="mt-1 text-xs text-slate-600">
+                                            {{ $event['staff_summary'] }}
+                                        </div>
+                                    </div>
+
+                                    <span class="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold {{ $event['color_badge'] }}">
+                                        {{ $event['start_time'] }}
+                                    </span>
+                                </div>
+
+                                <div class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-600">
+                                    <span>{{ $event['start_time'] }} – {{ $event['end_time'] }}</span>
+                                    <span>{{ $event['status_label'] }}</span>
+                                </div>
+                            </button>
+                        @empty
+                            <div class="flex h-full min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                                <div>
+                                    <div class="text-sm font-semibold text-slate-700">
+                                        No appointments
+                                    </div>
+                                    <p class="mt-1 text-sm text-slate-500">
+                                        This clinic day has no bookings for the current filter.
+                                    </p>
+                                </div>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            @endforeach
+        </section>
     </div>
 
-</x-internal-layout>
+    <div
+        id="calendar-detail-modal"
+        class="fixed inset-0 z-50 hidden"
+        aria-hidden="true"
+    >
+        <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"></div>
 
+        <div class="relative flex min-h-full items-center justify-center p-4">
+            <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            Appointment Detail
+                        </div>
+                        <h3 id="modal-customer-name" class="mt-1 text-2xl font-semibold text-slate-900">
+                            —
+                        </h3>
+                        <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">
+                            —
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="calendar-detail-close-top"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div class="space-y-6 px-6 py-6">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Time
+                            </div>
+                            <div id="modal-time" class="mt-2 text-sm font-semibold text-slate-900">
+                                —
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Status
+                            </div>
+                            <div id="modal-status" class="mt-2 text-sm font-semibold text-slate-900">
+                                —
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Services
+                            </div>
+                            <div id="modal-services" class="mt-2 space-y-2 text-sm text-slate-700">
+                                —
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Assigned Staff / Doctor
+                            </div>
+                            <div id="modal-staff" class="mt-2 space-y-2 text-sm text-slate-700">
+                                —
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Customer Phone
+                            </div>
+                            <div id="modal-phone" class="mt-2 text-sm text-slate-700">
+                                —
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Source
+                            </div>
+                            <div id="modal-source" class="mt-2 text-sm text-slate-700">
+                                —
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            Notes
+                        </div>
+                        <div id="modal-notes" class="mt-2 whitespace-pre-line text-sm text-slate-700">
+                            —
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end border-t border-slate-200 px-6 py-4">
+                    <button
+                        type="button"
+                        id="calendar-detail-close-bottom"
+                        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const modal = document.getElementById('calendar-detail-modal');
+            const closeTop = document.getElementById('calendar-detail-close-top');
+            const closeBottom = document.getElementById('calendar-detail-close-bottom');
+
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = value && String(value).trim() !== '' ? value : '—';
+                }
+            };
+
+            const setList = (id, values) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+
+                const items = Array.isArray(values) ? values.filter(Boolean) : [];
+                if (!items.length) {
+                    el.innerHTML = '<div>—</div>';
+                    return;
+                }
+
+                el.innerHTML = items
+                    .map(item => `<div class="rounded-xl bg-slate-50 px-3 py-2">${String(item)}</div>`)
+                    .join('');
+            };
+
+            const openModal = (eventData) => {
+                setText('modal-customer-name', eventData.customer_name);
+                setText('modal-service-summary', eventData.service_summary);
+                setText('modal-time', `${eventData.start_time || '—'} – ${eventData.end_time || '—'}`);
+                setText('modal-status', eventData.status_label);
+                setList('modal-services', eventData.service_names || []);
+                setList('modal-staff', eventData.staff_details || eventData.staff_names || []);
+                setText('modal-phone', eventData.customer_phone);
+                setText('modal-source', eventData.source || '—');
+                setText('modal-notes', eventData.notes || 'No notes recorded.');
+
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            document.querySelectorAll('.calendar-event-btn').forEach((button) => {
+                button.addEventListener('click', () => {
+                    try {
+                        const payload = JSON.parse(button.dataset.event || '{}');
+                        openModal(payload);
+                    } catch (error) {
+                        console.error('Failed to open appointment detail modal.', error);
+                    }
+                });
+            });
+
+            [closeTop, closeBottom].forEach((button) => {
+                if (button) {
+                    button.addEventListener('click', closeModal);
+                }
+            });
+
+            modal?.addEventListener('click', (event) => {
+                if (event.target === modal || event.target === modal.firstElementChild) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+</x-layouts.internal>
