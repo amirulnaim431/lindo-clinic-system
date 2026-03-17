@@ -21,15 +21,15 @@
             $value = strtolower((string) $status);
 
             return match ($value) {
-                'booked', 'confirmed' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
-                'pending' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
-                'cancelled', 'canceled' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
-                'completed', 'done' => 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200',
-                default => 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200',
+                'booked', 'confirmed' => 'background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;',
+                'pending' => 'background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a;',
+                'cancelled', 'canceled' => 'background-color: #fff1f2; color: #be123c; border: 1px solid #fecdd3;',
+                'completed', 'done' => 'background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;',
+                default => 'background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1;',
             };
         };
 
-        $canEditCustomer = auth()->user() && method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin();
+        $canEditCustomer = auth()->check() && method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin();
     @endphp
 
     <div class="space-y-6">
@@ -62,13 +62,13 @@
                         @endif
 
                         @if($customer->current_package)
-                            <span class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-inset ring-violet-200">
+                            <span class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" style="border: 1px solid #ddd6fe;">
                                 Package: {{ $customer->current_package }}
                             </span>
                         @endif
 
                         @if($customer->membership_code)
-                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700" style="border: 1px solid #a7f3d0;">
                                 Code: {{ $customer->membership_code }}
                             </span>
                         @endif
@@ -80,7 +80,10 @@
                 @if($canEditCustomer)
                     <a
                         href="{{ route('app.customers.edit', $customer) }}"
-                        class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                        class="inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-sm transition"
+                        style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a;"
+                        onmouseover="this.style.background='#1e293b';this.style.borderColor='#1e293b';"
+                        onmouseout="this.style.background='#0f172a';this.style.borderColor='#0f172a';"
                     >
                         Edit Customer
                     </a>
@@ -201,16 +204,14 @@
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-sm font-semibold text-slate-900">Upcoming appointments</h3>
-                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700" style="border: 1px solid #cbd5e1;">
                                     {{ $upcomingAppointments->count() }}
                                 </span>
                             </div>
 
                             <div class="space-y-3">
                                 @forelse($upcomingAppointments as $group)
-                                    @php
-                                        $status = $statusLabel($group->status);
-                                    @endphp
+                                    @php $status = $statusLabel($group->status); @endphp
 
                                     <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -224,7 +225,7 @@
                                             </div>
 
                                             @if($status)
-                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ $badgeClass($status) }}">
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" style="{{ $badgeClass($status) }}">
                                                     {{ ucfirst($status) }}
                                                 </span>
                                             @endif
@@ -259,16 +260,14 @@
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-sm font-semibold text-slate-900">Appointment history</h3>
-                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700" style="border: 1px solid #cbd5e1;">
                                     {{ $appointmentHistory->count() }}
                                 </span>
                             </div>
 
                             <div class="space-y-3">
                                 @forelse($appointmentHistory as $group)
-                                    @php
-                                        $status = $statusLabel($group->status);
-                                    @endphp
+                                    @php $status = $statusLabel($group->status); @endphp
 
                                     <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -282,7 +281,7 @@
                                             </div>
 
                                             @if($status)
-                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ $badgeClass($status) }}">
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" style="{{ $badgeClass($status) }}">
                                                     {{ ucfirst($status) }}
                                                 </span>
                                             @endif

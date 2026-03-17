@@ -366,7 +366,10 @@
 
                 <button
                     type="submit"
-                    class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                    class="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold shadow-sm transition"
+                    style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a;"
+                    onmouseover="this.style.background='#1e293b';this.style.borderColor='#1e293b';"
+                    onmouseout="this.style.background='#0f172a';this.style.borderColor='#0f172a';"
                 >
                     Save customer changes
                 </button>
