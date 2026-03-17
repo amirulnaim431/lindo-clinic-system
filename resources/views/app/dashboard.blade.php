@@ -1,158 +1,142 @@
-<x-internal-layout
-    :title="'Dashboard'"
-    :subtitle="'Premium internal overview for appointments, clinic load, and staff operations.'">
-
-    @php
-        $selectedDate = request('date', $date ?? now()->toDateString());
-        $selectedStaffId = request('staff_id');
-    @endphp
-
-    <div class="stack">
-        @if (session('success'))
-            <div class="alert alert-success">
-                {{ session('success') }}
-            </div>
-        @endif
-
-        @if ($errors->any())
-            <div class="alert alert-error">
-                {{ $errors->first() }}
-            </div>
-        @endif
-
-        <div class="panel">
-            <div class="panel__header">
-                <h2 class="panel__title">Overview controls</h2>
-                <div class="panel__subtitle">
-                    Filter the dashboard by date and staff, then jump directly into the relevant operational pages.
-                </div>
-            </div>
-
-            <div class="panel__body">
-                <form method="GET" action="{{ route('app.dashboard') }}" class="form-grid">
-                    <div class="col-4">
-                        <label class="field-label" for="date">Date</label>
-                        <input
-                            id="date"
-                            name="date"
-                            type="date"
-                            class="field-input"
-                            value="{{ $selectedDate }}"
-                        >
-                    </div>
-
-                    <div class="col-4">
-                        <label class="field-label" for="staff_id">Staff</label>
-                        <select id="staff_id" name="staff_id" class="field-select">
-                            <option value="">All staff</option>
-                            @foreach ($staffList as $s)
-                                <option value="{{ $s->id }}" @selected((string) $selectedStaffId === (string) $s->id)>
-                                    {{ $s->full_name }} ({{ $s->role_key }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="col-4" style="display:flex; align-items:end;">
-                        <div class="btn-row">
-                            <button type="submit" class="btn btn-primary">Apply Filters</button>
-                            <a href="{{ route('app.dashboard') }}" class="btn btn-secondary">Reset</a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-card__label">Total appointments</div>
-                <div class="stat-card__value">{{ $kpi['total'] ?? 0 }}</div>
-            </div>
-
-            @foreach ($statusCases as $st)
-                @php
-                    $statusKey = is_object($st) ? $st->value : (string) $st;
-                    $statusLabel = method_exists($st, 'label')
-                        ? $st->label()
-                        : ucfirst(str_replace('_', ' ', $statusKey));
-                @endphp
-
-                <div class="stat-card">
-                    <div class="stat-card__label">{{ $statusLabel }}</div>
-                    <div class="stat-card__value">{{ $kpi['by_status'][$statusKey] ?? 0 }}</div>
-                </div>
-            @endforeach
-        </div>
-
-        <div class="panel">
-            <div class="panel__header" style="display:flex; justify-content:space-between; align-items:start; gap:16px; flex-wrap:wrap;">
+<x-layouts.internal
+    title="Dashboard"
+    subtitle="Premium internal overview for appointments, clinic load, and staff operations."
+>
+    <div class="space-y-6">
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
-                    <h2 class="panel__title">Schedule</h2>
-                    <div class="panel__subtitle">
-                        Appointment groups for {{ $selectedDate }}.
-                    </div>
-                </div>
-
-                <div class="btn-row">
-                    <a href="{{ route('app.appointments.index') }}" class="btn btn-secondary">Manage appointments</a>
-                    <a href="{{ route('app.calendar') }}" class="btn btn-secondary">Open calendar</a>
+                    <div class="text-sm font-semibold text-slate-900">Overview controls</div>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Filter the dashboard by date and staff, then jump directly into the relevant operational pages.
+                    </p>
                 </div>
             </div>
 
-            <div class="panel__body">
-                @forelse ($appointments as $g)
-                    @break($loop->first)
-                @empty
-                    <div class="empty-state">
-                        No appointments found for the selected filters.
+            <form method="GET" class="mt-5 grid gap-4 lg:grid-cols-[220px_240px_auto] lg:items-end">
+                <div>
+                    <label for="date" class="mb-2 block text-sm font-medium text-slate-700">Date</label>
+                    <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        value="{{ request('date', isset($selectedDate) ? \Illuminate\Support\Carbon::parse($selectedDate)->format('Y-m-d') : now()->format('Y-m-d')) }}"
+                        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    >
+                </div>
+
+                <div>
+                    <label for="staff_id" class="mb-2 block text-sm font-medium text-slate-700">Staff</label>
+                    <select
+                        id="staff_id"
+                        name="staff_id"
+                        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    >
+                        <option value="">All staff</option>
+                        @foreach(($staffOptions ?? []) as $staff)
+                            <option value="{{ $staff->id }}" @selected((string) request('staff_id', $selectedStaffId ?? '') === (string) $staff->id)>
+                                {{ $staff->full_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="flex gap-3">
+                    <button
+                        type="submit"
+                        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+                    >
+                        Apply Filters
+                    </button>
+
+                    <a
+                        href="{{ route('dashboard') }}"
+                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        Reset
+                    </a>
+                </div>
+            </form>
+        </section>
+
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total Appointments</div>
+                <div class="mt-3 text-3xl font-semibold text-slate-900">{{ $todayAppointments ?? 0 }}</div>
+                <div class="mt-1 text-sm text-slate-500">For selected date</div>
+            </div>
+
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total Staff</div>
+                <div class="mt-3 text-3xl font-semibold text-slate-900">{{ $staffCount ?? 0 }}</div>
+                <div class="mt-1 text-sm text-slate-500">Active in system</div>
+            </div>
+
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming</div>
+                <div class="mt-3 text-3xl font-semibold text-slate-900">{{ $upcomingAppointments ?? 0 }}</div>
+                <div class="mt-1 text-sm text-slate-500">Upcoming appointments</div>
+            </div>
+
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Completed Today</div>
+                <div class="mt-3 text-3xl font-semibold text-slate-900">{{ $completedToday ?? 0 }}</div>
+                <div class="mt-1 text-sm text-slate-500">Completed for selected date</div>
+            </div>
+        </section>
+
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Today’s Schedule</h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Appointment groups for {{ isset($selectedDate) ? \Illuminate\Support\Carbon::parse($selectedDate)->format('d M Y') : now()->format('d M Y') }}.
+                        </p>
                     </div>
-                @endforelse
 
-                @if ($appointments->count())
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width:120px;">Time</th>
-                                    <th>Customer</th>
-                                    <th>Services</th>
-                                    <th>Staff</th>
-                                    <th style="width:150px;">Status</th>
+                    <a
+                        href="{{ route('app.calendar') }}"
+                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        Open Calendar
+                    </a>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                @if(isset($todayList) && count($todayList))
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Service</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Staff</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            @foreach($todayList as $row)
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-5 py-4 text-sm font-medium text-slate-900">{{ $row->start_time }}</td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">{{ $row->customer_name }}</td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">{{ $row->service_name }}</td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">{{ $row->staff_name }}</td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">{{ $row->status }}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($appointments as $g)
-                                    @php
-                                        $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
-                                        $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
-                                        $currentStatus = is_object($g->status) ? $g->status->value : (string) $g->status;
-                                        $currentStatusLabel = is_object($g->status) && method_exists($g->status, 'label')
-                                            ? $g->status->label()
-                                            : ucfirst(str_replace('_', ' ', $currentStatus));
-                                    @endphp
-
-                                    <tr>
-                                        <td>
-                                            <strong>{{ optional($g->starts_at)->format('H:i') ?: '-' }}</strong>
-                                        </td>
-                                        <td>
-                                            <div style="font-weight:700;">{{ $g->customer?->full_name ?? '-' }}</div>
-                                            @if ($g->customer?->phone)
-                                                <div class="text-muted">{{ $g->customer->phone }}</div>
-                                            @endif
-                                        </td>
-                                        <td>{{ $servicesSummary }}</td>
-                                        <td>{{ $staffSummary }}</td>
-                                        <td>
-                                            <span class="chip chip--soft">{{ $currentStatusLabel }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="px-5 py-10 text-center">
+                        <div class="text-sm font-semibold text-slate-700">No appointments scheduled</div>
+                        <p class="mt-1 text-sm text-slate-500">
+                            No appointments found for the selected filters.
+                        </p>
                     </div>
                 @endif
             </div>
-        </div>
+        </section>
     </div>
-</x-internal-layout>
+</x-layouts.internal>

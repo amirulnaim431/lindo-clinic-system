@@ -1,23 +1,23 @@
-@vite(['resources/css/app.css', 'resources/js/app.js'])
-
-@php
-    $is = fn (string $name) => request()->routeIs($name);
-
-    $r = function (string $name, array $params = [], string $fallback = '#') {
-        return \Illuminate\Support\Facades\Route::has($name) ? route($name, $params) : $fallback;
-    };
-
-    $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
-@endphp
-
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Lindo Clinic' }}</title>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
+    @php
+        $is = fn (string $name) => request()->routeIs($name);
+
+        $r = function (string $name, array $params = [], string $fallback = '#') {
+            return \Illuminate\Support\Facades\Route::has($name) ? route($name, $params) : $fallback;
+        };
+
+        $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
+    @endphp
+
     <div class="flex min-h-screen">
         <aside class="hidden w-72 shrink-0 bg-slate-950 text-slate-100 lg:flex lg:flex-col">
             <div class="border-b border-slate-800 px-6 py-6">
@@ -65,7 +65,7 @@
                         <a href="{{ $r('app.customers.index') }}"
                            class="{{ $customersNavActive ? 'text-white' : 'text-slate-300 hover:bg-slate-900 hover:text-white' }} flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition">
                             <span>Customers</span>
-                            <span class="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-200">2</span>
+                            <span class="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-200">CRM</span>
                         </a>
 
                         <a href="{{ $r('app.customers.index') }}"
