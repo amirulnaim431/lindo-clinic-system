@@ -153,7 +153,7 @@
             </div>
 
             <div class="px-6 py-6 lg:px-8">
-                {{ $slot ?? '' }}
+                @yield('content')
             </div>
         </main>
     </div>

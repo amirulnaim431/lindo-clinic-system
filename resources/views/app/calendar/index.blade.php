@@ -1,3 +1,9 @@
+@extends('layouts.internal')
+
+@section('title', 'Calendar')
+
+@section('content')
+
 <x-layouts.internal
     :title="$title"
     :subtitle="$subtitle"
@@ -521,3 +527,5 @@
         })();
     </script>
 </x-layouts.internal>
+
+@endsection
