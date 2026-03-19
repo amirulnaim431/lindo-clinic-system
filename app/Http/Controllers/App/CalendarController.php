@@ -177,7 +177,17 @@ class CalendarController extends Controller
             ->filter(fn ($group) => optional($group->starts_at)?->isSameDay($selectedDate))
             ->values();
 
-        $dayEvents = $groupsForSelectedDay
+        $visibleTimelineGroups = $groupsForSelectedDay
+            ->reject(function ($group) {
+                $status = $group->status instanceof AppointmentStatus
+                    ? $group->status->value
+                    : (string) $group->status;
+
+                return in_array($status, ['cancelled', 'no_show'], true);
+            })
+            ->values();
+
+        $dayEvents = $visibleTimelineGroups
             ->map(fn (AppointmentGroup $group) => $this->mapGroupToEvent($group))
             ->filter()
             ->values();
