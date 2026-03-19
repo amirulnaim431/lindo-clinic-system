@@ -59,7 +59,7 @@ class StaffSeeder extends Seeder
 
             if (! $staff->exists) {
                 $staff->can_login = false;
-                $staff->access_permissions = [];
+                $staff->access_permissions = json_encode([]);
             }
 
             $staff->save();
