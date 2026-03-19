@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\App;
 
+use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\Staff;
@@ -14,85 +15,154 @@ class CalendarController extends Controller
     private const SLOT_MINUTES = 30;
     private const DAY_START_HOUR = 9;
     private const DAY_END_HOUR = 18;
-    private const SLOT_HEIGHT_PX = 56;
+    private const ROW_HEIGHT_PX = 72;
 
-    private const COLOR_PALETTE = [
+    private const SERVICE_PALETTES = [
         [
-            'card' => 'border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100',
-            'dot' => 'bg-sky-500',
-            'badge' => 'border-sky-200 bg-sky-100 text-sky-800',
+            'surface' => '#f3f8ff',
+            'surface_strong' => '#dbeafe',
+            'border' => '#bfdbfe',
+            'accent' => '#2563eb',
+            'accent_soft' => '#93c5fd',
+            'chip_bg' => '#dbeafe',
+            'chip_text' => '#1d4ed8',
+            'text' => '#172554',
         ],
         [
-            'card' => 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100',
-            'dot' => 'bg-emerald-500',
-            'badge' => 'border-emerald-200 bg-emerald-100 text-emerald-800',
+            'surface' => '#f5fbfa',
+            'surface_strong' => '#d1fae5',
+            'border' => '#a7f3d0',
+            'accent' => '#059669',
+            'accent_soft' => '#6ee7b7',
+            'chip_bg' => '#d1fae5',
+            'chip_text' => '#047857',
+            'text' => '#064e3b',
         ],
         [
-            'card' => 'border-violet-200 bg-violet-50 text-violet-950 hover:bg-violet-100',
-            'dot' => 'bg-violet-500',
-            'badge' => 'border-violet-200 bg-violet-100 text-violet-800',
+            'surface' => '#fff7ed',
+            'surface_strong' => '#fed7aa',
+            'border' => '#fdba74',
+            'accent' => '#ea580c',
+            'accent_soft' => '#fb923c',
+            'chip_bg' => '#fed7aa',
+            'chip_text' => '#c2410c',
+            'text' => '#7c2d12',
         ],
         [
-            'card' => 'border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100',
-            'dot' => 'bg-amber-500',
-            'badge' => 'border-amber-200 bg-amber-100 text-amber-800',
+            'surface' => '#fdf4ff',
+            'surface_strong' => '#f5d0fe',
+            'border' => '#f0abfc',
+            'accent' => '#c026d3',
+            'accent_soft' => '#e879f9',
+            'chip_bg' => '#f5d0fe',
+            'chip_text' => '#a21caf',
+            'text' => '#701a75',
         ],
         [
-            'card' => 'border-rose-200 bg-rose-50 text-rose-950 hover:bg-rose-100',
-            'dot' => 'bg-rose-500',
-            'badge' => 'border-rose-200 bg-rose-100 text-rose-800',
+            'surface' => '#fff8f1',
+            'surface_strong' => '#fde68a',
+            'border' => '#fcd34d',
+            'accent' => '#d97706',
+            'accent_soft' => '#fbbf24',
+            'chip_bg' => '#fef3c7',
+            'chip_text' => '#b45309',
+            'text' => '#78350f',
         ],
         [
-            'card' => 'border-cyan-200 bg-cyan-50 text-cyan-950 hover:bg-cyan-100',
-            'dot' => 'bg-cyan-500',
-            'badge' => 'border-cyan-200 bg-cyan-100 text-cyan-800',
+            'surface' => '#f5f3ff',
+            'surface_strong' => '#ddd6fe',
+            'border' => '#c4b5fd',
+            'accent' => '#7c3aed',
+            'accent_soft' => '#a78bfa',
+            'chip_bg' => '#ddd6fe',
+            'chip_text' => '#6d28d9',
+            'text' => '#4c1d95',
         ],
         [
-            'card' => 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-950 hover:bg-fuchsia-100',
-            'dot' => 'bg-fuchsia-500',
-            'badge' => 'border-fuchsia-200 bg-fuchsia-100 text-fuchsia-800',
+            'surface' => '#ecfeff',
+            'surface_strong' => '#bae6fd',
+            'border' => '#7dd3fc',
+            'accent' => '#0891b2',
+            'accent_soft' => '#38bdf8',
+            'chip_bg' => '#bae6fd',
+            'chip_text' => '#0e7490',
+            'text' => '#164e63',
         ],
         [
-            'card' => 'border-teal-200 bg-teal-50 text-teal-950 hover:bg-teal-100',
-            'dot' => 'bg-teal-500',
-            'badge' => 'border-teal-200 bg-teal-100 text-teal-800',
+            'surface' => '#fff1f2',
+            'surface_strong' => '#fecdd3',
+            'border' => '#fda4af',
+            'accent' => '#e11d48',
+            'accent_soft' => '#fb7185',
+            'chip_bg' => '#fecdd3',
+            'chip_text' => '#be123c',
+            'text' => '#881337',
+        ],
+    ];
+
+    private const STATUS_STYLES = [
+        'booked' => [
+            'label' => 'Pending',
+            'dot' => '#f59e0b',
+            'badge_bg' => '#fff7ed',
+            'badge_border' => '#fed7aa',
+            'badge_text' => '#c2410c',
+        ],
+        'confirmed' => [
+            'label' => 'Confirmed',
+            'dot' => '#0284c7',
+            'badge_bg' => '#f0f9ff',
+            'badge_border' => '#bae6fd',
+            'badge_text' => '#0369a1',
+        ],
+        'checked_in' => [
+            'label' => 'Checked In',
+            'dot' => '#7c3aed',
+            'badge_bg' => '#f5f3ff',
+            'badge_border' => '#ddd6fe',
+            'badge_text' => '#6d28d9',
+        ],
+        'completed' => [
+            'label' => 'Completed',
+            'dot' => '#059669',
+            'badge_bg' => '#ecfdf5',
+            'badge_border' => '#a7f3d0',
+            'badge_text' => '#047857',
+        ],
+        'cancelled' => [
+            'label' => 'Cancelled',
+            'dot' => '#e11d48',
+            'badge_bg' => '#fff1f2',
+            'badge_border' => '#fecdd3',
+            'badge_text' => '#be123c',
+        ],
+        'no_show' => [
+            'label' => 'No-show',
+            'dot' => '#475569',
+            'badge_bg' => '#f8fafc',
+            'badge_border' => '#cbd5e1',
+            'badge_text' => '#475569',
         ],
     ];
 
     public function index(Request $request)
     {
-        $weekInput = $request->string('week')->toString();
-        $anchor = $weekInput !== '' ? Carbon::parse($weekInput) : now();
-
-        $weekStart = $anchor->copy()->startOfWeek(Carbon::TUESDAY)->startOfDay();
+        $selectedDate = $this->resolveSelectedDate($request);
+        $weekStart = $selectedDate->copy()->startOfWeek(Carbon::TUESDAY)->startOfDay();
         $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
-
-        $days = collect(range(0, 4))->map(function (int $offset) use ($weekStart) {
-            $date = $weekStart->copy()->addDays($offset);
-
-            return [
-                'date' => $date->toDateString(),
-                'label' => $date->format('D'),
-                'full_label' => $date->format('l'),
-                'display_date' => $date->format('d M'),
-                'is_today' => $date->isToday(),
-                'add_url' => route('app.appointments.index', ['date' => $date->toDateString()]),
-            ];
-        });
+        $staffId = trim((string) $request->input('staff_id', ''));
 
         $staffList = Staff::query()
-            ->select('id', 'full_name', 'role_key')
+            ->select('id', 'full_name', 'role_key', 'job_title')
             ->where('is_active', true)
             ->orderBy('full_name')
             ->get();
 
-        $staffId = $request->string('staff_id')->toString();
-
-        $groups = AppointmentGroup::query()
+        $weekGroups = AppointmentGroup::query()
             ->with([
-                'customer:id,full_name,phone',
+                'customer:id,full_name,phone,membership_type,membership_code,current_package',
                 'items.service:id,name',
-                'items.staff:id,full_name,role_key',
+                'items.staff:id,full_name,role_key,job_title',
             ])
             ->whereBetween('starts_at', [$weekStart, $weekEnd])
             ->when($staffId !== '', function ($query) use ($staffId) {
@@ -103,60 +173,118 @@ class CalendarController extends Controller
             ->orderBy('starts_at')
             ->get();
 
-        $slots = $this->buildSlots();
-        $eventsByDay = $days->mapWithKeys(fn (array $day) => [$day['date'] => collect()]);
+        $groupsForSelectedDay = $weekGroups
+            ->filter(fn ($group) => optional($group->starts_at)?->isSameDay($selectedDate))
+            ->values();
 
-        foreach ($groups as $group) {
-            $dateKey = optional($group->starts_at)?->toDateString();
+        $dayEvents = $groupsForSelectedDay
+            ->map(fn (AppointmentGroup $group) => $this->mapGroupToEvent($group))
+            ->filter()
+            ->values();
 
-            if (! $dateKey || ! $eventsByDay->has($dateKey)) {
-                continue;
-            }
+        $timelineEvents = $this->applyTimelineLayout($dayEvents);
+        $slots = $this->buildSlots($selectedDate);
 
-            $event = $this->mapGroupToSchedulerEvent($group);
+        $days = collect(range(0, 4))->map(function (int $offset) use ($weekStart, $weekGroups, $selectedDate, $staffId) {
+            $date = $weekStart->copy()->addDays($offset);
+            $count = $weekGroups->filter(fn ($group) => optional($group->starts_at)?->isSameDay($date))->count();
 
-            if ($event === null) {
-                continue;
-            }
-
-            $eventsByDay[$dateKey]->push($event);
-        }
-
-        $eventsByDay = $eventsByDay->map(function (Collection $events) {
-            return $events->sortBy('starts_at')->values();
+            return [
+                'date' => $date->toDateString(),
+                'label' => $date->format('D'),
+                'full_label' => $date->format('l'),
+                'display_date' => $date->format('d M'),
+                'is_today' => $date->isToday(),
+                'is_selected' => $date->isSameDay($selectedDate),
+                'appointment_count' => $count,
+                'url' => route('app.calendar', array_filter([
+                    'week' => $weekStart->toDateString(),
+                    'date' => $date->toDateString(),
+                    'staff_id' => $staffId !== '' ? $staffId : null,
+                ])),
+            ];
         });
 
-        $allEvents = $eventsByDay->flatten(1)->values();
+        $daySummary = $this->buildDaySummary($groupsForSelectedDay);
+        $staffLoad = $this->buildStaffLoad($groupsForSelectedDay);
+        $selectedStaff = $staffList->firstWhere('id', $staffId);
 
         return view('app.calendar.index', [
             'title' => 'Calendar',
-            'subtitle' => 'Operational scheduler view for Tuesday to Saturday appointments.',
+            'subtitle' => 'Live operational schedule for front desk, treatment coordination, and quick booking.',
             'days' => $days,
             'slots' => $slots,
-            'slotHeightPx' => self::SLOT_HEIGHT_PX,
-            'dayColumnHeightPx' => count($slots) * self::SLOT_HEIGHT_PX,
-            'eventsByDay' => $eventsByDay,
+            'timelineEvents' => $timelineEvents,
+            'timelineHeightPx' => count($slots) * self::ROW_HEIGHT_PX,
+            'rowHeightPx' => self::ROW_HEIGHT_PX,
             'staffList' => $staffList,
             'staffId' => $staffId,
+            'selectedStaff' => $selectedStaff,
+            'selectedDate' => $selectedDate,
+            'selectedDateLabel' => $selectedDate->format('l, d M Y'),
+            'selectedDateIso' => $selectedDate->toDateString(),
             'weekStart' => $weekStart,
             'weekEnd' => $weekEnd,
             'previousWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
             'currentWeek' => now()->startOfWeek(Carbon::TUESDAY)->toDateString(),
-            'totalAppointments' => $allEvents->count(),
+            'daySummary' => $daySummary,
+            'staffLoad' => $staffLoad,
+            'totalAppointments' => $groupsForSelectedDay->count(),
+            'statusLegend' => $this->statusLegend(),
         ]);
     }
 
-    private function buildSlots(): array
+    private function resolveSelectedDate(Request $request): Carbon
+    {
+        $dateInput = trim((string) $request->input('date', ''));
+        $weekInput = trim((string) $request->input('week', ''));
+
+        $anchor = $dateInput !== ''
+            ? Carbon::parse($dateInput)
+            : ($weekInput !== '' ? Carbon::parse($weekInput) : now());
+
+        $weekStart = $anchor->copy()->startOfWeek(Carbon::TUESDAY);
+        $selectedDate = $dateInput !== ''
+            ? Carbon::parse($dateInput)
+            : $this->clampToClinicWeek($anchor, $weekStart);
+
+        if ($selectedDate->lt($weekStart)) {
+            return $weekStart->startOfDay();
+        }
+
+        if ($selectedDate->gt($weekStart->copy()->addDays(4))) {
+            return $weekStart->copy()->addDays(4)->startOfDay();
+        }
+
+        return $selectedDate->startOfDay();
+    }
+
+    private function clampToClinicWeek(Carbon $date, Carbon $weekStart): Carbon
+    {
+        if ($date->betweenIncluded($weekStart, $weekStart->copy()->addDays(4))) {
+            return $date->copy();
+        }
+
+        return $weekStart->copy();
+    }
+
+    private function buildSlots(Carbon $selectedDate): array
     {
         $slots = [];
-        $cursor = Carbon::today()->setTime(self::DAY_START_HOUR, 0);
-        $end = Carbon::today()->setTime(self::DAY_END_HOUR, 0);
+        $cursor = $selectedDate->copy()->setTime(self::DAY_START_HOUR, 0);
+        $end = $selectedDate->copy()->setTime(self::DAY_END_HOUR, 0);
 
         while ($cursor->lt($end)) {
+            $slotTime = $cursor->format('H:i');
+
             $slots[] = [
-                'time' => $cursor->format('H:i'),
+                'time' => $slotTime,
                 'label' => $cursor->format('h:i A'),
+                'create_url' => route('app.appointments.index', [
+                    'date' => $selectedDate->toDateString(),
+                    'slot' => $slotTime,
+                ]),
             ];
 
             $cursor->addMinutes(self::SLOT_MINUTES);
@@ -165,7 +293,7 @@ class CalendarController extends Controller
         return $slots;
     }
 
-    private function mapGroupToSchedulerEvent(AppointmentGroup $group): ?array
+    private function mapGroupToEvent(AppointmentGroup $group): ?array
     {
         $startsAt = $group->starts_at;
         $endsAt = $group->ends_at;
@@ -200,60 +328,193 @@ class CalendarController extends Controller
 
                 return [
                     'name' => $staff->full_name,
-                    'role' => $staff->role_key,
+                    'role' => $staff->job_title ?: $staff->role_key,
                 ];
             })
             ->filter()
             ->unique(fn ($staff) => ($staff['name'] ?? '').'|'.($staff['role'] ?? ''))
             ->values();
 
-        $primaryService = $services->first() ?: 'General Service';
-        $colors = $this->serviceColors($primaryService);
-
         $serviceNames = $services->all();
         $staffNames = $staffMembers->pluck('name')->filter()->values()->all();
+        $primaryService = $serviceNames[0] ?? 'General Service';
+        $serviceStyles = $this->serviceVisuals($primaryService);
+        $statusValue = $group->status instanceof AppointmentStatus
+            ? $group->status->value
+            : (string) $group->status;
+        $statusStyles = $this->statusVisuals($statusValue);
 
         $topMinutes = $dayStart->diffInMinutes($visibleStart);
         $heightMinutes = max(self::SLOT_MINUTES, $visibleStart->diffInMinutes($visibleEnd));
-
-        $pixelsPerMinute = self::SLOT_HEIGHT_PX / self::SLOT_MINUTES;
-        $topPx = (int) round($topMinutes * $pixelsPerMinute);
-        $heightPx = max(52, (int) round($heightMinutes * $pixelsPerMinute) - 6);
+        $pixelsPerMinute = self::ROW_HEIGHT_PX / self::SLOT_MINUTES;
 
         return [
             'id' => (string) $group->id,
             'customer_name' => optional($group->customer)->full_name ?: 'Unknown Customer',
-            'customer_phone' => optional($group->customer)->phone ?: '—',
+            'customer_phone' => optional($group->customer)->phone ?: 'No phone recorded',
+            'membership_label' => $this->membershipLabel($group),
             'service_names' => $serviceNames,
             'service_summary' => $this->summarizeNames($serviceNames, 'No service'),
             'staff_names' => $staffNames,
             'staff_summary' => $this->summarizeNames($staffNames, 'Unassigned'),
-            'staff_details' => $staffMembers->map(function ($staff) {
-                $role = $staff['role'] ?? null;
-
-                return $role
-                    ? $staff['name'].' ('.$role.')'
-                    : $staff['name'];
-            })->values()->all(),
-            'starts_at' => $startsAt->format('Y-m-d H:i:s'),
-            'ends_at' => $endsAt->format('Y-m-d H:i:s'),
+            'staff_details' => $staffMembers
+                ->map(fn ($staff) => $staff['role'] ? $staff['name'].' - '.$staff['role'] : $staff['name'])
+                ->values()
+                ->all(),
             'start_time' => $startsAt->format('h:i A'),
             'end_time' => $endsAt->format('h:i A'),
-            'status_value' => $group->status instanceof \BackedEnum
-                ? $group->status->value
-                : (string) $group->status,
-            'status_label' => $this->statusLabel($group->status),
+            'date_label' => $startsAt->format('d M Y'),
+            'status_value' => $statusValue,
+            'status_label' => $statusStyles['label'],
             'notes' => $group->notes ?: null,
-            'source' => $group->source ?: null,
-            'color_card' => $colors['card'],
-            'color_dot' => $colors['dot'],
-            'color_badge' => $colors['badge'],
-            'primary_service' => $primaryService,
-            'top_px' => $topPx,
-            'height_px' => $heightPx,
+            'source' => $group->source ? str($group->source)->replace('_', ' ')->title()->toString() : null,
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
-            'status_url' => route('app.appointments.status', $group),
+            'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
+            'service_styles' => $serviceStyles,
+            'status_styles' => $statusStyles,
+            'primary_service' => $primaryService,
+            'top_px' => (int) round($topMinutes * $pixelsPerMinute),
+            'height_px' => max(60, (int) round($heightMinutes * $pixelsPerMinute) - 8),
+            'start_minutes' => $dayStart->diffInMinutes($visibleStart),
+            'end_minutes' => $dayStart->diffInMinutes($visibleEnd),
         ];
+    }
+
+    private function applyTimelineLayout(Collection $events): Collection
+    {
+        $sorted = $events->sortBy('start_minutes')->values();
+        $clusters = [];
+        $currentCluster = [];
+        $clusterEnd = null;
+
+        foreach ($sorted as $event) {
+            if ($clusterEnd === null || $event['start_minutes'] < $clusterEnd) {
+                $currentCluster[] = $event;
+                $clusterEnd = $clusterEnd === null
+                    ? $event['end_minutes']
+                    : max($clusterEnd, $event['end_minutes']);
+            } else {
+                $clusters[] = $currentCluster;
+                $currentCluster = [$event];
+                $clusterEnd = $event['end_minutes'];
+            }
+        }
+
+        if ($currentCluster !== []) {
+            $clusters[] = $currentCluster;
+        }
+
+        $positioned = collect();
+
+        foreach ($clusters as $cluster) {
+            $lanes = [];
+            $maxLaneIndex = -1;
+
+            foreach ($cluster as $index => $event) {
+                foreach ($lanes as $laneIndex => $laneEnd) {
+                    if ($laneEnd <= $event['start_minutes']) {
+                        unset($lanes[$laneIndex]);
+                    }
+                }
+
+                $laneIndex = 0;
+                while (array_key_exists($laneIndex, $lanes)) {
+                    $laneIndex++;
+                }
+
+                $lanes[$laneIndex] = $event['end_minutes'];
+                $maxLaneIndex = max($maxLaneIndex, $laneIndex);
+                $cluster[$index]['lane_index'] = $laneIndex;
+            }
+
+            $columns = max(1, $maxLaneIndex + 1);
+
+            foreach ($cluster as $event) {
+                $event['width_pct'] = round(100 / $columns, 4);
+                $event['left_pct'] = round($event['lane_index'] * $event['width_pct'], 4);
+                $positioned->push($event);
+            }
+        }
+
+        return $positioned->sortBy('start_minutes')->values();
+    }
+
+    private function buildDaySummary(Collection $groups): array
+    {
+        $statusCounts = [
+            'pending' => 0,
+            'confirmed' => 0,
+            'checked_in' => 0,
+            'completed' => 0,
+            'cancelled_or_no_show' => 0,
+        ];
+
+        foreach ($groups as $group) {
+            $status = $group->status instanceof AppointmentStatus
+                ? $group->status->value
+                : (string) $group->status;
+
+            match ($status) {
+                'confirmed' => $statusCounts['confirmed']++,
+                'checked_in' => $statusCounts['checked_in']++,
+                'completed' => $statusCounts['completed']++,
+                'cancelled', 'no_show' => $statusCounts['cancelled_or_no_show']++,
+                default => $statusCounts['pending']++,
+            };
+        }
+
+        return [
+            'total' => $groups->count(),
+            'pending' => $statusCounts['pending'],
+            'confirmed' => $statusCounts['confirmed'],
+            'checked_in' => $statusCounts['checked_in'],
+            'completed' => $statusCounts['completed'],
+            'cancelled_or_no_show' => $statusCounts['cancelled_or_no_show'],
+        ];
+    }
+
+    private function buildStaffLoad(Collection $groups): Collection
+    {
+        return $groups
+            ->flatMap(fn ($group) => $group->items)
+            ->groupBy('staff_id')
+            ->map(function (Collection $items) {
+                $staff = optional($items->first())->staff;
+                $minutes = $items->sum(function ($item) {
+                    if (! $item->starts_at || ! $item->ends_at) {
+                        return 0;
+                    }
+
+                    return $item->starts_at->diffInMinutes($item->ends_at);
+                });
+
+                return [
+                    'name' => $staff?->full_name ?? 'Unassigned',
+                    'job_title' => $staff?->job_title ?: $staff?->role_key,
+                    'appointments' => $items->count(),
+                    'minutes' => $minutes,
+                    'hours_label' => number_format($minutes / 60, 1).'h booked',
+                ];
+            })
+            ->sortByDesc('minutes')
+            ->values();
+    }
+
+    private function membershipLabel(AppointmentGroup $group): ?string
+    {
+        $customer = $group->customer;
+
+        if (! $customer) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $customer->membership_type,
+            $customer->membership_code,
+            $customer->current_package,
+        ]);
+
+        return $parts === [] ? null : implode(' | ', $parts);
     }
 
     private function summarizeNames(array $names, string $fallback): string
@@ -271,24 +532,45 @@ class CalendarController extends Controller
         return $names[0].' +'.(count($names) - 1);
     }
 
-    private function statusLabel(mixed $status): string
+    private function statusLegend(): array
     {
-        $value = $status instanceof \BackedEnum
-            ? $status->value
-            : (string) $status;
-
-        if ($value === '') {
-            return '—';
-        }
-
-        return str($value)->replace('_', ' ')->title()->toString();
+        return collect(self::STATUS_STYLES)
+            ->map(fn ($style, $key) => [
+                'key' => $key,
+                'label' => $style['label'],
+                'dot' => $style['dot'],
+                'badge_bg' => $style['badge_bg'],
+                'badge_border' => $style['badge_border'],
+                'badge_text' => $style['badge_text'],
+            ])
+            ->values()
+            ->all();
     }
 
-    private function serviceColors(string $serviceName): array
+    private function statusVisuals(string $status): array
     {
-        $hash = abs(crc32(mb_strtolower(trim($serviceName))));
-        $index = $hash % count(self::COLOR_PALETTE);
+        return self::STATUS_STYLES[$status] ?? [
+            'label' => str($status)->replace('_', ' ')->title()->toString(),
+            'dot' => '#475569',
+            'badge_bg' => '#f8fafc',
+            'badge_border' => '#cbd5e1',
+            'badge_text' => '#475569',
+        ];
+    }
 
-        return self::COLOR_PALETTE[$index];
+    private function serviceVisuals(string $serviceName): array
+    {
+        $normalized = mb_strtolower(trim($serviceName));
+
+        $palette = match (true) {
+            str_contains($normalized, 'consult') => self::SERVICE_PALETTES[0],
+            str_contains($normalized, 'facial'), str_contains($normalized, 'beauty'), str_contains($normalized, 'aesthetic') => self::SERVICE_PALETTES[7],
+            str_contains($normalized, 'nail') => self::SERVICE_PALETTES[6],
+            str_contains($normalized, 'inject') => self::SERVICE_PALETTES[5],
+            str_contains($normalized, 'weight'), str_contains($normalized, 'detox') => self::SERVICE_PALETTES[4],
+            default => self::SERVICE_PALETTES[abs(crc32($normalized)) % count(self::SERVICE_PALETTES)],
+        };
+
+        return $palette;
     }
 }

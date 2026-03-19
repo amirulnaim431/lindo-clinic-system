@@ -24,6 +24,7 @@ class AppointmentController extends Controller
             'service_ids' => $request->input('service_ids', []),
             'staff_id' => $request->input('staff_id'),
             'status' => $request->input('status'),
+            'slot' => $this->sanitizeSlot($request->input('slot')),
         ];
 
         if (! is_array($filters['service_ids'])) {
@@ -52,8 +53,8 @@ class AppointmentController extends Controller
             ->orderBy('starts_at');
 
         if (! empty($filters['staff_id'])) {
-            $appointmentGroupsQuery->whereHas('items', function ($q) use ($filters) {
-                $q->where('staff_id', $filters['staff_id']);
+            $appointmentGroupsQuery->whereHas('items', function ($query) use ($filters) {
+                $query->where('staff_id', $filters['staff_id']);
             });
         }
 
@@ -69,8 +70,8 @@ class AppointmentController extends Controller
 
         if (! empty($filters['service_ids'])) {
             $selectedServices = Service::query()
-                ->with(['staff' => function ($q) {
-                    $q->where('is_active', true)->orderBy('full_name');
+                ->with(['staff' => function ($query) {
+                    $query->where('is_active', true)->orderBy('full_name');
                 }])
                 ->whereIn('id', $filters['service_ids'])
                 ->where('is_active', true)
@@ -85,6 +86,28 @@ class AppointmentController extends Controller
             }
         }
 
+        $quickCreate = [
+            'prefilled_slot' => $filters['slot'],
+            'slot_is_available' => false,
+            'slot_combinations' => [],
+            'message' => null,
+        ];
+
+        if ($filters['slot'] !== null) {
+            if ($availability === null) {
+                $quickCreate['message'] = 'Time slot selected from calendar. Choose one or more services, then check availability to continue.';
+            } else {
+                $slotDetails = $availability['slots'][$filters['slot']] ?? null;
+
+                if ($slotDetails && ! empty($slotDetails['combinations'])) {
+                    $quickCreate['slot_is_available'] = true;
+                    $quickCreate['slot_combinations'] = $slotDetails['combinations'];
+                } else {
+                    $quickCreate['message'] = 'The selected calendar slot is no longer available for the chosen services. Please pick another time.';
+                }
+            }
+        }
+
         $statusOptions = AppointmentStatus::cases();
 
         return view('app.appointments.index', compact(
@@ -93,7 +116,8 @@ class AppointmentController extends Controller
             'staffList',
             'availability',
             'appointmentGroups',
-            'statusOptions'
+            'statusOptions',
+            'quickCreate'
         ));
     }
 
@@ -111,8 +135,8 @@ class AppointmentController extends Controller
         ]);
 
         $selectedServices = Service::query()
-            ->with(['staff' => function ($q) {
-                $q->where('is_active', true)->orderBy('full_name');
+            ->with(['staff' => function ($query) {
+                $query->where('is_active', true)->orderBy('full_name');
             }])
             ->whereIn('id', $validated['service_ids'])
             ->where('is_active', true)
@@ -150,6 +174,7 @@ class AppointmentController extends Controller
         $end = $start->copy()->addMinutes($durationMinutes);
 
         $chosenStaffIds = array_values($serviceStaffMap);
+
         if (count($chosenStaffIds) !== count(array_unique($chosenStaffIds))) {
             return back()
                 ->withErrors(['selected_combination' => 'The same staff member cannot be assigned to multiple concurrent services.'])
@@ -181,8 +206,8 @@ class AppointmentController extends Controller
 
             $hasConflict = Staff::query()
                 ->whereKey($staff->id)
-                ->whereHas('appointmentItems', function ($q) use ($start, $end) {
-                    $q->where('starts_at', '<', $end)
+                ->whereHas('appointmentItems', function ($query) use ($start, $end) {
+                    $query->where('starts_at', '<', $end)
                         ->where('ends_at', '>', $start);
                 })
                 ->exists();
@@ -210,13 +235,13 @@ class AppointmentController extends Controller
             }
 
             $group = AppointmentGroup::query()->create([
-    'customer_id' => $customer->id,
-    'starts_at' => $start,
-    'ends_at' => $end,
-    'status' => AppointmentStatus::Booked,
-    'source' => 'admin',
-    'notes' => $validated['notes'] ?? null,
-]);
+                'customer_id' => $customer->id,
+                'starts_at' => $start,
+                'ends_at' => $end,
+                'status' => AppointmentStatus::Booked,
+                'source' => 'admin',
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
             foreach ($selectedServices as $service) {
                 $assignedStaff = $resolvedAssignments[(string) $service->id];
@@ -233,7 +258,7 @@ class AppointmentController extends Controller
         });
 
         return redirect()
-            ->to('/app/appointments?date='.$validated['date'])
+            ->to(route('app.appointments.index', ['date' => $validated['date']]))
             ->with('success', 'Appointment created.');
     }
 
@@ -247,6 +272,17 @@ class AppointmentController extends Controller
         $appointmentGroup->save();
 
         return back()->with('success', 'Status updated.');
+    }
+
+    private function sanitizeSlot(mixed $slot): ?string
+    {
+        if (! is_string($slot) || trim($slot) === '') {
+            return null;
+        }
+
+        $slot = trim($slot);
+
+        return preg_match('/^\d{2}:\d{2}$/', $slot) === 1 ? $slot : null;
     }
 
     private function buildAvailability(Collection $selectedServices, Carbon $date): array
@@ -298,8 +334,8 @@ class AppointmentController extends Controller
             foreach ($selectedServices as $service) {
                 $availableStaff = $service->staff()
                     ->where('staff.is_active', true)
-                    ->whereDoesntHave('appointmentItems', function ($q) use ($start, $end) {
-                        $q->where('starts_at', '<', $end)
+                    ->whereDoesntHave('appointmentItems', function ($query) use ($start, $end) {
+                        $query->where('starts_at', '<', $end)
                             ->where('ends_at', '>', $start);
                     })
                     ->orderBy('staff.full_name')
@@ -368,12 +404,13 @@ class AppointmentController extends Controller
 
             if ($index >= count($serviceIds)) {
                 $results[] = [
-                    'label' => implode(' · ', $parts),
+                    'label' => implode(' | ', $parts),
                     'payload' => json_encode([
                         'duration_minutes' => $durationMinutes,
                         'service_staff_map' => $staffMap,
                     ]),
                 ];
+
                 return;
             }
 

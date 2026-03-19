@@ -1,329 +1,251 @@
-<x-layouts.internal :title="$title" :subtitle="$subtitle">
+<x-internal-layout :title="$title" :subtitle="$subtitle">
     @php
-        $queryBase = request()->except(['week']);
+        $weekQueryBase = request()->except(['week', 'date']);
     @endphp
 
+    <style>
+        .ops-card{border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);border-radius:24px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+        .ops-stat{border:1px solid #e2e8f0;border-radius:22px;padding:18px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%)}
+        .ops-stat__label{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
+        .ops-stat__value{margin-top:10px;font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em;color:#0f172a}
+        .ops-stat__meta{margin-top:8px;font-size:13px;color:#64748b}
+        .calendar-day-card{display:block;border:1px solid #e2e8f0;border-radius:22px;padding:16px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);transition:.18s ease}
+        .calendar-day-card:hover{border-color:#cbd5e1;box-shadow:0 12px 28px rgba(15,23,42,.08);transform:translateY(-1px)}
+        .calendar-day-card.is-selected{border-color:#0f172a;background:linear-gradient(180deg,#fff 0%,#eef4ff 100%);box-shadow:0 0 0 3px rgba(15,23,42,.06)}
+        .timeline-grid{position:relative;margin-left:92px;border:1px solid #e2e8f0;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(248,250,252,.92) 100%)}
+        .timeline-row{position:relative;border-bottom:1px solid #e2e8f0}
+        .timeline-row:last-child{border-bottom:none}
+        .timeline-slot-link{position:absolute;inset:10px 14px 10px 18px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;color:#94a3b8;opacity:0;transition:.16s ease;border-radius:18px;border:1px dashed transparent;background:rgba(255,255,255,0)}
+        .timeline-row:hover .timeline-slot-link{opacity:1;color:#475569;border-color:#cbd5e1;background:rgba(255,255,255,.72)}
+        .timeline-slot-link span{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+        .timeline-time{position:absolute;left:0;width:76px;transform:translateY(-50%);text-align:right;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#64748b}
+        .event-layer{position:absolute;inset:0 0 0 92px;pointer-events:none}
+        .calendar-event{position:absolute;padding:12px 14px 12px 16px;border-radius:20px;border:1px solid transparent;box-shadow:0 14px 32px rgba(15,23,42,.12);cursor:pointer;pointer-events:auto;overflow:hidden;transition:.16s ease}
+        .calendar-event:hover{transform:translateY(-1px);box-shadow:0 18px 36px rgba(15,23,42,.16)}
+        .calendar-event::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--service-accent)}
+        .calendar-event__head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+        .calendar-event__service-chip,.calendar-event__status-chip,.legend-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;border:1px solid transparent;white-space:nowrap}
+        .legend-pill{padding:8px 12px;font-size:12px;border-color:#e2e8f0;background:#fff;color:#334155}
+        .calendar-event__status-dot,.legend-dot{width:8px;height:8px;border-radius:999px;display:inline-block;flex:0 0 auto}
+        .load-card{border:1px solid #e2e8f0;border-radius:20px;padding:16px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}
+    </style>
+
     <div class="space-y-6">
-        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <section class="ops-card p-5">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                 <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Calendar Window
-                    </div>
-                    <h2 class="mt-1 text-2xl font-semibold text-slate-900">
-                        {{ $weekStart->format('d M') }} – {{ $weekEnd->format('d M Y') }}
-                    </h2>
-                    <p class="mt-2 text-sm text-slate-500">
-                        Operational calendar view for clinic working days only. Monday and Sunday are hidden from this view.
-                    </p>
+                    <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Operational Board</div>
+                    <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-slate-950">{{ $selectedDateLabel }}</h2>
+                    <p class="mt-2 max-w-3xl text-sm text-slate-500">Service color is the primary scheduling signal, while the status badge shows operational state. Click any appointment for full detail, or click an open row to start a booking fast.</p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3">
-                    <a
-                        href="{{ route('app.calendar', array_merge($queryBase, ['week' => $previousWeek])) }}"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                        ← Previous
-                    </a>
-
-                    <a
-                        href="{{ route('app.calendar', array_merge(request()->except(['week', 'staff_id']), ['week' => $currentWeek])) }}"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                        This Week
-                    </a>
-
-                    <a
-                        href="{{ route('app.calendar', array_merge($queryBase, ['week' => $nextWeek])) }}"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                        Next →
-                    </a>
+                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $previousWeek, 'date' => \Carbon\Carbon::parse($previousWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"><- Previous Week</a>
+                    <a href="{{ route('app.calendar', array_merge(request()->except(['week', 'date']), ['week' => $currentWeek, 'date' => now()->startOfWeek(\Carbon\Carbon::TUESDAY)->toDateString()])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">This Week</a>
+                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $nextWeek, 'date' => \Carbon\Carbon::parse($nextWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Next Week -></a>
                 </div>
             </div>
 
-            <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-3">
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Visible Days
-                        </div>
-                        <div class="mt-2 text-2xl font-semibold text-slate-900">
-                            {{ $days->count() }}
-                        </div>
-                        <div class="mt-1 text-sm text-slate-500">
-                            Tue to Sat
-                        </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Total Appointments
-                        </div>
-                        <div class="mt-2 text-2xl font-semibold text-slate-900">
-                            {{ $totalAppointments }}
-                        </div>
-                        <div class="mt-1 text-sm text-slate-500">
-                            In current calendar window
-                        </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Mode
-                        </div>
-                        <div class="mt-2 text-base font-semibold text-slate-900">
-                            Operational Weekly View
-                        </div>
-                        <div class="mt-1 text-sm text-slate-500">
-                            Customer, service, doctor/staff, and schedule in one place
-                        </div>
-                    </div>
+            <div class="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+                    <div class="ops-stat"><div class="ops-stat__label">Total</div><div class="ops-stat__value">{{ $daySummary['total'] }}</div><div class="ops-stat__meta">Appointments today</div></div>
+                    <div class="ops-stat"><div class="ops-stat__label">Pending</div><div class="ops-stat__value">{{ $daySummary['pending'] }}</div><div class="ops-stat__meta">Awaiting confirmation or arrival</div></div>
+                    <div class="ops-stat"><div class="ops-stat__label">Confirmed</div><div class="ops-stat__value">{{ $daySummary['confirmed'] }}</div><div class="ops-stat__meta">Reserved and expected</div></div>
+                    <div class="ops-stat"><div class="ops-stat__label">Checked In</div><div class="ops-stat__value">{{ $daySummary['checked_in'] }}</div><div class="ops-stat__meta">Already on site</div></div>
+                    <div class="ops-stat"><div class="ops-stat__label">Completed</div><div class="ops-stat__value">{{ $daySummary['completed'] }}</div><div class="ops-stat__meta">Finished today</div></div>
+                    <div class="ops-stat"><div class="ops-stat__label">Cancelled / No-show</div><div class="ops-stat__value">{{ $daySummary['cancelled_or_no_show'] }}</div><div class="ops-stat__meta">Operational loss / released slots</div></div>
                 </div>
 
-                <form method="GET" action="{{ route('app.calendar') }}" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div class="text-sm font-semibold text-slate-900">
-                        Filter calendar
-                    </div>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Narrow the calendar by assigned staff while keeping the same week view.
-                    </p>
-
+                <form method="GET" action="{{ route('app.calendar') }}" class="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                    <div class="text-sm font-extrabold text-slate-900">Filter schedule</div>
+                    <p class="mt-1 text-sm text-slate-500">Narrow the live board to one staff member without leaving the selected clinic day.</p>
                     <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
-
+                    <input type="hidden" name="date" value="{{ $selectedDateIso }}">
                     <div class="mt-4">
-                        <label for="staff_id" class="mb-2 block text-sm font-medium text-slate-700">
-                            Assigned staff
-                        </label>
-                        <select
-                            id="staff_id"
-                            name="staff_id"
-                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                        >
-                            <option value="">All staff</option>
-                            @foreach($staffList as $staff)
-                                <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>
-                                    {{ $staff->full_name }}@if($staff->role_key) ({{ $staff->role_key }}) @endif
-                                </option>
+                        <label for="staff_id" class="mb-2 block text-sm font-semibold text-slate-700">Assigned staff</label>
+                        <select id="staff_id" name="staff_id" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200">
+                            <option value="">All active staff</option>
+                            @foreach ($staffList as $staff)
+                                <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}@if($staff->job_title) - {{ $staff->job_title }} @endif</option>
                             @endforeach
                         </select>
                     </div>
-
                     <div class="mt-4 flex gap-3">
-                        <button
-                            type="submit"
-                            class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                        >
-                            Apply Filter
-                        </button>
-
-                        <a
-                            href="{{ route('app.calendar', ['week' => $weekStart->toDateString()]) }}"
-                            class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
-                        >
-                            Clear
-                        </a>
+                        <button type="submit" class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Apply</button>
+                        <a href="{{ route('app.calendar', ['week' => $weekStart->toDateString(), 'date' => $selectedDateIso]) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">Clear</a>
+                    </div>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Current Scope</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-900">{{ $selectedStaff ? $selectedStaff->full_name : 'All staff' }}</div>
+                        <div class="mt-1 text-sm text-slate-500">{{ $selectedStaff?->job_title ?: 'Viewing full clinic workload for the day.' }}</div>
                     </div>
                 </form>
             </div>
         </section>
 
-        <section class="grid gap-4 xl:grid-cols-5">
-            @foreach($days as $day)
-                @php
-                    $dayEvents = $eventsByDay[$day['date']] ?? collect();
-                @endphp
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="space-y-6">
+                <div class="ops-card p-5">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Week Strip</div>
+                            <h3 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-slate-950">Tue to Sat operational window</h3>
+                        </div>
+                        <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Open Booking Queue</a>
+                    </div>
 
-                <div class="flex min-h-[520px] flex-col rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div class="border-b border-slate-200 px-5 py-4">
-                        <div class="flex items-start justify-between gap-3">
+                    <div class="mt-4 grid gap-3 md:grid-cols-5">
+                        @foreach ($days as $day)
+                            <a href="{{ $day['url'] }}" class="calendar-day-card {{ $day['is_selected'] ? 'is-selected' : '' }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">{{ $day['full_label'] }}</div>
+                                        <div class="mt-2 text-lg font-extrabold tracking-[-0.03em] text-slate-950">{{ $day['display_date'] }}</div>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-2">
+                                        @if ($day['is_today'])
+                                            <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Today</span>
+                                        @endif
+                                        <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600">{{ $day['appointment_count'] }} appt</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-sm text-slate-500">{{ $day['is_selected'] ? 'Focused day board' : 'Switch to this day' }}</div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="ops-card overflow-hidden">
+                    <div class="border-b border-slate-200 px-5 py-5">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                             <div>
-                                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                    {{ $day['full_label'] }}
-                                </div>
-                                <div class="mt-1 text-lg font-semibold text-slate-900">
-                                    {{ $day['display_date'] }}
-                                </div>
+                                <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Live Day Board</div>
+                                <h3 class="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-slate-950">Daily operations timeline</h3>
+                                <p class="mt-2 text-sm text-slate-500">Click a service card for details, or hover an empty time row and use the quick-create affordance.</p>
                             </div>
-
-                            <div class="flex items-center gap-2">
-                                @if($day['is_today'])
-                                    <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                                        Today
-                                    </span>
-                                @endif
-
-                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
-                                    {{ $dayEvents->count() }} appt
-                                </span>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($statusLegend as $item)
+                                    <span class="legend-pill" style="background: {{ $item['badge_bg'] }}; border-color: {{ $item['badge_border'] }}; color: {{ $item['badge_text'] }};"><span class="legend-dot" style="background: {{ $item['dot'] }};"></span>{{ $item['label'] }}</span>
+                                @endforeach
                             </div>
                         </div>
                     </div>
 
-                    <div class="flex-1 space-y-3 px-4 py-4">
-                        @forelse($dayEvents as $event)
-                            <button
-                                type="button"
-                                class="calendar-event-btn block w-full rounded-2xl border p-4 text-left shadow-sm transition {{ $event['color_card'] }}"
-                                data-event='@json($event)'
-                            >
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="h-2.5 w-2.5 rounded-full {{ $event['color_dot'] }}"></span>
-                                            <div class="truncate text-sm font-semibold">
-                                                {{ $event['service_summary'] }}
+                    <div class="px-5 py-5">
+                        @if ($timelineEvents->count())
+                            <div class="timeline-grid" style="height: {{ $timelineHeightPx }}px;">
+                                @foreach ($slots as $index => $slot)
+                                    @php $rowTop = $index * $rowHeightPx; @endphp
+                                    <div class="timeline-time" style="top: {{ $rowTop + 18 }}px;">{{ $slot['label'] }}</div>
+                                    <div class="timeline-row" style="height: {{ $rowHeightPx }}px;">
+                                        <a href="{{ $slot['create_url'] }}" class="timeline-slot-link"><span>+ Quick Create</span></a>
+                                    </div>
+                                @endforeach
+
+                                <div class="event-layer">
+                                    @foreach ($timelineEvents as $event)
+                                        <button type="button" class="calendar-event calendar-event-btn text-left" style="top: {{ $event['top_px'] }}px; height: {{ $event['height_px'] }}px; left: calc({{ $event['left_pct'] }}% + 8px); width: calc({{ $event['width_pct'] }}% - 12px); background: {{ $event['service_styles']['surface'] }}; border-color: {{ $event['service_styles']['border'] }}; color: {{ $event['service_styles']['text'] }}; --service-accent: {{ $event['service_styles']['accent'] }};" data-event='@json($event)'>
+                                            <div class="calendar-event__head">
+                                                <span class="calendar-event__service-chip" style="background: {{ $event['service_styles']['chip_bg'] }}; color: {{ $event['service_styles']['chip_text'] }}; border-color: {{ $event['service_styles']['border'] }};">{{ $event['service_summary'] }}</span>
+                                                <span class="calendar-event__status-chip" style="background: {{ $event['status_styles']['badge_bg'] }}; border-color: {{ $event['status_styles']['badge_border'] }}; color: {{ $event['status_styles']['badge_text'] }};"><span class="calendar-event__status-dot" style="background: {{ $event['status_styles']['dot'] }};"></span>{{ $event['status_label'] }}</span>
                                             </div>
-                                        </div>
-
-                                        <div class="mt-2 text-sm font-medium text-slate-800">
-                                            {{ $event['customer_name'] }}
-                                        </div>
-
-                                        <div class="mt-1 text-xs text-slate-600">
-                                            {{ $event['staff_summary'] }}
-                                        </div>
-                                    </div>
-
-                                    <span class="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold {{ $event['color_badge'] }}">
-                                        {{ $event['start_time'] }}
-                                    </span>
-                                </div>
-
-                                <div class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-600">
-                                    <span>{{ $event['start_time'] }} – {{ $event['end_time'] }}</span>
-                                    <span>{{ $event['status_label'] }}</span>
-                                </div>
-                            </button>
-                        @empty
-                            <div class="flex h-full min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
-                                <div>
-                                    <div class="text-sm font-semibold text-slate-700">
-                                        No appointments
-                                    </div>
-                                    <p class="mt-1 text-sm text-slate-500">
-                                        This clinic day has no bookings for the current filter.
-                                    </p>
+                                            <div class="mt-3 truncate text-sm font-extrabold text-slate-950">{{ $event['customer_name'] }}</div>
+                                            <div class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
+                                            <div class="mt-3 space-y-1 text-xs text-slate-700">
+                                                <div class="truncate"><span class="font-bold text-slate-900">Staff:</span> {{ $event['staff_summary'] }}</div>
+                                                @if ($event['membership_label'])
+                                                    <div class="truncate"><span class="font-bold text-slate-900">Package:</span> {{ $event['membership_label'] }}</div>
+                                                @endif
+                                            </div>
+                                        </button>
+                                    @endforeach
                                 </div>
                             </div>
+                        @else
+                            <div class="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+                                <div class="text-base font-extrabold text-slate-800">No appointments on this day</div>
+                                <p class="mt-2 text-sm text-slate-500">Use the quick booking flow to fill the day, or change the selected date or staff filter.</p>
+                                <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="mt-5 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Create Appointment</a>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="ops-card p-5">
+                    <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Service Signal</div>
+                    <h3 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-slate-950">Reading the board</h3>
+                    <div class="mt-3 space-y-3 text-sm text-slate-500">
+                        <p>Primary card tint and left accent indicate the booked service type or treatment family.</p>
+                        <p>Secondary status chip indicates whether the booking is pending, confirmed, checked in, completed, cancelled, or no-show.</p>
+                        <p>Assigned staff is shown directly on each card so front desk can infer occupancy immediately.</p>
+                    </div>
+                </div>
+
+                <div class="ops-card p-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Staff Load</div>
+                            <h3 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-slate-950">Booked staff today</h3>
+                        </div>
+                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{{ $staffLoad->count() }} staff</span>
+                    </div>
+                    <div class="mt-4 space-y-3">
+                        @forelse ($staffLoad as $load)
+                            <div class="load-card">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="text-sm font-extrabold text-slate-950">{{ $load['name'] }}</div>
+                                        <div class="mt-1 text-xs uppercase tracking-[0.08em] text-slate-500">{{ $load['job_title'] ?: 'Operational staff' }}</div>
+                                    </div>
+                                    <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">{{ $load['appointments'] }} item{{ $load['appointments'] === 1 ? '' : 's' }}</span>
+                                </div>
+                                <div class="mt-3 text-sm text-slate-600">{{ $load['hours_label'] }}</div>
+                            </div>
+                        @empty
+                            <div class="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center text-sm text-slate-500">No active staff assignments in the selected day and filter.</div>
                         @endforelse
                     </div>
                 </div>
-            @endforeach
+            </div>
         </section>
     </div>
 
-    <div
-        id="calendar-detail-modal"
-        class="fixed inset-0 z-50 hidden"
-        aria-hidden="true"
-    >
-        <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"></div>
-
+    <div id="calendar-detail-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+        <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"></div>
         <div class="relative flex min-h-full items-center justify-center p-4">
-            <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Appointment Detail
+            <div class="w-full max-w-3xl overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
+                <div id="modal-header" class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Appointment Details</div>
+                            <h3 id="modal-customer-name" class="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-slate-950">-</h3>
+                            <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">-</p>
                         </div>
-                        <h3 id="modal-customer-name" class="mt-1 text-2xl font-semibold text-slate-900">
-                            —
-                        </h3>
-                        <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">
-                            —
-                        </p>
+                        <button type="button" id="calendar-detail-close-top" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" aria-label="Close">X</button>
                     </div>
-
-                    <button
-                        type="button"
-                        id="calendar-detail-close-top"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
-                        aria-label="Close"
-                    >
-                        ✕
-                    </button>
                 </div>
-
                 <div class="space-y-6 px-6 py-6">
+                    <div class="grid gap-4 md:grid-cols-4">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Date & Time</div><div id="modal-time" class="mt-2 text-sm font-bold text-slate-900">-</div></div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Status</div><div id="modal-status" class="mt-2"></div></div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Customer Phone</div><div id="modal-phone" class="mt-2 text-sm font-bold text-slate-900">-</div></div>
+                    </div>
                     <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Time
-                            </div>
-                            <div id="modal-time" class="mt-2 text-sm font-semibold text-slate-900">
-                                —
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Status
-                            </div>
-                            <div id="modal-status" class="mt-2 text-sm font-semibold text-slate-900">
-                                —
-                            </div>
-                        </div>
+                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Services</div><div id="modal-services" class="mt-3 space-y-2 text-sm text-slate-700">-</div></div>
+                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Assigned Staff</div><div id="modal-staff" class="mt-3 space-y-2 text-sm text-slate-700">-</div></div>
                     </div>
-
                     <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Services
-                            </div>
-                            <div id="modal-services" class="mt-2 space-y-2 text-sm text-slate-700">
-                                —
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-slate-200 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Assigned Staff / Doctor
-                            </div>
-                            <div id="modal-staff" class="mt-2 space-y-2 text-sm text-slate-700">
-                                —
-                            </div>
-                        </div>
+                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Package / Membership</div><div id="modal-membership" class="mt-2 text-sm text-slate-700">-</div></div>
+                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Source</div><div id="modal-source" class="mt-2 text-sm text-slate-700">-</div></div>
                     </div>
-
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Customer Phone
-                            </div>
-                            <div id="modal-phone" class="mt-2 text-sm text-slate-700">
-                                —
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-slate-200 p-4">
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                Source
-                            </div>
-                            <div id="modal-source" class="mt-2 text-sm text-slate-700">
-                                —
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Notes
-                        </div>
-                        <div id="modal-notes" class="mt-2 whitespace-pre-line text-sm text-slate-700">
-                            —
-                        </div>
-                    </div>
+                    <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Notes</div><div id="modal-notes" class="mt-2 whitespace-pre-line text-sm text-slate-700">-</div></div>
                 </div>
-
-                <div class="flex justify-end border-t border-slate-200 px-6 py-4">
-                    <button
-                        type="button"
-                        id="calendar-detail-close-bottom"
-                        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                    >
-                        Close
-                    </button>
+                <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:justify-end">
+                    <a id="modal-create-link" href="#" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">New Booking At This Time</a>
+                    <a id="modal-manage-link" href="#" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Open Appointments</a>
+                    <button type="button" id="calendar-detail-close-bottom" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Close</button>
                 </div>
             </div>
         </div>
@@ -332,42 +254,50 @@
     <script>
         (() => {
             const modal = document.getElementById('calendar-detail-modal');
+            const modalHeader = document.getElementById('modal-header');
             const closeTop = document.getElementById('calendar-detail-close-top');
             const closeBottom = document.getElementById('calendar-detail-close-bottom');
+            const manageLink = document.getElementById('modal-manage-link');
+            const createLink = document.getElementById('modal-create-link');
 
-            const setText = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.textContent = value && String(value).trim() !== '' ? value : '—';
+            const setText = (id, value, fallback = '-') => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = value && String(value).trim() !== '' ? value : fallback;
                 }
             };
 
             const setList = (id, values) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-
+                const element = document.getElementById(id);
+                if (!element) return;
                 const items = Array.isArray(values) ? values.filter(Boolean) : [];
                 if (!items.length) {
-                    el.innerHTML = '<div>—</div>';
+                    element.innerHTML = '<div>-</div>';
                     return;
                 }
+                element.innerHTML = items.map((item) => `<div class="rounded-xl bg-slate-50 px-3 py-2">${String(item)}</div>`).join('');
+            };
 
-                el.innerHTML = items
-                    .map(item => `<div class="rounded-xl bg-slate-50 px-3 py-2">${String(item)}</div>`)
-                    .join('');
+            const setStatusChip = (eventData) => {
+                const container = document.getElementById('modal-status');
+                if (!container) return;
+                container.innerHTML = `<span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold" style="background:${eventData.status_styles.badge_bg}; border-color:${eventData.status_styles.badge_border}; color:${eventData.status_styles.badge_text};"><span style="width:8px; height:8px; border-radius:999px; background:${eventData.status_styles.dot}; display:inline-block;"></span>${eventData.status_label || 'Status'}</span>`;
             };
 
             const openModal = (eventData) => {
                 setText('modal-customer-name', eventData.customer_name);
                 setText('modal-service-summary', eventData.service_summary);
-                setText('modal-time', `${eventData.start_time || '—'} – ${eventData.end_time || '—'}`);
-                setText('modal-status', eventData.status_label);
+                setText('modal-time', `${eventData.date_label || '-'} | ${eventData.start_time || '-'} - ${eventData.end_time || '-'}`);
+                setStatusChip(eventData);
                 setList('modal-services', eventData.service_names || []);
                 setList('modal-staff', eventData.staff_details || eventData.staff_names || []);
-                setText('modal-phone', eventData.customer_phone);
-                setText('modal-source', eventData.source || '—');
-                setText('modal-notes', eventData.notes || 'No notes recorded.');
-
+                setText('modal-phone', eventData.customer_phone, 'No phone recorded');
+                setText('modal-membership', eventData.membership_label, 'No package or membership linked');
+                setText('modal-source', eventData.source, 'Not recorded');
+                setText('modal-notes', eventData.notes, 'No notes recorded.');
+                manageLink.href = eventData.manage_url || '#';
+                createLink.href = eventData.create_url || '#';
+                modalHeader.style.background = `linear-gradient(180deg, ${eventData.service_styles.surface} 0%, #ffffff 100%)`;
                 modal.classList.remove('hidden');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('overflow-hidden');
@@ -382,26 +312,19 @@
             document.querySelectorAll('.calendar-event-btn').forEach((button) => {
                 button.addEventListener('click', () => {
                     try {
-                        const payload = JSON.parse(button.dataset.event || '{}');
-                        openModal(payload);
+                        openModal(JSON.parse(button.dataset.event || '{}'));
                     } catch (error) {
                         console.error('Failed to open appointment detail modal.', error);
                     }
                 });
             });
 
-            [closeTop, closeBottom].forEach((button) => {
-                if (button) {
-                    button.addEventListener('click', closeModal);
-                }
-            });
-
+            [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
             modal?.addEventListener('click', (event) => {
                 if (event.target === modal || event.target === modal.firstElementChild) {
                     closeModal();
                 }
             });
-
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
                     closeModal();
@@ -409,4 +332,4 @@
             });
         })();
     </script>
-</x-layouts.internal>
+</x-internal-layout>
