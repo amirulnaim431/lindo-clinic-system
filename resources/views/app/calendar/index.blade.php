@@ -1,19 +1,21 @@
 <x-internal-layout :title="$title" :subtitle="$subtitle">
     @php
         $weekQueryBase = request()->except(['week', 'date']);
+        $timelineHasEvents = $timelineEvents->count() > 0;
     @endphp
 
     <style>
-        .ops-card{border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);border-radius:24px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
-        .toolbar-card{border:1px solid #e2e8f0;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-radius:22px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
-        .ops-stat{border:1px solid #e2e8f0;border-radius:18px;padding:14px 16px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%)}
-        .ops-stat__label{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
-        .ops-stat__value{margin-top:8px;font-size:26px;line-height:1;font-weight:800;letter-spacing:-.04em;color:#0f172a}
-        .ops-stat__meta{margin-top:6px;font-size:12px;color:#64748b}
-        .calendar-day-card{display:block;border:1px solid #e2e8f0;border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);transition:.18s ease}
-        .calendar-day-card:hover{border-color:#cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.08);transform:translateY(-1px)}
-        .calendar-day-card.is-selected{border-color:#0f172a;background:linear-gradient(180deg,#fff 0%,#eef4ff 100%);box-shadow:0 0 0 3px rgba(15,23,42,.06)}
-        .timeline-grid{position:relative;margin-left:92px;border:1px solid #e2e8f0;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(248,250,252,.92) 100%)}
+        .toolbar-card{border:1px solid #e2e8f0;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-radius:22px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+        .surface-card{border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);border-radius:24px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+        .metric-chip{border:1px solid #e2e8f0;border-radius:18px;padding:10px 12px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%)}
+        .metric-chip__label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
+        .metric-chip__value{margin-top:6px;font-size:20px;line-height:1;font-weight:800;letter-spacing:-.04em;color:#0f172a}
+        .metric-chip__meta{margin-top:4px;font-size:11px;color:#64748b}
+        .compact-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
+        .timeline-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
+        .timeline-panel{min-width:0}
+        .sidebar-stack{display:grid;gap:18px}
+        .timeline-grid{position:relative;margin-left:92px;border:1px solid #e2e8f0;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.94) 100%)}
         .timeline-row{position:relative;border-bottom:1px solid #e2e8f0}
         .timeline-row:last-child{border-bottom:none}
         .timeline-slot-link{position:absolute;inset:10px 14px 10px 18px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;color:#94a3b8;opacity:0;transition:.16s ease;border-radius:18px;border:1px dashed transparent;background:rgba(255,255,255,0)}
@@ -28,8 +30,15 @@
         .calendar-event__service-chip,.calendar-event__status-chip,.legend-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;border:1px solid transparent;white-space:nowrap}
         .legend-pill{padding:7px 11px;font-size:11px;border-color:#e2e8f0;background:#fff;color:#334155}
         .calendar-event__status-dot,.legend-dot{width:8px;height:8px;border-radius:999px;display:inline-block;flex:0 0 auto}
+        .timeline-empty-overlay{position:absolute;inset:0 0 0 92px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+        .timeline-empty-overlay__card{width:min(520px,calc(100% - 48px));border:1px dashed #cbd5e1;border-radius:24px;background:rgba(255,255,255,.9);padding:28px 24px;text-align:center;box-shadow:0 16px 36px rgba(15,23,42,.08)}
+        .sidebar-card{border:1px solid #e2e8f0;border-radius:22px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);padding:16px}
         .load-card{border:1px solid #e2e8f0;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}
-        .compact-label{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
+        .day-link{display:block;border:1px solid #e2e8f0;border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);transition:.18s ease}
+        .day-link:hover{border-color:#cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.08);transform:translateY(-1px)}
+        .day-link.is-selected{border-color:#0f172a;background:linear-gradient(180deg,#fff 0%,#eef4ff 100%);box-shadow:0 0 0 3px rgba(15,23,42,.06)}
+        @media (max-width: 1280px){.timeline-wrap{grid-template-columns:1fr}.sidebar-stack{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media (max-width: 920px){.sidebar-stack{grid-template-columns:1fr}}
     </style>
 
     <div class="space-y-5">
@@ -38,7 +47,7 @@
                 <div>
                     <div class="compact-label">Operational Board</div>
                     <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-slate-950">{{ $selectedDateLabel }}</h2>
-                    <p class="mt-1 text-sm text-slate-500">Live clinic schedule with service-first color coding and status as the secondary signal.</p>
+                    <p class="mt-1 text-sm text-slate-500">The live day board is the primary workspace. Service color shows treatment type, and the badge shows appointment status.</p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -51,12 +60,12 @@
 
             <div class="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
                 <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-                    <div class="ops-stat"><div class="ops-stat__label">Total</div><div class="ops-stat__value">{{ $daySummary['total'] }}</div><div class="ops-stat__meta">Today</div></div>
-                    <div class="ops-stat"><div class="ops-stat__label">Pending</div><div class="ops-stat__value">{{ $daySummary['pending'] }}</div><div class="ops-stat__meta">Awaiting action</div></div>
-                    <div class="ops-stat"><div class="ops-stat__label">Confirmed</div><div class="ops-stat__value">{{ $daySummary['confirmed'] }}</div><div class="ops-stat__meta">Reserved</div></div>
-                    <div class="ops-stat"><div class="ops-stat__label">Checked In</div><div class="ops-stat__value">{{ $daySummary['checked_in'] }}</div><div class="ops-stat__meta">On site</div></div>
-                    <div class="ops-stat"><div class="ops-stat__label">Completed</div><div class="ops-stat__value">{{ $daySummary['completed'] }}</div><div class="ops-stat__meta">Finished</div></div>
-                    <div class="ops-stat"><div class="ops-stat__label">Cancelled</div><div class="ops-stat__value">{{ $daySummary['cancelled_or_no_show'] }}</div><div class="ops-stat__meta">Released / lost</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Total</div><div class="metric-chip__value">{{ $daySummary['total'] }}</div><div class="metric-chip__meta">Today</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Pending</div><div class="metric-chip__value">{{ $daySummary['pending'] }}</div><div class="metric-chip__meta">Awaiting action</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Confirmed</div><div class="metric-chip__value">{{ $daySummary['confirmed'] }}</div><div class="metric-chip__meta">Reserved</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Checked In</div><div class="metric-chip__value">{{ $daySummary['checked_in'] }}</div><div class="metric-chip__meta">On site</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Completed</div><div class="metric-chip__value">{{ $daySummary['completed'] }}</div><div class="metric-chip__meta">Finished</div></div>
+                    <div class="metric-chip"><div class="metric-chip__label">Cancelled</div><div class="metric-chip__value">{{ $daySummary['cancelled_or_no_show'] }}</div><div class="metric-chip__meta">Released / lost</div></div>
                 </div>
 
                 <form method="GET" action="{{ route('app.calendar') }}" class="rounded-[18px] border border-slate-200 bg-slate-50 p-3">
@@ -77,8 +86,8 @@
             </div>
         </section>
 
-        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div class="ops-card overflow-hidden">
+        <section class="timeline-wrap">
+            <div class="timeline-panel surface-card overflow-hidden">
                 <div class="border-b border-slate-200 px-5 py-4">
                     <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div>
@@ -94,47 +103,49 @@
                 </div>
 
                 <div class="px-5 py-5">
-                    @if ($timelineEvents->count())
-                        <div class="timeline-grid" style="height: {{ $timelineHeightPx }}px;">
-                            @foreach ($slots as $index => $slot)
-                                @php $rowTop = $index * $rowHeightPx; @endphp
-                                <div class="timeline-time" style="top: {{ $rowTop + 18 }}px;">{{ $slot['label'] }}</div>
-                                <div class="timeline-row" style="height: {{ $rowHeightPx }}px;">
-                                    <a href="{{ $slot['create_url'] }}" class="timeline-slot-link"><span>+ Quick Create</span></a>
-                                </div>
-                            @endforeach
-
-                            <div class="event-layer">
-                                @foreach ($timelineEvents as $event)
-                                    <button type="button" class="calendar-event calendar-event-btn text-left" style="top: {{ $event['top_px'] }}px; height: {{ $event['height_px'] }}px; left: calc({{ $event['left_pct'] }}% + 8px); width: calc({{ $event['width_pct'] }}% - 12px); background: {{ $event['service_styles']['surface'] }}; border-color: {{ $event['service_styles']['border'] }}; color: {{ $event['service_styles']['text'] }}; --service-accent: {{ $event['service_styles']['accent'] }};" data-event='@json($event)'>
-                                        <div class="calendar-event__head">
-                                            <span class="calendar-event__service-chip" style="background: {{ $event['service_styles']['chip_bg'] }}; color: {{ $event['service_styles']['chip_text'] }}; border-color: {{ $event['service_styles']['border'] }};">{{ $event['service_summary'] }}</span>
-                                            <span class="calendar-event__status-chip" style="background: {{ $event['status_styles']['badge_bg'] }}; border-color: {{ $event['status_styles']['badge_border'] }}; color: {{ $event['status_styles']['badge_text'] }};"><span class="calendar-event__status-dot" style="background: {{ $event['status_styles']['dot'] }};"></span>{{ $event['status_label'] }}</span>
-                                        </div>
-                                        <div class="mt-3 truncate text-sm font-extrabold text-slate-950">{{ $event['customer_name'] }}</div>
-                                        <div class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
-                                        <div class="mt-3 space-y-1 text-xs text-slate-700">
-                                            <div class="truncate"><span class="font-bold text-slate-900">Staff:</span> {{ $event['staff_summary'] }}</div>
-                                            @if ($event['membership_label'])
-                                                <div class="truncate"><span class="font-bold text-slate-900">Package:</span> {{ $event['membership_label'] }}</div>
-                                            @endif
-                                        </div>
-                                    </button>
-                                @endforeach
+                    <div class="timeline-grid" style="height: {{ $timelineHeightPx }}px;">
+                        @foreach ($slots as $index => $slot)
+                            @php $rowTop = $index * $rowHeightPx; @endphp
+                            <div class="timeline-time" style="top: {{ $rowTop + 18 }}px;">{{ $slot['label'] }}</div>
+                            <div class="timeline-row" style="height: {{ $rowHeightPx }}px;">
+                                <a href="{{ $slot['create_url'] }}" class="timeline-slot-link"><span>+ Quick Create</span></a>
                             </div>
+                        @endforeach
+
+                        <div class="event-layer">
+                            @foreach ($timelineEvents as $event)
+                                <button type="button" class="calendar-event calendar-event-btn text-left" style="top: {{ $event['top_px'] }}px; height: {{ $event['height_px'] }}px; left: calc({{ $event['left_pct'] }}% + 8px); width: calc({{ $event['width_pct'] }}% - 12px); background: {{ $event['service_styles']['surface'] }}; border-color: {{ $event['service_styles']['border'] }}; color: {{ $event['service_styles']['text'] }}; --service-accent: {{ $event['service_styles']['accent'] }};" data-event='@json($event)'>
+                                    <div class="calendar-event__head">
+                                        <span class="calendar-event__service-chip" style="background: {{ $event['service_styles']['chip_bg'] }}; color: {{ $event['service_styles']['chip_text'] }}; border-color: {{ $event['service_styles']['border'] }};">{{ $event['service_summary'] }}</span>
+                                        <span class="calendar-event__status-chip" style="background: {{ $event['status_styles']['badge_bg'] }}; border-color: {{ $event['status_styles']['badge_border'] }}; color: {{ $event['status_styles']['badge_text'] }};"><span class="calendar-event__status-dot" style="background: {{ $event['status_styles']['dot'] }};"></span>{{ $event['status_label'] }}</span>
+                                    </div>
+                                    <div class="mt-3 truncate text-sm font-extrabold text-slate-950">{{ $event['customer_name'] }}</div>
+                                    <div class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
+                                    <div class="mt-3 space-y-1 text-xs text-slate-700">
+                                        <div class="truncate"><span class="font-bold text-slate-900">Staff:</span> {{ $event['staff_summary'] }}</div>
+                                        @if ($event['membership_label'])
+                                            <div class="truncate"><span class="font-bold text-slate-900">Package:</span> {{ $event['membership_label'] }}</div>
+                                        @endif
+                                    </div>
+                                </button>
+                            @endforeach
                         </div>
-                    @else
-                        <div class="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                            <div class="text-base font-extrabold text-slate-800">No appointments on this day</div>
-                            <p class="mt-2 text-sm text-slate-500">Use the quick booking flow to fill the day, or change the selected date or staff filter.</p>
-                            <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="mt-5 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Create Appointment</a>
-                        </div>
-                    @endif
+
+                        @if (! $timelineHasEvents)
+                            <div class="timeline-empty-overlay">
+                                <div class="timeline-empty-overlay__card">
+                                    <div class="text-lg font-extrabold text-slate-900">No appointments on this day</div>
+                                    <p class="mt-2 text-sm text-slate-500">This still behaves like a real live board. Hover any time row to quick-create a booking directly from the empty schedule.</p>
+                                    <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="mt-5 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 pointer-events-auto">Create Appointment</a>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
 
-            <div class="space-y-5">
-                <div class="ops-card p-4">
+            <aside class="sidebar-stack">
+                <div class="sidebar-card">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <div class="compact-label">Staff Load</div>
@@ -160,11 +171,11 @@
                     </div>
                 </div>
 
-                <div class="ops-card p-4">
+                <div class="sidebar-card">
                     <div class="compact-label">Week Strip</div>
                     <div class="mt-3 grid gap-2">
                         @foreach ($days as $day)
-                            <a href="{{ $day['url'] }}" class="calendar-day-card {{ $day['is_selected'] ? 'is-selected' : '' }}">
+                            <a href="{{ $day['url'] }}" class="day-link {{ $day['is_selected'] ? 'is-selected' : '' }}">
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
                                         <div class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{{ $day['full_label'] }}</div>
@@ -181,7 +192,7 @@
                         @endforeach
                     </div>
                 </div>
-            </div>
+            </aside>
         </section>
     </div>
 
