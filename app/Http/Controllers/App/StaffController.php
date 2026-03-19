@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -262,5 +263,29 @@ class StaffController extends Controller
         return redirect()
             ->route('app.staff.index', $request->only(['search', 'department', 'operational_role', 'status', 'login', 'page']))
             ->with('success', 'Staff status updated successfully.');
+    }
+
+    public function destroy(Request $request, Staff $staff)
+    {
+        DB::transaction(function () use ($staff) {
+            $staff->services()->detach();
+
+            $existingNotes = trim((string) ($staff->notes ?? ''));
+            $removalNote = 'Staff removed from active directory on '.now()->format('Y-m-d H:i:s').'.';
+
+            $staff->update([
+                'is_active' => false,
+                'can_login' => false,
+                'user_id' => null,
+                'access_permissions' => [],
+                'notes' => $existingNotes !== '' ? $existingNotes."\n\n".$removalNote : $removalNote,
+            ]);
+
+            $staff->delete();
+        });
+
+        return redirect()
+            ->route('app.staff.index', $request->only(['search', 'department', 'operational_role', 'status', 'login', 'page']))
+            ->with('success', 'Staff record removed successfully.');
     }
 }

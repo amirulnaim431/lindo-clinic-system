@@ -201,6 +201,20 @@
                                                             {{ $member->is_active ? 'Set Inactive' : 'Set Active' }}
                                                         </button>
                                                     </form>
+
+                                                    <form method="POST" action="{{ route('app.staff.destroy', $member) }}" onsubmit="return confirm('Remove this staff record from the active directory? Historical appointments will be preserved.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <input type="hidden" name="search" value="{{ $filters['search'] }}">
+                                                        <input type="hidden" name="department" value="{{ $filters['department'] }}">
+                                                        <input type="hidden" name="operational_role" value="{{ $filters['operational_role'] }}">
+                                                        <input type="hidden" name="status" value="{{ $filters['status'] }}">
+                                                        <input type="hidden" name="login" value="{{ $filters['login'] }}">
+                                                        <input type="hidden" name="page" value="{{ request('page', 1) }}">
+                                                        <button type="submit" class="btn btn-secondary" style="border-color:#fecdd3;color:#9f1239;background:#fff1f2;">
+                                                            Remove
+                                                        </button>
+                                                    </form>
                                                 </div>
                                             @else
                                                 <span class="text-muted">View only</span>

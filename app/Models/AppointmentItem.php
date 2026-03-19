@@ -41,6 +41,6 @@ class AppointmentItem extends Model
 
     public function staff(): BelongsTo
     {
-        return $this->belongsTo(Staff::class, 'staff_id');
+        return $this->belongsTo(Staff::class, 'staff_id')->withTrashed();
     }
 }

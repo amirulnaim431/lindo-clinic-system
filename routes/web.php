@@ -72,6 +72,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::patch('/staff/{staff}/status', [StaffController::class, 'updateStatus'])
             ->middleware('app_permission:staff.manage')
             ->name('staff.status');
+        Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.destroy');
 
         Route::get('/customers/import', [CustomerImportController::class, 'index'])
             ->middleware('app_permission:customers.import')
