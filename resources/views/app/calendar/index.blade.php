@@ -40,8 +40,34 @@
         .day-link{display:block;border:1px solid #e2e8f0;border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);transition:.18s ease}
         .day-link:hover{border-color:#cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.08);transform:translateY(-1px)}
         .day-link.is-selected{border-color:#0f172a;background:linear-gradient(180deg,#fff 0%,#eef4ff 100%);box-shadow:0 0 0 3px rgba(15,23,42,.06)}
+        .modal-shell{position:fixed;inset:0;z-index:60}
+        .modal-shell.hidden{display:none}
+        .modal-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.56);backdrop-filter:blur(10px)}
+        .modal-stage{position:relative;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+        .modal-card{width:min(760px,100%);border:1px solid #dbe4ef;border-radius:28px;background:#ffffff;box-shadow:0 28px 80px rgba(15,23,42,.26);overflow:hidden}
+        .modal-header{padding:22px 24px 18px;border-bottom:1px solid #e2e8f0}
+        .modal-header__row{display:flex;align-items:start;justify-content:space-between;gap:16px}
+        .modal-close{appearance:none;border:1px solid #dbe4ef;background:rgba(255,255,255,.72);color:#475569;border-radius:16px;width:40px;height:40px;font-size:18px;font-weight:700;cursor:pointer;transition:.16s ease}
+        .modal-close:hover{background:#f8fafc;color:#0f172a}
+        .modal-kicker{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#64748b}
+        .modal-title{margin-top:8px;font-size:28px;line-height:1.05;font-weight:800;letter-spacing:-.04em;color:#0f172a}
+        .modal-subtitle{margin-top:8px;font-size:14px;color:#64748b}
+        .modal-body{padding:20px 24px 22px;display:grid;gap:16px}
+        .modal-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+        .modal-panel{border:1px solid #e2e8f0;border-radius:20px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);padding:15px 16px}
+        .modal-panel--wide{grid-column:span 2}
+        .modal-panel__label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
+        .modal-panel__value{margin-top:8px;font-size:14px;font-weight:700;color:#0f172a;line-height:1.5}
+        .modal-pill-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+        .modal-pill{display:inline-flex;align-items:center;border-radius:999px;border:1px solid #dbe4ef;background:#ffffff;padding:8px 11px;font-size:12px;font-weight:700;color:#334155}
+        .modal-actions{padding:16px 24px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;background:#fcfdff}
+        .modal-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:16px;padding:11px 14px;font-size:13px;font-weight:800;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:.16s ease}
+        .modal-btn--secondary{background:#ffffff;border-color:#cbd5e1;color:#0f172a}
+        .modal-btn--secondary:hover{background:#f8fafc}
+        .modal-btn--primary{background:#0f172a;border-color:#0f172a;color:#ffffff}
+        .modal-btn--primary:hover{background:#1e293b}
         @media (max-width: 1280px){.timeline-wrap{grid-template-columns:1fr}.sidebar-stack{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media (max-width: 920px){.sidebar-stack{grid-template-columns:1fr}}
+        @media (max-width: 920px){.sidebar-stack{grid-template-columns:1fr}.modal-meta-grid{grid-template-columns:1fr}.modal-panel--wide{grid-column:span 1}.modal-stage{padding:14px}.modal-card{width:100%}.modal-title{font-size:24px}}
     </style>
 
     <div class="space-y-5">
@@ -202,40 +228,40 @@
         </section>
     </div>
 
-    <div id="calendar-detail-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
-        <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"></div>
-        <div class="relative flex min-h-full items-center justify-center p-4">
-            <div class="w-full max-w-3xl overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
-                <div id="modal-header" class="border-b border-slate-200 px-6 py-5">
-                    <div class="flex items-start justify-between gap-4">
+    <div id="calendar-detail-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card">
+                <div id="modal-header" class="modal-header">
+                    <div class="modal-header__row">
                         <div>
-                            <div class="text-xs font-extrabold uppercase tracking-[0.22em] text-slate-400">Appointment Details</div>
-                            <h3 id="modal-customer-name" class="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-slate-950">-</h3>
-                            <p id="modal-service-summary" class="mt-2 text-sm text-slate-500">-</p>
+                            <div class="modal-kicker">Appointment Details</div>
+                            <h3 id="modal-customer-name" class="modal-title">-</h3>
+                            <p id="modal-service-summary" class="modal-subtitle">-</p>
                         </div>
-                        <button type="button" id="calendar-detail-close-top" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" aria-label="Close">X</button>
+                        <button type="button" id="calendar-detail-close-top" class="modal-close" aria-label="Close">×</button>
                     </div>
                 </div>
-                <div class="space-y-6 px-6 py-6">
-                    <div class="grid gap-4 md:grid-cols-4">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Date & Time</div><div id="modal-time" class="mt-2 text-sm font-bold text-slate-900">-</div></div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Status</div><div id="modal-status" class="mt-2"></div></div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Customer Phone</div><div id="modal-phone" class="mt-2 text-sm font-bold text-slate-900">-</div></div>
+                <div class="modal-body">
+                    <div class="modal-meta-grid">
+                        <div class="modal-panel modal-panel--wide"><div class="modal-panel__label">Date & Time</div><div id="modal-time" class="modal-panel__value">-</div></div>
+                        <div class="modal-panel"><div class="modal-panel__label">Status</div><div id="modal-status" class="modal-panel__value" style="margin-top:10px;"></div></div>
                     </div>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Services</div><div id="modal-services" class="mt-3 space-y-2 text-sm text-slate-700">-</div></div>
-                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Assigned Staff</div><div id="modal-staff" class="mt-3 space-y-2 text-sm text-slate-700">-</div></div>
+                    <div class="modal-meta-grid">
+                        <div class="modal-panel"><div class="modal-panel__label">Customer Phone</div><div id="modal-phone" class="modal-panel__value">-</div></div>
+                        <div class="modal-panel"><div class="modal-panel__label">Package / Membership</div><div id="modal-membership" class="modal-panel__value">-</div></div>
+                        <div class="modal-panel"><div class="modal-panel__label">Source</div><div id="modal-source" class="modal-panel__value">-</div></div>
                     </div>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Package / Membership</div><div id="modal-membership" class="mt-2 text-sm text-slate-700">-</div></div>
-                        <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Source</div><div id="modal-source" class="mt-2 text-sm text-slate-700">-</div></div>
+                    <div class="modal-meta-grid">
+                        <div class="modal-panel"><div class="modal-panel__label">Services</div><div id="modal-services" class="modal-pill-list">-</div></div>
+                        <div class="modal-panel"><div class="modal-panel__label">Assigned Staff</div><div id="modal-staff" class="modal-pill-list">-</div></div>
                     </div>
-                    <div class="rounded-2xl border border-slate-200 p-4"><div class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Notes</div><div id="modal-notes" class="mt-2 whitespace-pre-line text-sm text-slate-700">-</div></div>
+                    <div class="modal-panel"><div class="modal-panel__label">Notes</div><div id="modal-notes" class="modal-panel__value" style="white-space:pre-line;">-</div></div>
                 </div>
-                <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:justify-end">
-                    <a id="modal-create-link" href="#" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">New Booking At This Time</a>
-                    <a id="modal-manage-link" href="#" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Open Appointments</a>
-                    <button type="button" id="calendar-detail-close-bottom" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Close</button>
+                <div class="modal-actions">
+                    <a id="modal-create-link" href="#" class="modal-btn modal-btn--secondary">New Booking At This Time</a>
+                    <a id="modal-manage-link" href="#" class="modal-btn modal-btn--primary">Open Appointments</a>
+                    <button type="button" id="calendar-detail-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
                 </div>
             </div>
         </div>
@@ -272,7 +298,7 @@
                     element.innerHTML = '<div>-</div>';
                     return;
                 }
-                element.innerHTML = items.map((item) => `<div class="rounded-xl bg-slate-50 px-3 py-2">${String(item)}</div>`).join('');
+                element.innerHTML = items.map((item) => `<span class="modal-pill">${String(item)}</span>`).join('');
             };
 
             const setStatusChip = (eventData) => {
