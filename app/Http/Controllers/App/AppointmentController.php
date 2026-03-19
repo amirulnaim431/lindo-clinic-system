@@ -11,6 +11,7 @@ use App\Models\Service;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -125,6 +126,7 @@ class AppointmentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'customer_id' => ['nullable', 'string', Rule::exists('customers', 'id')],
             'date' => ['required', 'date_format:Y-m-d'],
             'slot' => ['required', 'date_format:H:i'],
             'service_ids' => ['required', 'array', 'min:1'],
@@ -224,16 +226,28 @@ class AppointmentController extends Controller
 
         DB::transaction(function () use ($validated, $start, $end, $selectedServices, $resolvedAssignments) {
             $phone = trim($validated['customer_phone']);
+            $customer = null;
 
-            $customer = Customer::query()->firstOrCreate(
-                ['phone' => $phone],
-                ['full_name' => $validated['customer_full_name']]
-            );
+            if (! empty($validated['customer_id'])) {
+                $customer = Customer::query()->find($validated['customer_id']);
+            }
+
+            if (! $customer) {
+                $customer = Customer::query()->firstOrCreate(
+                    ['phone' => $phone],
+                    ['full_name' => $validated['customer_full_name']]
+                );
+            }
 
             if ($customer->full_name !== $validated['customer_full_name']) {
                 $customer->full_name = $validated['customer_full_name'];
-                $customer->save();
             }
+
+            if ($customer->phone !== $phone) {
+                $customer->phone = $phone;
+            }
+
+            $customer->save();
 
             $group = AppointmentGroup::query()->create([
                 'customer_id' => $customer->id,
@@ -261,6 +275,63 @@ class AppointmentController extends Controller
         return redirect()
             ->to(route('app.appointments.index', ['date' => $validated['date']]))
             ->with('success', 'Appointment created.');
+    }
+
+    public function customerSearch(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
+
+        if ($query === '') {
+            return response()->json([
+                'customers' => [],
+            ]);
+        }
+
+        $digits = preg_replace('/\D+/', '', $query);
+
+        $customers = Customer::query()
+            ->select([
+                'id',
+                'full_name',
+                'phone',
+                'membership_code',
+                'membership_type',
+                'current_package',
+            ])
+            ->where(function ($builder) use ($query, $digits) {
+                $like = '%'.$query.'%';
+
+                $builder
+                    ->where('full_name', 'like', $like)
+                    ->orWhere('phone', 'like', $like)
+                    ->orWhere('membership_code', 'like', $like);
+
+                if ($digits !== '') {
+                    $builder->orWhereRaw(
+                        'REPLACE(REPLACE(REPLACE(phone, "+", ""), "-", ""), " ", "") like ?',
+                        ['%'.$digits.'%']
+                    );
+                }
+            })
+            ->orderByRaw("CASE WHEN full_name IS NULL OR full_name = '' THEN 1 ELSE 0 END")
+            ->orderBy('full_name')
+            ->limit(5)
+            ->get()
+            ->map(function (Customer $customer) {
+                return [
+                    'id' => (string) $customer->id,
+                    'full_name' => $customer->full_name ?: 'Unnamed Customer',
+                    'phone' => $customer->phone ?: '',
+                    'membership_code' => $customer->membership_code ?: '',
+                    'membership_type' => $customer->membership_type ?: '',
+                    'current_package' => $customer->current_package ?: '',
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'customers' => $customers,
+        ]);
     }
 
     public function updateStatus(Request $request, AppointmentGroup $appointmentGroup)

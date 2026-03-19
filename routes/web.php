@@ -43,6 +43,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::get('/appointments', [AppointmentController::class, 'index'])
             ->middleware('app_permission:appointments.view')
             ->name('appointments.index');
+        Route::get('/appointments/customer-search', [AppointmentController::class, 'customerSearch'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.customer-search');
         Route::post('/appointments', [AppointmentController::class, 'store'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.store');

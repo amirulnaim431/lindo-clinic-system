@@ -99,6 +99,14 @@
         .flash--error{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
         .flash--warn{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
         .hidden{display:none !important}
+        .customer-picker{position:relative}
+        .customer-suggestions{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:20;border:1px solid #dbe4ef;border-radius:18px;background:#ffffff;box-shadow:0 18px 36px rgba(15,23,42,.14);overflow:hidden}
+        .customer-suggestion{padding:12px 14px;border-bottom:1px solid #eef2f7;cursor:pointer;transition:.16s ease}
+        .customer-suggestion:last-child{border-bottom:none}
+        .customer-suggestion:hover,.customer-suggestion.is-active{background:#f8fbff}
+        .customer-suggestion__name{font-size:13px;font-weight:800;color:#0f172a}
+        .customer-suggestion__meta{margin-top:4px;font-size:12px;color:#64748b}
+        .customer-picked{margin-top:8px;border:1px solid #dbe4ef;border-radius:16px;background:#f8fafc;padding:10px 12px;font-size:12px;color:#475569}
         @media (max-width: 1280px){.ops-grid,.booking-grid{grid-template-columns:1fr}}
         @media (max-width: 960px){.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-grid,.field-row{grid-template-columns:1fr}}
         @media (max-width: 640px){.metrics-grid{grid-template-columns:1fr}}
@@ -344,6 +352,7 @@
 
                             <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form">
                                 @csrf
+                                <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
                                 <input type="hidden" name="date" value="{{ $selectedDate }}">
                                 <input type="hidden" name="slot" id="selected-slot-input" value="">
                                 <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
@@ -357,9 +366,20 @@
                                 </div>
 
                                 <div class="booking-form-grid">
-                                    <div class="field-block">
+                                    <div class="field-block customer-picker">
                                         <label for="customer_full_name">Customer name</label>
-                                        <input id="customer_full_name" type="text" name="customer_full_name" value="{{ old('customer_full_name') }}" class="field-input" required>
+                                        <input
+                                            id="customer_full_name"
+                                            type="text"
+                                            name="customer_full_name"
+                                            value="{{ old('customer_full_name') }}"
+                                            class="field-input"
+                                            autocomplete="off"
+                                            placeholder="Start typing member name or phone"
+                                            required
+                                        >
+                                        <div id="customer_suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
+                                        <div id="customer_selected_hint" class="customer-picked hidden"></div>
                                     </div>
                                     <div class="field-block">
                                         <label for="customer_phone">Customer phone</label>
@@ -517,6 +537,13 @@
             const comboSelect = document.getElementById('selected_combination_select');
             const prefilledSlot = @json($prefilledSlot);
             const slotAvailable = @json($quickCreate['slot_is_available']);
+            const customerIdInput = document.getElementById('customer_id');
+            const customerNameInput = document.getElementById('customer_full_name');
+            const customerPhoneInput = document.getElementById('customer_phone');
+            const customerSuggestions = document.getElementById('customer_suggestions');
+            const customerSelectedHint = document.getElementById('customer_selected_hint');
+            const customerSearchUrl = @json(route('app.appointments.customer-search'));
+            let activeCustomerRequest = null;
 
             serviceCheckboxes.forEach((checkbox) => {
                 checkbox.addEventListener('change', function () {
@@ -594,6 +621,144 @@
                     openSlot(prefilledSlot, combinations, matchedButton);
                 }
             }
+
+            function hideCustomerSuggestions() {
+                if (customerSuggestions) {
+                    customerSuggestions.innerHTML = '';
+                    customerSuggestions.classList.add('hidden');
+                }
+            }
+
+            function renderSelectedCustomer(customer) {
+                if (!customerSelectedHint) {
+                    return;
+                }
+
+                if (!customer) {
+                    customerSelectedHint.textContent = '';
+                    customerSelectedHint.classList.add('hidden');
+                    return;
+                }
+
+                const parts = [customer.full_name || 'Customer'];
+
+                if (customer.phone) {
+                    parts.push(customer.phone);
+                }
+
+                if (customer.membership_code) {
+                    parts.push(`Member ${customer.membership_code}`);
+                }
+
+                customerSelectedHint.textContent = `Linked to existing customer: ${parts.join(' | ')}`;
+                customerSelectedHint.classList.remove('hidden');
+            }
+
+            function selectCustomer(customer) {
+                if (customerIdInput) {
+                    customerIdInput.value = customer.id || '';
+                }
+
+                if (customerNameInput) {
+                    customerNameInput.value = customer.full_name || '';
+                }
+
+                if (customerPhoneInput && customer.phone) {
+                    customerPhoneInput.value = customer.phone;
+                }
+
+                renderSelectedCustomer(customer);
+                hideCustomerSuggestions();
+            }
+
+            function clearSelectedCustomer() {
+                if (customerIdInput) {
+                    customerIdInput.value = '';
+                }
+
+                renderSelectedCustomer(null);
+            }
+
+            async function searchCustomers(query) {
+                if (!customerSuggestions) {
+                    return;
+                }
+
+                if (activeCustomerRequest) {
+                    activeCustomerRequest.abort();
+                }
+
+                activeCustomerRequest = new AbortController();
+
+                try {
+                    const response = await fetch(`${customerSearchUrl}?q=${encodeURIComponent(query)}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        signal: activeCustomerRequest.signal,
+                    });
+
+                    const result = await response.json().catch(() => ({ customers: [] }));
+                    const customers = Array.isArray(result.customers) ? result.customers : [];
+
+                    if (!customers.length) {
+                        hideCustomerSuggestions();
+                        return;
+                    }
+
+                    customerSuggestions.innerHTML = '';
+
+                    customers.forEach((customer, index) => {
+                        const option = document.createElement('button');
+                        option.type = 'button';
+                        option.className = `customer-suggestion${index === 0 ? ' is-active' : ''}`;
+                        option.innerHTML = `
+                            <div class="customer-suggestion__name">${customer.full_name || 'Customer'}</div>
+                            <div class="customer-suggestion__meta">
+                                ${(customer.phone || 'No phone')}
+                                ${customer.membership_code ? ` | Member ${customer.membership_code}` : ''}
+                                ${customer.current_package ? ` | ${customer.current_package}` : ''}
+                            </div>
+                        `;
+
+                        option.addEventListener('click', () => selectCustomer(customer));
+                        customerSuggestions.appendChild(option);
+                    });
+
+                    customerSuggestions.classList.remove('hidden');
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        hideCustomerSuggestions();
+                    }
+                }
+            }
+
+            if (customerNameInput) {
+                customerNameInput.addEventListener('input', function () {
+                    const query = this.value.trim();
+                    clearSelectedCustomer();
+
+                    if (query.length < 2) {
+                        hideCustomerSuggestions();
+                        return;
+                    }
+
+                    searchCustomers(query);
+                });
+
+                customerNameInput.addEventListener('blur', function () {
+                    window.setTimeout(() => hideCustomerSuggestions(), 120);
+                });
+            }
+
+            customerPhoneInput?.addEventListener('input', function () {
+                if (customerIdInput?.value) {
+                    clearSelectedCustomer();
+                }
+            });
         });
     </script>
 </x-internal-layout>
