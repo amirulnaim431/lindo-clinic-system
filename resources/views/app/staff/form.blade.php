@@ -1,267 +1,328 @@
 <x-internal-layout
-    :title="$mode === 'create' ? 'New Staff' : 'Edit Staff'"
-    :subtitle="$mode === 'create' ? 'Create a staff member and assign allowed services.' : 'Update staff details and service assignments.'"
+    :title="$mode === 'create' ? 'Create Staff' : 'Edit Staff'"
+    :subtitle="$mode === 'create'
+        ? 'Add a staff profile with job title, operational role, service eligibility, and optional system access.'
+        : 'Update the staff profile, service eligibility, linked login, and access permissions.'"
 >
     @php
         $selectedServiceIds = collect(old('service_ids', $selectedServiceIds ?? []))
             ->map(fn ($id) => (string) $id)
             ->all();
+
+        $selectedPermissions = collect(old('access_permissions', $selectedPermissions ?? []))
+            ->filter()
+            ->values()
+            ->all();
     @endphp
 
     <style>
-        .service-card {
+        .staff-card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .selection-card {
             border: 1px solid #e2e8f0;
-            background: #ffffff;
-            border-radius: 1rem;
-            padding: 1rem;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-            transition: all 0.18s ease;
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+            transition: 0.18s ease;
         }
 
-        .service-card:hover {
-            border-color: #e7b7b0;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        .selection-card:hover {
+            border-color: #94a3b8;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
         }
 
-        .service-card.is-selected {
-            border-color: #d6a39a;
-            background: linear-gradient(180deg, #fff8f6 0%, #fff1ee 100%);
-            box-shadow: 0 0 0 3px rgba(214, 163, 154, 0.20);
+        .selection-card.is-selected {
+            border-color: #0f172a;
+            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
 
-        .service-card-badge {
+        .selection-card__header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .selection-card__title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .selection-card__meta {
+            color: #64748b;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .selection-card__badge {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 9999px;
-            border: 1px solid #e2e8f0;
-            padding: 0.25rem 0.625rem;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            padding: 6px 10px;
             font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
+            font-weight: 800;
+            color: #334155;
             background: #ffffff;
-            transition: all 0.18s ease;
+            white-space: nowrap;
         }
 
-        .service-card.is-selected .service-card-badge {
-            border-color: #d6a39a;
-            color: #9a5c52;
-            background: #ffffff;
-        }
-
-        .service-card-muted {
-            color: #64748b;
-            transition: color 0.18s ease;
-        }
-
-        .service-card.is-selected .service-card-muted {
-            color: #9a5c52;
-        }
-
-        .service-card-title {
-            color: #0f172a;
-            transition: color 0.18s ease;
-        }
-
-        .service-card.is-selected .service-card-title {
-            color: #7c3f35;
+        @media (max-width: 920px) {
+            .staff-card-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 
-    @if ($errors->any())
-        <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-sm">
-            <div class="mb-1 font-semibold">Please fix the following:</div>
-            <ul class="ml-5 list-disc space-y-1">
-                @foreach ($errors->all() as $e)
-                    <li>{{ $e }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+    <div class="stack" style="max-width:1180px;">
+        @if ($errors->any())
+            <div class="alert alert-error">
+                <div style="font-weight:800; margin-bottom:8px;">Please fix the following:</div>
+                <ul style="margin:0; padding-left:18px;">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
-    <div class="max-w-4xl">
-        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 px-6 py-5">
-                <h2 class="text-xl font-semibold text-slate-900">
-                    {{ $mode === 'create' ? 'Create Staff' : 'Update Staff' }}
-                </h2>
-                <p class="mt-1 text-sm text-slate-500">
-                    Roles should match your appointment engine, and services assigned here determine appointment eligibility.
-                </p>
+        <form method="POST" action="{{ $mode === 'create' ? route('app.staff.store') : route('app.staff.update', $staff) }}" class="stack">
+            @csrf
+            @if ($mode === 'edit')
+                @method('PUT')
+            @endif
+
+            <div class="panel">
+                <div class="panel__header">
+                    <h2 class="panel__title">Profile details</h2>
+                    <div class="panel__subtitle">
+                        Capture the staff member's official title and contact details separately from their operational service role.
+                    </div>
+                </div>
+
+                <div class="panel__body">
+                    <div class="form-grid">
+                        <div class="col-6">
+                            <label class="field-label" for="full_name">Full name</label>
+                            <input id="full_name" name="full_name" type="text" class="field-input" value="{{ old('full_name', $staff->full_name) }}" required>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="field-label" for="job_title">Job title</label>
+                            <input id="job_title" name="job_title" type="text" class="field-input" value="{{ old('job_title', $staff->job_title) }}" required>
+                        </div>
+
+                        <div class="col-4">
+                            <label class="field-label" for="department">Department</label>
+                            <select id="department" name="department" class="field-select">
+                                <option value="">Select department</option>
+                                @foreach ($departmentOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('department', $staff->department) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-4">
+                            <label class="field-label" for="operational_role">Operational role</label>
+                            <select id="operational_role" name="operational_role" class="field-select" required>
+                                <option value="">Select role</option>
+                                @foreach ($roleOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('operational_role', $staff->operational_role) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-4">
+                            <label class="field-label" for="email">Email</label>
+                            <input id="email" name="email" type="email" class="field-input" value="{{ old('email', $staff->email) }}" placeholder="Optional">
+                        </div>
+
+                        <div class="col-4">
+                            <label class="field-label" for="phone">Phone</label>
+                            <input id="phone" name="phone" type="text" class="field-input" value="{{ old('phone', $staff->phone) }}" placeholder="Optional">
+                        </div>
+
+                        <div class="col-8">
+                            <label class="field-label" for="notes">Notes</label>
+                            <textarea id="notes" name="notes" class="field-input" rows="4" placeholder="Optional admin notes about operations, coverage, or internal handling.">{{ old('notes', $staff->notes) }}</textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="btn-row" style="align-items:center;">
+                                <label style="display:inline-flex; align-items:center; gap:10px;">
+                                    <input type="hidden" name="is_active" value="0">
+                                    <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $staff->is_active))>
+                                    <span>Active staff record</span>
+                                </label>
+
+                                <span class="text-muted">
+                                    Inactive staff remain in the directory for history but are excluded from active scheduling lists.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <form
-                method="POST"
-                action="{{ $mode === 'create' ? route('app.staff.store') : route('app.staff.update', $staff) }}"
-                class="space-y-6 px-6 py-6"
-            >
-                @csrf
-                @if($mode === 'edit')
-                    @method('PUT')
-                @endif
+            <div class="panel">
+                <div class="panel__header">
+                    <h2 class="panel__title">Login linkage and permissions</h2>
+                    <div class="panel__subtitle">
+                        Link an existing internal user account if this staff member should access the system. Permissions are separate from job title and service role.
+                    </div>
+                </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                        <label for="full_name" class="mb-2 block text-sm font-semibold text-slate-800">
-                            Full Name
-                        </label>
-                        <input
-                            id="full_name"
-                            name="full_name"
-                            type="text"
-                            value="{{ old('full_name', $staff->full_name) }}"
-                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                            required
-                        >
+                <div class="panel__body stack">
+                    <div class="form-grid">
+                        <div class="col-6">
+                            <label class="field-label" for="user_id">Linked login user</label>
+                            <select id="user_id" name="user_id" class="field-select">
+                                <option value="">No linked login user</option>
+                                @foreach ($availableUsers as $user)
+                                    <option value="{{ $user->id }}" @selected((string) old('user_id', $staff->user_id) === (string) $user->id)>
+                                        {{ $user->name }} - {{ $user->email }} - {{ strtoupper($user->role) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="text-muted" style="margin-top:8px;">
+                                Staff-role logins use the selected permissions below. Admin-role logins retain full admin access.
+                            </div>
+                        </div>
+
+                        <div class="col-6" style="display:flex; align-items:end;">
+                            <div class="btn-row" style="align-items:center;">
+                                <label style="display:inline-flex; align-items:center; gap:10px;">
+                                    <input type="hidden" name="can_login" value="0">
+                                    <input type="checkbox" name="can_login" value="1" @checked(old('can_login', $staff->can_login))>
+                                    <span>Allow linked staff login</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
-                        <label for="role" class="mb-2 block text-sm font-semibold text-slate-800">
-                            Role
-                        </label>
-                        <select
-                            id="role"
-                            name="role"
-                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                            required
-                        >
-                            @foreach($roles as $key => $label)
-                                <option value="{{ $key }}" @selected(old('role', $staff->role) === $key)>
-                                    {{ $label }}
-                                </option>
+                        <div class="field-label">System access</div>
+                        <div class="text-muted" style="margin-bottom:14px;">
+                            Choose which internal modules the linked staff login can access or manage.
+                        </div>
+
+                        <div class="staff-card-grid">
+                            @foreach ($permissionOptions as $permissionKey => $permission)
+                                @php
+                                    $checked = in_array($permissionKey, $selectedPermissions, true);
+                                @endphp
+
+                                <label class="selection-card {{ $checked ? 'is-selected' : '' }}">
+                                    <input type="checkbox" class="permission-checkbox" name="access_permissions[]" value="{{ $permissionKey }}" {{ $checked ? 'checked' : '' }} style="position:absolute; opacity:0; pointer-events:none;">
+
+                                    <div class="selection-card__header">
+                                        <div>
+                                            <div class="selection-card__title">{{ $permission['label'] }}</div>
+                                            <div class="selection-card__meta">{{ $permission['description'] }}</div>
+                                        </div>
+                                        <span class="selection-card__badge">{{ $checked ? 'Enabled' : 'Optional' }}</span>
+                                    </div>
+                                </label>
                             @endforeach
-                        </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel__header">
+                    <h2 class="panel__title">Service assignment</h2>
+                    <div class="panel__subtitle">
+                        Assign only the services this staff member is operationally allowed to handle.
                     </div>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <label class="flex items-center gap-3">
-                        <input
-                            type="checkbox"
-                            name="is_active"
-                            value="1"
-                            class="h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-300"
-                            @checked(old('is_active', $staff->is_active) ? true : false)
-                        >
-                        <span class="text-sm font-medium text-slate-800">Active staff</span>
-                    </label>
-                    <p class="mt-2 text-xs text-slate-500">
-                        Only active staff can be considered for appointment availability.
-                    </p>
-                </div>
-
-                <div>
-                    <div class="mb-2 block text-sm font-semibold text-slate-800">
-                        Allowed Services
-                    </div>
-                    <p class="mb-4 text-sm text-slate-500">
-                        Select which services this staff member is allowed to perform.
-                    </p>
-
-                    @if($services->count())
-                        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            @foreach($services as $service)
+                <div class="panel__body">
+                    @if ($services->count())
+                        <div class="staff-card-grid">
+                            @foreach ($services as $service)
                                 @php
                                     $isSelected = in_array((string) $service->id, $selectedServiceIds, true);
                                 @endphp
 
-                                <label class="block cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="service_ids[]"
-                                        value="{{ $service->id }}"
-                                        class="service-checkbox sr-only"
-                                        {{ $isSelected ? 'checked' : '' }}
-                                    >
+                                <label class="selection-card {{ $isSelected ? 'is-selected' : '' }}">
+                                    <input type="checkbox" class="service-checkbox" name="service_ids[]" value="{{ $service->id }}" {{ $isSelected ? 'checked' : '' }} style="position:absolute; opacity:0; pointer-events:none;">
 
-                                    <div class="service-card {{ $isSelected ? 'is-selected' : '' }}">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div>
-                                                <div class="service-card-title text-sm font-semibold">
-                                                    {{ $service->name }}
-                                                </div>
-
-                                                @if(!empty($service->description))
-                                                    <div class="mt-1 text-xs text-slate-500">
-                                                        {{ $service->description }}
-                                                    </div>
-                                                @endif
-                                            </div>
-
-                                            <div class="service-card-badge">
-                                                {{ (int) ($service->duration_minutes ?? 60) }} mins
-                                            </div>
+                                    <div class="selection-card__header">
+                                        <div>
+                                            <div class="selection-card__title">{{ $service->name }}</div>
+                                            @if ($service->description)
+                                                <div class="selection-card__meta">{{ $service->description }}</div>
+                                            @endif
                                         </div>
-
-                                        <div class="mt-3 flex items-center justify-between">
-                                            <div class="service-card-muted text-xs">
-                                                Click to assign service
-                                            </div>
-
-                                            <div class="service-card-badge service-state-badge">
-                                                {{ $isSelected ? 'Selected' : 'Available' }}
-                                            </div>
-                                        </div>
+                                        <span class="selection-card__badge">{{ $isSelected ? 'Assigned' : (((int) ($service->duration_minutes ?? 60)) . ' min') }}</span>
                                     </div>
                                 </label>
                             @endforeach
                         </div>
                     @else
-                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                            No active services available for assignment.
+                        <div class="empty-state">
+                            No active services are available for assignment.
                         </div>
                     @endif
-
-                    @error('service_ids')
-                        <div class="mt-2 text-sm text-rose-600">{{ $message }}</div>
-                    @enderror
-
-                    @error('service_ids.*')
-                        <div class="mt-2 text-sm text-rose-600">{{ $message }}</div>
-                    @enderror
                 </div>
+            </div>
 
-                <div class="flex items-center justify-between gap-3 pt-2">
-                    <a
-                        href="{{ route('app.staff.index') }}"
-                        class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
-                    >
-                        ← Back
-                    </a>
-
-                    <button
-                        type="submit"
-                        class="inline-flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-                        style="background-color:#0f172a;color:#ffffff;border-color:#0f172a;"
-                    >
-                        {{ $mode === 'create' ? 'Create Staff' : 'Save Changes' }}
-                    </button>
-                </div>
-            </form>
-        </div>
+            <div class="btn-row" style="justify-content:space-between;">
+                <a href="{{ route('app.staff.index') }}" class="btn btn-secondary">Back to Staff</a>
+                <button type="submit" class="btn btn-primary">{{ $mode === 'create' ? 'Create Staff' : 'Save Changes' }}</button>
+            </div>
+        </form>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const checkboxes = document.querySelectorAll('.service-checkbox');
+            document.querySelectorAll('.permission-checkbox').forEach(function (checkbox) {
+                const card = checkbox.closest('.selection-card');
+                const badge = card ? card.querySelector('.selection-card__badge') : null;
 
-            const refreshCardState = (checkbox) => {
-                const card = checkbox.closest('label')?.querySelector('.service-card');
-                if (!card) return;
+                const syncState = function () {
+                    if (! card) {
+                        return;
+                    }
 
-                card.classList.toggle('is-selected', checkbox.checked);
+                    card.classList.toggle('is-selected', checkbox.checked);
 
-                const badge = card.querySelector('.service-state-badge');
-                if (badge) {
-                    badge.textContent = checkbox.checked ? 'Selected' : 'Available';
-                }
-            };
+                    if (badge) {
+                        badge.textContent = checkbox.checked ? 'Enabled' : 'Optional';
+                    }
+                };
 
-            checkboxes.forEach((checkbox) => {
-                refreshCardState(checkbox);
-                checkbox.addEventListener('change', function () {
-                    refreshCardState(this);
-                });
+                syncState();
+                checkbox.addEventListener('change', syncState);
+            });
+
+            document.querySelectorAll('.service-checkbox').forEach(function (checkbox) {
+                const card = checkbox.closest('.selection-card');
+                const badge = card ? card.querySelector('.selection-card__badge') : null;
+
+                const syncState = function () {
+                    if (! card) {
+                        return;
+                    }
+
+                    card.classList.toggle('is-selected', checkbox.checked);
+
+                    if (badge) {
+                        badge.textContent = checkbox.checked ? 'Assigned' : 'Optional';
+                    }
+                };
+
+                syncState();
+                checkbox.addEventListener('change', syncState);
             });
         });
     </script>

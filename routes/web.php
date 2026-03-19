@@ -22,60 +22,76 @@ Route::middleware('auth')->get('/dashboard', function () {
     return redirect()->route('app.dashboard');
 })->name('dashboard');
 
-/*
-|--------------------------------------------------------------------------
-| Breeze Profile routes
-|--------------------------------------------------------------------------
-*/
-
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Public booking
-|--------------------------------------------------------------------------
-*/
-
 Route::get('/booking', [BookingController::class, 'index'])->name('booking.index');
 Route::get('/booking/slots', [BookingController::class, 'slots'])->name('booking.slots');
 Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
-
-/*
-|--------------------------------------------------------------------------
-| Internal app area (Staff/Admin)
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware(['auth', 'staff_or_admin'])
     ->prefix('app')
     ->name('app.')
     ->group(function () {
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])
+            ->middleware('app_permission:dashboard.view')
+            ->name('dashboard');
 
-        Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
-        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store');
+        Route::get('/appointments', [AppointmentController::class, 'index'])
+            ->middleware('app_permission:appointments.view')
+            ->name('appointments.index');
+        Route::post('/appointments', [AppointmentController::class, 'store'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.store');
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
+            ->middleware('app_permission:appointments.manage')
             ->name('appointments.status');
 
-        Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+        Route::get('/calendar', [CalendarController::class, 'index'])
+            ->middleware('app_permission:calendar.view')
+            ->name('calendar');
 
-        Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
-        Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
-        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
-        Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
-        Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::get('/staff', [StaffController::class, 'index'])
+            ->middleware('app_permission:staff.view')
+            ->name('staff.index');
+        Route::get('/staff/create', [StaffController::class, 'create'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.create');
+        Route::post('/staff', [StaffController::class, 'store'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.store');
+        Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.edit');
+        Route::put('/staff/{staff}', [StaffController::class, 'update'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.update');
+        Route::patch('/staff/{staff}/status', [StaffController::class, 'updateStatus'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.status');
 
-        Route::get('/customers/import', [CustomerImportController::class, 'index'])->name('customers.import.index');
-        Route::post('/customers/import', [CustomerImportController::class, 'store'])->name('customers.import.store');
+        Route::get('/customers/import', [CustomerImportController::class, 'index'])
+            ->middleware('app_permission:customers.import')
+            ->name('customers.import.index');
+        Route::post('/customers/import', [CustomerImportController::class, 'store'])
+            ->middleware('app_permission:customers.import')
+            ->name('customers.import.store');
 
-        Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
-        Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
-        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
-        Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::get('/customers', [CustomerController::class, 'index'])
+            ->middleware('app_permission:customers.view')
+            ->name('customers.index');
+        Route::get('/customers/{customer}', [CustomerController::class, 'show'])
+            ->middleware('app_permission:customers.view')
+            ->name('customers.show');
+        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])
+            ->middleware('app_permission:customers.manage')
+            ->name('customers.edit');
+        Route::put('/customers/{customer}', [CustomerController::class, 'update'])
+            ->middleware('app_permission:customers.manage')
+            ->name('customers.update');
     });
 
 require __DIR__.'/auth.php';

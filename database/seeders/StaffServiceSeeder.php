@@ -6,6 +6,7 @@ use App\Models\Service;
 use App\Models\Staff;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StaffServiceSeeder extends Seeder
 {
@@ -14,32 +15,34 @@ class StaffServiceSeeder extends Seeder
         $services = Service::all()->keyBy('name');
         $staff = Staff::all()->keyBy('full_name');
 
-        // Helper
         $attach = function (string $staffName, array $serviceNames) use ($staff, $services) {
-            $st = $staff[$staffName] ?? null;
-            if (!$st) return;
+            $member = $staff[$staffName] ?? null;
 
-            foreach ($serviceNames as $svcName) {
-                $svc = $services[$svcName] ?? null;
-                if (!$svc) continue;
+            if (! $member) {
+                return;
+            }
+
+            foreach ($serviceNames as $serviceName) {
+                $service = $services[$serviceName] ?? null;
+
+                if (! $service) {
+                    continue;
+                }
 
                 DB::table('staff_services')->updateOrInsert(
-                    ['staff_id' => $st->id, 'service_id' => $svc->id],
-                    ['id' => (string)\Illuminate\Support\Str::ulid(), 'created_at' => now(), 'updated_at' => now()]
+                    ['staff_id' => $member->id, 'service_id' => $service->id],
+                    ['id' => (string) Str::ulid(), 'created_at' => now(), 'updated_at' => now()]
                 );
             }
         };
 
-        // Doctors
-        $attach('Doctor A', ['Weight Loss Program', 'Facial Treatment', 'Consultation']);
-        $attach('Doctor B', ['Liver Detox', 'Consultation']);
-
-        // Nurses
-        $attach('Nurse A', ['Simple Injection']);
-        $attach('Nurse B', ['Simple Injection']);
-
-        // Beauticians
-        $attach('Beautician A', ['Nails']);
-        $attach('Beautician B', ['Nails']);
+        $attach('Dr. Amanda Binti Elli', ['Weight Loss Program', 'Facial Treatment', 'Consultation', 'Liver Detox']);
+        $attach('Dr. Syarifah Munira \'Aaqilah Binti Al Sayed Mohamad', ['Weight Loss Program', 'Facial Treatment', 'Consultation', 'Liver Detox']);
+        $attach('Nur Adilla Binti Mohd Ali', ['Simple Injection']);
+        $attach('Nur Mastura Ali Toh', ['Nails']);
+        $attach('Nurul Rizna Fatima Binti Andi', ['Nails']);
+        $attach('Van Ian Par', ['Nails']);
+        $attach('Nur Farhanna Binti Abdul Malek', ['Nails']);
+        $attach('Monica Tial Tin Rem', ['Nails']);
     }
 }

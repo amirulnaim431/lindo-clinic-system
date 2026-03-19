@@ -10,9 +10,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // ✅ Register custom middleware alias
         $middleware->alias([
             'staff_or_admin' => \App\Http\Middleware\EnsureStaffOrAdmin::class,
+            'app_permission' => \App\Http\Middleware\EnsureAppPermission::class,
         ]);
     })
     ->withExceptions(function ($exceptions) {
