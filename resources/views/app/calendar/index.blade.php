@@ -444,22 +444,39 @@
                     }
 
                     try {
+                        const body = new URLSearchParams();
+                        body.set('_method', 'PATCH');
+                        body.set('_token', csrfToken);
+                        body.set('starts_at', `${selectedDateIso} ${targetSlot}`);
+
                         const response = await fetch(payload.reschedule_url, {
-                            method: 'PATCH',
+                            method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
                                 'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                                 'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
                             },
-                            body: JSON.stringify({
-                                starts_at: `${selectedDateIso} ${targetSlot}`,
-                            }),
+                            credentials: 'same-origin',
+                            body: body.toString(),
                         });
 
-                        const result = await response.json().catch(() => ({}));
+                        const responseText = await response.text();
+                        let result = {};
+
+                        try {
+                            result = responseText ? JSON.parse(responseText) : {};
+                        } catch (parseError) {
+                            result = {};
+                        }
 
                         if (!response.ok) {
-                            throw new Error(result.message || result.errors?.starts_at?.[0] || 'Unable to reschedule this appointment.');
+                            throw new Error(
+                                result.message
+                                || result.errors?.starts_at?.[0]
+                                || result.errors?.[0]
+                                || 'Unable to reschedule this appointment.'
+                            );
                         }
 
                         window.location.reload();
