@@ -118,7 +118,7 @@ class Staff extends Model
                 ->values()
                 ->all();
 
-            $staff->attributes['access_permissions'] = $permissions;
+            $staff->attributes['access_permissions'] = json_encode($permissions);
         });
     }
 
