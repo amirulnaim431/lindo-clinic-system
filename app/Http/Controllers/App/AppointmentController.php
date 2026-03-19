@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class AppointmentController extends Controller
@@ -272,6 +273,88 @@ class AppointmentController extends Controller
         $appointmentGroup->save();
 
         return back()->with('success', 'Status updated.');
+    }
+
+    public function reschedule(Request $request, AppointmentGroup $appointmentGroup)
+    {
+        $validated = $request->validate([
+            'starts_at' => ['required', 'date_format:Y-m-d H:i'],
+        ]);
+
+        $appointmentGroup->loadMissing('items:id,appointment_group_id,staff_id,starts_at,ends_at');
+
+        if ($appointmentGroup->items->isEmpty()) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'This appointment cannot be rescheduled because it has no assigned service items.',
+            ]);
+        }
+
+        $originalStart = $appointmentGroup->starts_at;
+        $originalEnd = $appointmentGroup->ends_at;
+
+        if (! $originalStart || ! $originalEnd) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'This appointment is missing its current schedule window.',
+            ]);
+        }
+
+        $newStart = Carbon::createFromFormat('Y-m-d H:i', $validated['starts_at']);
+        $durationMinutes = max(30, $originalStart->diffInMinutes($originalEnd));
+        $newEnd = $newStart->copy()->addMinutes($durationMinutes);
+
+        $clinicStart = $newStart->copy()->setTime(9, 0);
+        $clinicEnd = $newStart->copy()->setTime(18, 0);
+
+        if ($newStart->lt($clinicStart) || $newEnd->gt($clinicEnd)) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'Appointments can only be moved within clinic hours from 09:00 to 18:00.',
+            ]);
+        }
+
+        $staffIds = $appointmentGroup->items
+            ->pluck('staff_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($staffIds as $staffId) {
+            $hasConflict = AppointmentItem::query()
+                ->where('staff_id', $staffId)
+                ->where('appointment_group_id', '!=', $appointmentGroup->id)
+                ->where('starts_at', '<', $newEnd)
+                ->where('ends_at', '>', $newStart)
+                ->exists();
+
+            if ($hasConflict) {
+                $staffName = $appointmentGroup->items
+                    ->firstWhere('staff_id', $staffId)?->staff?->full_name
+                    ?? 'Assigned staff';
+
+                throw ValidationException::withMessages([
+                    'starts_at' => "{$staffName} is already occupied in that time block. Choose another empty slot.",
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($appointmentGroup, $newStart, $newEnd) {
+            $appointmentGroup->update([
+                'starts_at' => $newStart,
+                'ends_at' => $newEnd,
+            ]);
+
+            foreach ($appointmentGroup->items as $item) {
+                $item->update([
+                    'starts_at' => $newStart,
+                    'ends_at' => $newEnd,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'message' => 'Appointment rescheduled successfully.',
+            'starts_at' => $newStart->format('Y-m-d H:i:s'),
+            'ends_at' => $newEnd->format('Y-m-d H:i:s'),
+        ]);
     }
 
     private function sanitizeSlot(mixed $slot): ?string

@@ -23,8 +23,11 @@
         .timeline-slot-link span{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
         .timeline-time{position:absolute;left:0;width:76px;transform:translateY(-50%);text-align:right;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#64748b}
         .event-layer{position:absolute;inset:0 0 0 92px;pointer-events:none}
-        .calendar-event{position:absolute;padding:12px 14px 12px 16px;border-radius:20px;border:1px solid transparent;box-shadow:0 14px 32px rgba(15,23,42,.12);cursor:pointer;pointer-events:auto;overflow:hidden;transition:.16s ease}
+        .calendar-event{position:absolute;padding:12px 14px 12px 16px;border-radius:20px;border:1px solid transparent;box-shadow:0 14px 32px rgba(15,23,42,.12);cursor:pointer;pointer-events:auto;overflow:hidden;transition:.16s ease;touch-action:none;user-select:none}
         .calendar-event:hover{transform:translateY(-1px);box-shadow:0 18px 36px rgba(15,23,42,.16)}
+        .calendar-event.is-draggable{cursor:grab}
+        .calendar-event.is-dragging{cursor:grabbing;z-index:40;box-shadow:0 22px 40px rgba(15,23,42,.22)}
+        .calendar-event.is-conflict{outline:3px solid rgba(225,29,72,.22)}
         .calendar-event::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--service-accent)}
         .calendar-event__head{display:flex;justify-content:space-between;gap:12px;align-items:start}
         .calendar-event__service-chip,.calendar-event__status-chip,.legend-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;border:1px solid transparent;white-space:nowrap}
@@ -93,6 +96,9 @@
                         <div>
                             <div class="compact-label">Live Day Board</div>
                             <h3 class="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-slate-950">Daily operations timeline</h3>
+                            @if ($canManageAppointments)
+                                <p class="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Drag whole appointment blocks to reschedule. Occupied staff blocks are rejected automatically.</p>
+                            @endif
                         </div>
                         <div class="flex flex-wrap gap-2">
                             @foreach ($statusLegend as $item)
@@ -114,7 +120,7 @@
 
                         <div class="event-layer">
                             @foreach ($timelineEvents as $event)
-                                <button type="button" class="calendar-event calendar-event-btn text-left" style="top: {{ $event['top_px'] }}px; height: {{ $event['height_px'] }}px; left: calc({{ $event['left_pct'] }}% + 8px); width: calc({{ $event['width_pct'] }}% - 12px); background: {{ $event['service_styles']['surface'] }}; border-color: {{ $event['service_styles']['border'] }}; color: {{ $event['service_styles']['text'] }}; --service-accent: {{ $event['service_styles']['accent'] }};" data-event='@json($event)'>
+                                <button type="button" class="calendar-event calendar-event-btn text-left {{ $canManageAppointments ? 'is-draggable' : '' }}" style="top: {{ $event['top_px'] }}px; height: {{ $event['height_px'] }}px; left: calc({{ $event['left_pct'] }}% + 8px); width: calc({{ $event['width_pct'] }}% - 12px); background: {{ $event['service_styles']['surface'] }}; border-color: {{ $event['service_styles']['border'] }}; color: {{ $event['service_styles']['text'] }}; --service-accent: {{ $event['service_styles']['accent'] }};" data-event='@json($event)' data-original-top="{{ $event['top_px'] }}" title="{{ $canManageAppointments ? 'Drag to reschedule or click for details' : 'Click for details' }}">
                                     <div class="calendar-event__head">
                                         <span class="calendar-event__service-chip" style="background: {{ $event['service_styles']['chip_bg'] }}; color: {{ $event['service_styles']['chip_text'] }}; border-color: {{ $event['service_styles']['border'] }};">{{ $event['service_summary'] }}</span>
                                         <span class="calendar-event__status-chip" style="background: {{ $event['status_styles']['badge_bg'] }}; border-color: {{ $event['status_styles']['badge_border'] }}; color: {{ $event['status_styles']['badge_text'] }};"><span class="calendar-event__status-dot" style="background: {{ $event['status_styles']['dot'] }};"></span>{{ $event['status_label'] }}</span>
@@ -243,6 +249,13 @@
             const closeBottom = document.getElementById('calendar-detail-close-bottom');
             const manageLink = document.getElementById('modal-manage-link');
             const createLink = document.getElementById('modal-create-link');
+            const timelineGrid = document.querySelector('.timeline-grid');
+            const timelineButtons = Array.from(document.querySelectorAll('.calendar-event-btn'));
+            const canManageAppointments = @json($canManageAppointments);
+            const rowHeightPx = @json($rowHeightPx);
+            const selectedDateIso = @json($selectedDateIso);
+            const slots = @json($slots);
+            const csrfToken = @json(csrf_token());
 
             const setText = (id, value, fallback = '-') => {
                 const element = document.getElementById(id);
@@ -293,15 +306,184 @@
                 document.body.classList.remove('overflow-hidden');
             };
 
-            document.querySelectorAll('.calendar-event-btn').forEach((button) => {
-                button.addEventListener('click', () => {
+            const parseEventPayload = (button) => {
+                try {
+                    return JSON.parse(button.dataset.event || '{}');
+                } catch (error) {
+                    return {};
+                }
+            };
+
+            const toMinutes = (time) => {
+                const [hours, minutes] = String(time || '00:00').split(':').map(Number);
+                return (hours * 60) + minutes;
+            };
+
+            const sharesStaff = (sourceEvent, otherEvent) => {
+                const sourceStaff = new Set((sourceEvent.staff_names || []).filter(Boolean));
+                return (otherEvent.staff_names || []).some((name) => sourceStaff.has(name));
+            };
+
+            const hasClientConflict = (sourceEvent, proposedStartMinutes, proposedEndMinutes) => {
+                return timelineButtons.some((otherButton) => {
+                    const otherEvent = parseEventPayload(otherButton);
+
+                    if (!otherEvent.id || otherEvent.id === sourceEvent.id) {
+                        return false;
+                    }
+
+                    if (!sharesStaff(sourceEvent, otherEvent)) {
+                        return false;
+                    }
+
+                    const otherStart = toMinutes(otherEvent.start_24);
+                    const otherEnd = otherStart + Number(otherEvent.duration_minutes || 0);
+
+                    return proposedStartMinutes < otherEnd && proposedEndMinutes > otherStart;
+                });
+            };
+
+            const attachDragBehavior = (button) => {
+                const payload = parseEventPayload(button);
+
+                if (!canManageAppointments || !payload.id || !payload.reschedule_url || !timelineGrid) {
+                    button.addEventListener('click', () => openModal(payload));
+                    return;
+                }
+
+                let dragState = null;
+
+                button.addEventListener('pointerdown', (event) => {
+                    if (event.button !== 0) {
+                        return;
+                    }
+
+                    dragState = {
+                        startY: event.clientY,
+                        originalTop: Number(button.dataset.originalTop || payload.top_px || 0),
+                        currentTop: Number(button.dataset.originalTop || payload.top_px || 0),
+                        dragged: false,
+                    };
+
+                    button.setPointerCapture?.(event.pointerId);
+                });
+
+                button.addEventListener('pointermove', (event) => {
+                    if (!dragState) {
+                        return;
+                    }
+
+                    const deltaY = event.clientY - dragState.startY;
+
+                    if (!dragState.dragged && Math.abs(deltaY) > 6) {
+                        dragState.dragged = true;
+                        button.classList.add('is-dragging');
+                    }
+
+                    if (!dragState.dragged) {
+                        return;
+                    }
+
+                    const maxTop = Math.max(0, timelineGrid.offsetHeight - button.offsetHeight);
+                    const rawTop = dragState.originalTop + deltaY;
+                    const snappedTop = Math.max(0, Math.min(maxTop, Math.round(rawTop / rowHeightPx) * rowHeightPx));
+                    const slotIndex = Math.max(0, Math.min(slots.length - 1, Math.round(snappedTop / rowHeightPx)));
+                    const proposedStart = toMinutes(slots[slotIndex]?.time || payload.start_24);
+                    const proposedEnd = proposedStart + Number(payload.duration_minutes || 0);
+                    const conflict = hasClientConflict(payload, proposedStart, proposedEnd);
+
+                    dragState.currentTop = snappedTop;
+                    button.style.top = `${snappedTop}px`;
+                    button.classList.toggle('is-conflict', conflict);
+                });
+
+                button.addEventListener('pointerup', async () => {
+                    if (!dragState) {
+                        return;
+                    }
+
+                    const wasDragged = dragState.dragged;
+                    const finalTop = dragState.currentTop;
+
+                    button.classList.remove('is-dragging');
+
+                    if (!wasDragged) {
+                        openModal(payload);
+                        dragState = null;
+                        return;
+                    }
+
+                    const slotIndex = Math.max(0, Math.min(slots.length - 1, Math.round(finalTop / rowHeightPx)));
+                    const targetSlot = slots[slotIndex]?.time || payload.start_24;
+                    const proposedStart = toMinutes(targetSlot);
+                    const proposedEnd = proposedStart + Number(payload.duration_minutes || 0);
+                    const conflict = hasClientConflict(payload, proposedStart, proposedEnd);
+
+                    if (conflict) {
+                        button.style.top = `${dragState.originalTop}px`;
+                        button.classList.remove('is-conflict');
+                        window.alert('That staff block is already occupied by another customer. Choose an empty time slot.');
+                        dragState = null;
+                        return;
+                    }
+
+                    if (targetSlot === payload.start_24) {
+                        button.style.top = `${dragState.originalTop}px`;
+                        button.classList.remove('is-conflict');
+                        dragState = null;
+                        return;
+                    }
+
+                    const confirmed = window.confirm(`Move this appointment to ${targetSlot}?`);
+
+                    if (!confirmed) {
+                        button.style.top = `${dragState.originalTop}px`;
+                        button.classList.remove('is-conflict');
+                        dragState = null;
+                        return;
+                    }
+
                     try {
-                        openModal(JSON.parse(button.dataset.event || '{}'));
+                        const response = await fetch(payload.reschedule_url, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify({
+                                starts_at: `${selectedDateIso} ${targetSlot}`,
+                            }),
+                        });
+
+                        const result = await response.json().catch(() => ({}));
+
+                        if (!response.ok) {
+                            throw new Error(result.message || result.errors?.starts_at?.[0] || 'Unable to reschedule this appointment.');
+                        }
+
+                        window.location.reload();
                     } catch (error) {
-                        console.error('Failed to open appointment detail modal.', error);
+                        button.style.top = `${dragState.originalTop}px`;
+                        button.classList.remove('is-conflict');
+                        window.alert(error.message || 'Unable to reschedule this appointment.');
+                    } finally {
+                        dragState = null;
                     }
                 });
-            });
+
+                button.addEventListener('pointercancel', () => {
+                    if (!dragState) {
+                        return;
+                    }
+
+                    button.style.top = `${dragState.originalTop}px`;
+                    button.classList.remove('is-dragging', 'is-conflict');
+                    dragState = null;
+                });
+            };
+
+            timelineButtons.forEach((button) => attachDragBehavior(button));
 
             [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
             modal?.addEventListener('click', (event) => {

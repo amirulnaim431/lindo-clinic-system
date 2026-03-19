@@ -232,6 +232,7 @@ class CalendarController extends Controller
             'staffLoad' => $staffLoad,
             'totalAppointments' => $groupsForSelectedDay->count(),
             'statusLegend' => $this->statusLegend(),
+            'canManageAppointments' => auth()->user()?->hasAppPermission('appointments.manage') ?? false,
         ]);
     }
 
@@ -346,6 +347,7 @@ class CalendarController extends Controller
 
         $topMinutes = $dayStart->diffInMinutes($visibleStart);
         $heightMinutes = max(self::SLOT_MINUTES, $visibleStart->diffInMinutes($visibleEnd));
+        $durationMinutes = max(self::SLOT_MINUTES, $startsAt->diffInMinutes($endsAt));
         $pixelsPerMinute = self::ROW_HEIGHT_PX / self::SLOT_MINUTES;
 
         return [
@@ -370,6 +372,7 @@ class CalendarController extends Controller
             'source' => $group->source ? str($group->source)->replace('_', ' ')->title()->toString() : null,
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
             'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
+            'reschedule_url' => route('app.appointments.reschedule', $group),
             'service_styles' => $serviceStyles,
             'status_styles' => $statusStyles,
             'primary_service' => $primaryService,
@@ -377,6 +380,9 @@ class CalendarController extends Controller
             'height_px' => max(60, (int) round($heightMinutes * $pixelsPerMinute) - 8),
             'start_minutes' => $dayStart->diffInMinutes($visibleStart),
             'end_minutes' => $dayStart->diffInMinutes($visibleEnd),
+            'duration_minutes' => $durationMinutes,
+            'date_iso' => $startsAt->toDateString(),
+            'start_24' => $startsAt->format('H:i'),
         ];
     }
 

@@ -46,6 +46,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::post('/appointments', [AppointmentController::class, 'store'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.store');
+        Route::patch('/appointments/{appointmentGroup}/reschedule', [AppointmentController::class, 'reschedule'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.reschedule');
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.status');
