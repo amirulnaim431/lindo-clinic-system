@@ -63,6 +63,15 @@
             ->filter()
             ->values()
             ->all();
+        $serviceCatalog = $services->mapWithKeys(function ($service) {
+            return [
+                (string) $service->id => [
+                    'id' => (string) $service->id,
+                    'name' => $service->name,
+                    'duration' => (int) ($service->duration_minutes ?? 60),
+                ],
+            ];
+        })->all();
     @endphp
 
     <style>
@@ -625,15 +634,7 @@
             const customerSelectedHint = document.getElementById('customer_selected_hint');
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const selectedServicesSeed = @json($selectedServiceOrderIds);
-            const serviceCatalog = @json(
-                $services->mapWithKeys(fn ($service) => [
-                    (string) $service->id => [
-                        'id' => (string) $service->id,
-                        'name' => $service->name,
-                        'duration' => (int) ($service->duration_minutes ?? 60),
-                    ],
-                ])
-            );
+            const serviceCatalog = @json($serviceCatalog);
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
 
