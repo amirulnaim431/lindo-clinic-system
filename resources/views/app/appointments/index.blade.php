@@ -4,6 +4,7 @@
         $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->values()->all();
         $selectedDate = $filters['date'] ?? now()->format('Y-m-d');
         $prefilledSlot = $filters['slot'] ?? null;
+        $selectedArrangementMode = $filters['arrangement_mode'] ?? 'same_slot';
         $services = $services ?? collect();
         $availability = $availability ?? null;
         $appointmentGroups = $appointmentGroups ?? collect();
@@ -49,6 +50,19 @@
             }
         }
         $selectedServiceLabels = $services->whereIn('id', $selectedServiceIds)->pluck('name')->values()->all();
+        $selectedServiceOrderIds = collect($filters['service_order'] ?? [])
+            ->map(fn ($id) => (string) $id)
+            ->filter(fn ($id) => in_array($id, $selectedServiceIds, true))
+            ->values();
+        $selectedServiceOrderIds = $selectedServiceOrderIds
+            ->concat(collect($selectedServiceIds)->reject(fn ($id) => $selectedServiceOrderIds->contains($id)))
+            ->values()
+            ->all();
+        $selectedServiceOrderLabels = collect($selectedServiceOrderIds)
+            ->map(fn ($id) => $services->firstWhere('id', $id)?->name)
+            ->filter()
+            ->values()
+            ->all();
     @endphp
 
     <style>
@@ -107,8 +121,23 @@
         .customer-suggestion__name{font-size:13px;font-weight:800;color:#0f172a}
         .customer-suggestion__meta{margin-top:4px;font-size:12px;color:#64748b}
         .customer-picked{margin-top:8px;border:1px solid #dbe4ef;border-radius:16px;background:#f8fafc;padding:10px 12px;font-size:12px;color:#475569}
+        .arrangement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+        .arrangement-card{position:relative;border:1px solid #dbe4ef;border-radius:20px;padding:16px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);cursor:pointer;transition:.18s ease}
+        .arrangement-card:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(15,23,42,.08);border-color:#c5d3e3}
+        .arrangement-card.is-selected{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08);background:radial-gradient(circle at top right, rgba(14,165,233,.10), transparent 36%),linear-gradient(180deg,#ffffff 0%,#eef4ff 100%)}
+        .arrangement-card__title{font-size:14px;font-weight:800;color:#0f172a}
+        .arrangement-card__meta{margin-top:6px;font-size:12px;color:#64748b}
+        .workflow-panel{border:1px solid #dbe4ef;border-radius:20px;background:#f8fafc;padding:16px}
+        .workflow-list{display:grid;gap:10px;margin-top:12px}
+        .workflow-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dbe4ef;border-radius:16px;background:#ffffff;padding:10px 12px}
+        .workflow-item__name{font-size:13px;font-weight:800;color:#0f172a}
+        .workflow-item__meta{font-size:11px;color:#64748b}
+        .workflow-actions{display:flex;gap:8px}
+        .workflow-btn{appearance:none;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;border-radius:12px;padding:6px 9px;font-size:11px;font-weight:800;cursor:pointer;transition:.16s ease}
+        .workflow-btn:hover{background:#f8fafc}
+        .workflow-btn[disabled]{opacity:.4;cursor:not-allowed}
         @media (max-width: 1280px){.ops-grid,.booking-grid{grid-template-columns:1fr}}
-        @media (max-width: 960px){.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-grid,.field-row{grid-template-columns:1fr}}
+        @media (max-width: 960px){.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-grid,.field-row,.arrangement-grid{grid-template-columns:1fr}}
         @media (max-width: 640px){.metrics-grid{grid-template-columns:1fr}}
     </style>
 
@@ -184,6 +213,11 @@
                 <div class="ops-card__body">
                     <form method="GET" action="{{ route('app.appointments.index') }}" class="form-stack">
                         <input type="hidden" name="slot" value="{{ $prefilledSlot }}">
+                        <div id="service-order-inputs">
+                            @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
+                            @endforeach
+                        </div>
 
                         <div>
                             <div class="ops-kicker" style="color:#475569;">Step 1</div>
@@ -205,6 +239,30 @@
                                     <div class="flash flash--warn" style="grid-column:1 / -1;">No active services found. Activate clinic services first before checking appointment availability.</div>
                                 @endforelse
                             </div>
+                        </div>
+
+                        <div>
+                            <div class="ops-kicker" style="color:#475569;">Step 1B</div>
+                            <h4 style="margin:6px 0 0;font-size:18px;font-weight:800;color:#0f172a;">Choose service arrangement</h4>
+                            <div class="arrangement-grid" style="margin-top:14px;">
+                                <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
+                                    <input type="radio" name="arrangement_mode" value="same_slot" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'same_slot' ? 'checked' : '' }}>
+                                    <div class="arrangement-card__title">Same slot</div>
+                                    <div class="arrangement-card__meta">All selected services happen within the same appointment block. Best for consultation during treatment or parallel handling with different staff.</div>
+                                </label>
+                                <label class="arrangement-card {{ $selectedArrangementMode === 'back_to_back' ? 'is-selected' : '' }}">
+                                    <input type="radio" name="arrangement_mode" value="back_to_back" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'back_to_back' ? 'checked' : '' }}>
+                                    <div class="arrangement-card__title">Back-to-back</div>
+                                    <div class="arrangement-card__meta">Services are scheduled sequentially inside one visit. Best for consultation before or after nails, facial, or other treatment steps.</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="workflow-panel">
+                            <div class="ops-kicker" style="color:#475569;">Service workflow</div>
+                            <div style="margin-top:6px;font-size:14px;font-weight:800;color:#0f172a;">Set the service order used for back-to-back visits</div>
+                            <div style="margin-top:6px;font-size:12px;color:#64748b;">This order matters only for sequential visits. Same-slot visits still keep the service lineup for staff awareness.</div>
+                            <div id="workflow-list" class="workflow-list"></div>
                         </div>
 
                         <div>
@@ -235,12 +293,20 @@
                                 <span class="summary-pill__value">{{ count($selectedServiceLabels) ? implode(', ', $selectedServiceLabels) : 'None yet' }}</span>
                             </div>
                             <div class="summary-pill">
+                                <span class="summary-pill__label">Arrangement</span>
+                                <span class="summary-pill__value">{{ $selectedArrangementMode === 'back_to_back' ? 'Back-to-back visit' : 'Same-slot visit' }}</span>
+                            </div>
+                            <div class="summary-pill">
                                 <span class="summary-pill__label">Calendar slot</span>
                                 <span class="summary-pill__value">{{ $prefilledSlot ?: 'Not prefilled' }}</span>
                             </div>
                             <div class="summary-pill">
                                 <span class="summary-pill__label">Viable slots</span>
                                 <span class="summary-pill__value">{{ count($slotOptions) ? count($slotOptions) : 'Check first' }}</span>
+                            </div>
+                            <div class="summary-pill">
+                                <span class="summary-pill__label">Workflow order</span>
+                                <span class="summary-pill__value">{{ count($selectedServiceOrderLabels) ? implode(' -> ', $selectedServiceOrderLabels) : 'Select services' }}</span>
                             </div>
                         </div>
                     </div>
@@ -355,10 +421,16 @@
                                 <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
                                 <input type="hidden" name="date" value="{{ $selectedDate }}">
                                 <input type="hidden" name="slot" id="selected-slot-input" value="">
+                                <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
                                 <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
                                 @foreach ($selectedServiceIds as $serviceId)
                                     <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
                                 @endforeach
+                                <div id="booking-service-order-inputs">
+                                    @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                        <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
+                                    @endforeach
+                                </div>
 
                                 <div class="field-block">
                                     <label for="selected_combination_select">Staff combination</label>
@@ -452,7 +524,12 @@
                                 <div style="display:grid;gap:10px;margin-top:16px;">
                                     @foreach ($group->items as $item)
                                         <div class="service-line">
-                                            <div class="service-line__name">{{ $item->service?->name ?? 'Service' }}</div>
+                                            <div>
+                                                <div class="service-line__name">{{ $item->service?->name ?? 'Service' }}</div>
+                                                @if ($item->starts_at && $item->ends_at)
+                                                    <div class="service-card__meta">{{ $item->starts_at->format('h:i A') }} - {{ $item->ends_at->format('h:i A') }}</div>
+                                                @endif
+                                            </div>
                                             <div class="service-line__staff">{{ $item->staff?->full_name ?? 'Unassigned' }}@if($item->staff?->role_key) ({{ $item->staff->role_key }}) @endif</div>
                                         </div>
                                     @endforeach
@@ -529,12 +606,16 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const serviceCheckboxes = document.querySelectorAll('.service-checkbox');
+            const arrangementRadios = document.querySelectorAll('.arrangement-radio');
             const slotButtons = document.querySelectorAll('.slot-select-button');
             const slotCard = document.getElementById('selected-slot-card');
             const slotTimeLabel = document.getElementById('selected-slot-time-label');
             const slotInput = document.getElementById('selected-slot-input');
             const comboInput = document.getElementById('selected-combination-input');
             const comboSelect = document.getElementById('selected_combination_select');
+            const workflowList = document.getElementById('workflow-list');
+            const serviceOrderInputs = document.getElementById('service-order-inputs');
+            const bookingServiceOrderInputs = document.getElementById('booking-service-order-inputs');
             const prefilledSlot = @json($prefilledSlot);
             const slotAvailable = @json($quickCreate['slot_is_available']);
             const customerIdInput = document.getElementById('customer_id');
@@ -543,12 +624,133 @@
             const customerSuggestions = document.getElementById('customer_suggestions');
             const customerSelectedHint = document.getElementById('customer_selected_hint');
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
+            const selectedServicesSeed = @json($selectedServiceOrderIds);
+            const serviceCatalog = @json(
+                $services->mapWithKeys(fn ($service) => [
+                    (string) $service->id => [
+                        'id' => (string) $service->id,
+                        'name' => $service->name,
+                        'duration' => (int) ($service->duration_minutes ?? 60),
+                    ],
+                ])
+            );
             let activeCustomerRequest = null;
+            let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
+
+            function buildHiddenInputs(container, inputName, values) {
+                if (!container) {
+                    return;
+                }
+
+                container.innerHTML = '';
+
+                values.forEach((value) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = inputName;
+                    input.value = value;
+                    container.appendChild(input);
+                });
+            }
+
+            function syncServiceOrderFromSelection() {
+                const checkedIds = Array.from(serviceCheckboxes)
+                    .filter((checkbox) => checkbox.checked)
+                    .map((checkbox) => checkbox.value);
+
+                selectedServiceOrder = selectedServiceOrder.filter((id) => checkedIds.includes(id));
+
+                checkedIds.forEach((id) => {
+                    if (!selectedServiceOrder.includes(id)) {
+                        selectedServiceOrder.push(id);
+                    }
+                });
+            }
+
+            function renderWorkflowList() {
+                if (!workflowList) {
+                    return;
+                }
+
+                if (!selectedServiceOrder.length) {
+                    workflowList.innerHTML = '<div class="helper-note__body">Select one or more services above to define the visit workflow.</div>';
+                    return;
+                }
+
+                workflowList.innerHTML = '';
+
+                selectedServiceOrder.forEach((serviceId, index) => {
+                    const service = serviceCatalog[serviceId];
+
+                    if (!service) {
+                        return;
+                    }
+
+                    const row = document.createElement('div');
+                    row.className = 'workflow-item';
+                    row.innerHTML = `
+                        <div>
+                            <div class="workflow-item__name">${service.name}</div>
+                            <div class="workflow-item__meta">Step ${index + 1} - ${service.duration} mins</div>
+                        </div>
+                        <div class="workflow-actions">
+                            <button type="button" class="workflow-btn" data-direction="up" data-service-id="${serviceId}" ${index === 0 ? 'disabled' : ''}>Up</button>
+                            <button type="button" class="workflow-btn" data-direction="down" data-service-id="${serviceId}" ${index === selectedServiceOrder.length - 1 ? 'disabled' : ''}>Down</button>
+                        </div>
+                    `;
+                    workflowList.appendChild(row);
+                });
+            }
+
+            function syncServiceOrderUi() {
+                buildHiddenInputs(serviceOrderInputs, 'service_order[]', selectedServiceOrder);
+                buildHiddenInputs(bookingServiceOrderInputs, 'service_order[]', selectedServiceOrder);
+                renderWorkflowList();
+            }
+
+            function updateArrangementCards() {
+                arrangementRadios.forEach((radio) => {
+                    radio.closest('.arrangement-card')?.classList.toggle('is-selected', radio.checked);
+                });
+            }
 
             serviceCheckboxes.forEach((checkbox) => {
                 checkbox.addEventListener('change', function () {
                     this.closest('.service-card')?.classList.toggle('is-selected', this.checked);
+                    syncServiceOrderFromSelection();
+                    syncServiceOrderUi();
                 });
+            });
+
+            arrangementRadios.forEach((radio) => {
+                radio.addEventListener('change', updateArrangementCards);
+            });
+
+            workflowList?.addEventListener('click', function (event) {
+                const button = event.target.closest('.workflow-btn');
+
+                if (!button || button.disabled) {
+                    return;
+                }
+
+                const serviceId = button.dataset.serviceId;
+                const direction = button.dataset.direction;
+                const currentIndex = selectedServiceOrder.indexOf(serviceId);
+
+                if (currentIndex === -1) {
+                    return;
+                }
+
+                const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+                if (swapIndex < 0 || swapIndex >= selectedServiceOrder.length) {
+                    return;
+                }
+
+                const nextOrder = [...selectedServiceOrder];
+                [nextOrder[currentIndex], nextOrder[swapIndex]] = [nextOrder[swapIndex], nextOrder[currentIndex]];
+                selectedServiceOrder = nextOrder;
+                syncServiceOrderUi();
             });
 
             function setCombinations(combinations) {
@@ -759,6 +961,10 @@
                     clearSelectedCustomer();
                 }
             });
+
+            syncServiceOrderFromSelection();
+            syncServiceOrderUi();
+            updateArrangementCards();
         });
     </script>
 </x-internal-layout>

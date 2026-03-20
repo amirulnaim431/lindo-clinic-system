@@ -10,12 +10,12 @@ use App\Models\Customer;
 use App\Models\Service;
 use App\Models\Staff;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
 {
@@ -24,6 +24,8 @@ class AppointmentController extends Controller
         $filters = [
             'date' => $request->input('date') ?: now()->format('Y-m-d'),
             'service_ids' => $request->input('service_ids', []),
+            'service_order' => $request->input('service_order', []),
+            'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
             'staff_id' => $request->input('staff_id'),
             'status' => $request->input('status'),
             'slot' => $this->sanitizeSlot($request->input('slot')),
@@ -33,7 +35,17 @@ class AppointmentController extends Controller
             $filters['service_ids'] = [$filters['service_ids']];
         }
 
+        if (! is_array($filters['service_order'])) {
+            $filters['service_order'] = [$filters['service_order']];
+        }
+
         $filters['service_ids'] = collect($filters['service_ids'])
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        $filters['service_order'] = collect($filters['service_order'])
             ->filter()
             ->map(fn ($id) => (string) $id)
             ->values()
@@ -81,9 +93,12 @@ class AppointmentController extends Controller
                 ->get();
 
             if ($selectedServices->isNotEmpty()) {
+                $selectedServices = $this->reorderServices($selectedServices, $filters['service_order']);
+
                 $availability = $this->buildAvailability(
                     $selectedServices,
-                    Carbon::parse($filters['date'])
+                    Carbon::parse($filters['date']),
+                    $filters['arrangement_mode']
                 );
             }
         }
@@ -105,7 +120,7 @@ class AppointmentController extends Controller
                     $quickCreate['slot_is_available'] = true;
                     $quickCreate['slot_combinations'] = $slotDetails['combinations'];
                 } else {
-                    $quickCreate['message'] = 'The selected calendar slot is no longer available for the chosen services. Please pick another time.';
+                    $quickCreate['message'] = 'The selected calendar slot is no longer available for the chosen services and arrangement. Please pick another time.';
                 }
             }
         }
@@ -129,8 +144,11 @@ class AppointmentController extends Controller
             'customer_id' => ['nullable', 'string', Rule::exists('customers', 'id')],
             'date' => ['required', 'date_format:Y-m-d'],
             'slot' => ['required', 'date_format:H:i'],
+            'arrangement_mode' => ['required', Rule::in(['same_slot', 'back_to_back'])],
             'service_ids' => ['required', 'array', 'min:1'],
             'service_ids.*' => ['required', 'string', Rule::exists('services', 'id')],
+            'service_order' => ['nullable', 'array'],
+            'service_order.*' => ['required', 'string', Rule::exists('services', 'id')],
             'selected_combination' => ['required', 'string'],
             'customer_full_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:50'],
@@ -152,6 +170,10 @@ class AppointmentController extends Controller
                 ->withInput();
         }
 
+        $selectedServices = $this->reorderServices($selectedServices, $validated['service_order'] ?? []);
+        $arrangementMode = $this->normalizeArrangementMode($validated['arrangement_mode']);
+        $serviceOrderIds = $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
+
         $decodedCombination = json_decode($validated['selected_combination'], true);
 
         if (! is_array($decodedCombination) || empty($decodedCombination['service_staff_map']) || empty($decodedCombination['duration_minutes'])) {
@@ -172,15 +194,41 @@ class AppointmentController extends Controller
                 ->withInput();
         }
 
+        if (($decodedCombination['arrangement_mode'] ?? $arrangementMode) !== $arrangementMode) {
+            return back()
+                ->withErrors(['selected_combination' => 'Selected staff combination does not match the chosen appointment arrangement.'])
+                ->withInput();
+        }
+
+        $combinationServiceOrder = collect($decodedCombination['service_order'] ?? [])
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        if ($combinationServiceOrder !== [] && $combinationServiceOrder !== $serviceOrderIds) {
+            return back()
+                ->withErrors(['selected_combination' => 'Selected staff combination no longer matches the chosen service order. Please check availability again.'])
+                ->withInput();
+        }
+
         $date = Carbon::parse($validated['date']);
-        $start = $date->copy()->setTimeFromTimeString($validated['slot'].':00');
-        $end = $start->copy()->addMinutes($durationMinutes);
+        $visitStart = $date->copy()->setTimeFromTimeString($validated['slot'].':00');
+        $serviceSchedules = $this->buildServiceSchedules($selectedServices, $visitStart, $arrangementMode);
+        $visitEnd = collect($serviceSchedules)->max(fn ($schedule) => $schedule['end']) ?? $visitStart->copy()->addMinutes($durationMinutes);
+
+        $clinicEnd = $date->copy()->setTime(18, 0, 0);
+
+        if ($visitEnd->gt($clinicEnd)) {
+            return back()
+                ->withErrors(['slot' => 'The selected service arrangement extends past clinic hours. Please choose an earlier slot.'])
+                ->withInput();
+        }
 
         $chosenStaffIds = array_values($serviceStaffMap);
 
-        if (count($chosenStaffIds) !== count(array_unique($chosenStaffIds))) {
+        if ($arrangementMode === 'same_slot' && count($chosenStaffIds) !== count(array_unique($chosenStaffIds))) {
             return back()
-                ->withErrors(['selected_combination' => 'The same staff member cannot be assigned to multiple concurrent services.'])
+                ->withErrors(['selected_combination' => 'The same staff member cannot be assigned to multiple concurrent services in the same slot.'])
                 ->withInput();
         }
 
@@ -189,10 +237,17 @@ class AppointmentController extends Controller
         foreach ($selectedServices as $service) {
             $serviceId = (string) $service->id;
             $staffId = $serviceStaffMap[$serviceId] ?? null;
+            $schedule = $serviceSchedules[$serviceId] ?? null;
 
             if (! $staffId) {
                 return back()
                     ->withErrors(['selected_combination' => "Missing staff selection for {$service->name}."])
+                    ->withInput();
+            }
+
+            if (! $schedule) {
+                return back()
+                    ->withErrors(['selected_combination' => "Missing timing schedule for {$service->name}."])
                     ->withInput();
             }
 
@@ -209,22 +264,22 @@ class AppointmentController extends Controller
 
             $hasConflict = Staff::query()
                 ->whereKey($staff->id)
-                ->whereHas('appointmentItems', function ($query) use ($start, $end) {
-                    $query->where('starts_at', '<', $end)
-                        ->where('ends_at', '>', $start);
+                ->whereHas('appointmentItems', function ($query) use ($schedule) {
+                    $query->where('starts_at', '<', $schedule['end'])
+                        ->where('ends_at', '>', $schedule['start']);
                 })
                 ->exists();
 
             if ($hasConflict) {
                 return back()
-                    ->withErrors(['slot' => "{$staff->full_name} is no longer available for {$validated['slot']}. Please choose another slot or refresh availability."])
+                    ->withErrors(['slot' => "{$staff->full_name} is no longer available for the selected arrangement. Please choose another slot or refresh availability."])
                     ->withInput();
             }
 
             $resolvedAssignments[$serviceId] = $staff;
         }
 
-        DB::transaction(function () use ($validated, $start, $end, $selectedServices, $resolvedAssignments) {
+        DB::transaction(function () use ($validated, $visitStart, $visitEnd, $selectedServices, $resolvedAssignments, $serviceSchedules) {
             $phone = trim($validated['customer_phone']);
             $customer = null;
 
@@ -251,23 +306,25 @@ class AppointmentController extends Controller
 
             $group = AppointmentGroup::query()->create([
                 'customer_id' => $customer->id,
-                'starts_at' => $start,
-                'ends_at' => $end,
+                'starts_at' => $visitStart,
+                'ends_at' => $visitEnd,
                 'status' => AppointmentStatus::Booked,
                 'source' => 'admin',
                 'notes' => $validated['notes'] ?? null,
             ]);
 
             foreach ($selectedServices as $service) {
-                $assignedStaff = $resolvedAssignments[(string) $service->id];
+                $serviceId = (string) $service->id;
+                $assignedStaff = $resolvedAssignments[$serviceId];
+                $schedule = $serviceSchedules[$serviceId];
 
                 AppointmentItem::query()->create([
                     'appointment_group_id' => $group->id,
                     'service_id' => $service->id,
                     'staff_id' => $assignedStaff->id,
                     'required_role' => $assignedStaff->role_key,
-                    'starts_at' => $start,
-                    'ends_at' => $end,
+                    'starts_at' => $schedule['start'],
+                    'ends_at' => $schedule['end'],
                 ]);
             }
         });
@@ -352,7 +409,10 @@ class AppointmentController extends Controller
             'starts_at' => ['required', 'date_format:Y-m-d H:i'],
         ]);
 
-        $appointmentGroup->loadMissing('items:id,appointment_group_id,staff_id,starts_at,ends_at');
+        $appointmentGroup->loadMissing([
+            'items:id,appointment_group_id,staff_id,starts_at,ends_at',
+            'items.staff:id,full_name',
+        ]);
 
         if ($appointmentGroup->items->isEmpty()) {
             throw ValidationException::withMessages([
@@ -370,8 +430,25 @@ class AppointmentController extends Controller
         }
 
         $newStart = Carbon::createFromFormat('Y-m-d H:i', $validated['starts_at']);
-        $durationMinutes = max(30, $originalStart->diffInMinutes($originalEnd));
-        $newEnd = $newStart->copy()->addMinutes($durationMinutes);
+
+        $itemSchedules = $appointmentGroup->items
+            ->map(function ($item) use ($originalStart, $newStart) {
+                $itemStart = $item->starts_at ?: $originalStart;
+                $itemEnd = $item->ends_at ?: $itemStart?->copy()->addMinutes(30);
+                $offsetMinutes = $originalStart->diffInMinutes($itemStart);
+                $durationMinutes = max(30, $itemStart->diffInMinutes($itemEnd));
+                $newItemStart = $newStart->copy()->addMinutes($offsetMinutes);
+                $newItemEnd = $newItemStart->copy()->addMinutes($durationMinutes);
+
+                return [
+                    'item' => $item,
+                    'start' => $newItemStart,
+                    'end' => $newItemEnd,
+                ];
+            })
+            ->values();
+
+        $newEnd = $itemSchedules->max(fn ($schedule) => $schedule['end']) ?? $newStart->copy();
 
         $clinicStart = $newStart->copy()->setTime(9, 0);
         $clinicEnd = $newStart->copy()->setTime(18, 0);
@@ -382,24 +459,22 @@ class AppointmentController extends Controller
             ]);
         }
 
-        $staffIds = $appointmentGroup->items
-            ->pluck('staff_id')
-            ->filter()
-            ->unique()
-            ->values();
+        foreach ($itemSchedules as $schedule) {
+            $staffId = $schedule['item']->staff_id;
 
-        foreach ($staffIds as $staffId) {
+            if (! $staffId) {
+                continue;
+            }
+
             $hasConflict = AppointmentItem::query()
                 ->where('staff_id', $staffId)
                 ->where('appointment_group_id', '!=', $appointmentGroup->id)
-                ->where('starts_at', '<', $newEnd)
-                ->where('ends_at', '>', $newStart)
+                ->where('starts_at', '<', $schedule['end'])
+                ->where('ends_at', '>', $schedule['start'])
                 ->exists();
 
             if ($hasConflict) {
-                $staffName = $appointmentGroup->items
-                    ->firstWhere('staff_id', $staffId)?->staff?->full_name
-                    ?? 'Assigned staff';
+                $staffName = $schedule['item']->staff?->full_name ?? 'Assigned staff';
 
                 throw ValidationException::withMessages([
                     'starts_at' => "{$staffName} is already occupied in that time block. Choose another empty slot.",
@@ -407,16 +482,16 @@ class AppointmentController extends Controller
             }
         }
 
-        DB::transaction(function () use ($appointmentGroup, $newStart, $newEnd) {
+        DB::transaction(function () use ($appointmentGroup, $newStart, $newEnd, $itemSchedules) {
             $appointmentGroup->update([
                 'starts_at' => $newStart,
                 'ends_at' => $newEnd,
             ]);
 
-            foreach ($appointmentGroup->items as $item) {
-                $item->update([
-                    'starts_at' => $newStart,
-                    'ends_at' => $newEnd,
+            foreach ($itemSchedules as $schedule) {
+                $schedule['item']->update([
+                    'starts_at' => $schedule['start'],
+                    'ends_at' => $schedule['end'],
                 ]);
             }
         });
@@ -439,7 +514,7 @@ class AppointmentController extends Controller
         return preg_match('/^\d{2}:\d{2}$/', $slot) === 1 ? $slot : null;
     }
 
-    private function buildAvailability(Collection $selectedServices, Carbon $date): array
+    private function buildAvailability(Collection $selectedServices, Carbon $date, string $arrangementMode): array
     {
         $servicesSummary = $selectedServices->map(function ($service) {
             return [
@@ -464,12 +539,9 @@ class AppointmentController extends Controller
             ->values()
             ->all();
 
-        $durationMinutes = max(
-            30,
-            (int) $selectedServices->max(function ($service) {
-                return $service->duration_minutes ?: 60;
-            })
-        );
+        $durationMinutes = $arrangementMode === 'back_to_back'
+            ? max(30, (int) $selectedServices->sum(fn ($service) => $service->duration_minutes ?: 60))
+            : max(30, (int) $selectedServices->max(fn ($service) => $service->duration_minutes ?: 60));
 
         $slotStart = $date->copy()->setTime(9, 0, 0);
         $slotEndLimit = $date->copy()->setTime(18, 0, 0);
@@ -481,16 +553,20 @@ class AppointmentController extends Controller
             $start = $slotStart->copy();
             $end = $slotStart->copy()->addMinutes($durationMinutes);
             $timeKey = $start->format('H:i');
+            $serviceSchedules = $this->buildServiceSchedules($selectedServices, $start, $arrangementMode);
 
             $availableStaffByService = [];
             $serviceDebug = [];
 
             foreach ($selectedServices as $service) {
+                $serviceId = (string) $service->id;
+                $serviceSchedule = $serviceSchedules[$serviceId];
+
                 $availableStaff = $service->staff()
                     ->where('staff.is_active', true)
-                    ->whereDoesntHave('appointmentItems', function ($query) use ($start, $end) {
-                        $query->where('starts_at', '<', $end)
-                            ->where('ends_at', '>', $start);
+                    ->whereDoesntHave('appointmentItems', function ($query) use ($serviceSchedule) {
+                        $query->where('starts_at', '<', $serviceSchedule['end'])
+                            ->where('ends_at', '>', $serviceSchedule['start']);
                     })
                     ->orderBy('staff.full_name')
                     ->get(['staff.id', 'staff.full_name', 'staff.role_key'])
@@ -502,7 +578,7 @@ class AppointmentController extends Controller
                     ->values()
                     ->all();
 
-                $availableStaffByService[(string) $service->id] = [
+                $availableStaffByService[$serviceId] = [
                     'service_name' => $service->name,
                     'staff' => $availableStaff,
                 ];
@@ -510,10 +586,17 @@ class AppointmentController extends Controller
                 $serviceDebug[] = [
                     'service_name' => $service->name,
                     'available_count' => count($availableStaff),
+                    'start' => $serviceSchedule['start']->format('H:i'),
+                    'end' => $serviceSchedule['end']->format('H:i'),
                 ];
             }
 
-            $combinations = $this->generateValidCombinations($availableStaffByService, $durationMinutes);
+            $combinations = $this->generateValidCombinations(
+                $availableStaffByService,
+                $durationMinutes,
+                $arrangementMode,
+                $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all()
+            );
 
             $slots[$timeKey] = [
                 'start' => $start->format('H:i'),
@@ -521,6 +604,7 @@ class AppointmentController extends Controller
                 'duration_minutes' => $durationMinutes,
                 'combinations' => $combinations,
                 'service_debug' => $serviceDebug,
+                'arrangement_mode' => $arrangementMode,
             ];
 
             if (! empty($combinations)) {
@@ -533,7 +617,7 @@ class AppointmentController extends Controller
         $fullyBookedMessage = null;
 
         if (empty($viableSlots) && empty($servicesWithoutEligibleStaff)) {
-            $fullyBookedMessage = 'All eligible staff are fully booked for the selected services on this date.';
+            $fullyBookedMessage = 'All eligible staff are fully booked for the selected services and arrangement on this date.';
         }
 
         return [
@@ -543,15 +627,16 @@ class AppointmentController extends Controller
             'slots' => $slots,
             'duration_minutes' => $durationMinutes,
             'fully_booked_message' => $fullyBookedMessage,
+            'arrangement_mode' => $arrangementMode,
         ];
     }
 
-    private function generateValidCombinations(array $availableStaffByService, int $durationMinutes, int $limit = 50): array
+    private function generateValidCombinations(array $availableStaffByService, int $durationMinutes, string $arrangementMode, array $serviceOrderIds, int $limit = 50): array
     {
         $serviceIds = array_keys($availableStaffByService);
         $results = [];
 
-        $walk = function (int $index, array $pickedStaffIds, array $staffMap, array $parts) use (&$walk, &$results, $serviceIds, $availableStaffByService, $durationMinutes, $limit) {
+        $walk = function (int $index, array $pickedStaffIds, array $staffMap, array $parts) use (&$walk, &$results, $serviceIds, $availableStaffByService, $durationMinutes, $arrangementMode, $serviceOrderIds, $limit) {
             if (count($results) >= $limit) {
                 return;
             }
@@ -561,6 +646,8 @@ class AppointmentController extends Controller
                     'label' => implode(' | ', $parts),
                     'payload' => json_encode([
                         'duration_minutes' => $durationMinutes,
+                        'arrangement_mode' => $arrangementMode,
+                        'service_order' => $serviceOrderIds,
                         'service_staff_map' => $staffMap,
                     ]),
                 ];
@@ -573,7 +660,7 @@ class AppointmentController extends Controller
             $staffOptions = $availableStaffByService[$serviceId]['staff'];
 
             foreach ($staffOptions as $staff) {
-                if (in_array($staff['id'], $pickedStaffIds, true)) {
+                if ($arrangementMode === 'same_slot' && in_array($staff['id'], $pickedStaffIds, true)) {
                     continue;
                 }
 
@@ -593,5 +680,71 @@ class AppointmentController extends Controller
         $walk(0, [], [], []);
 
         return $results;
+    }
+
+    private function reorderServices(Collection $selectedServices, array $serviceOrderIds): Collection
+    {
+        $orderedIds = collect($serviceOrderIds)
+            ->map(fn ($id) => (string) $id)
+            ->values();
+
+        if ($orderedIds->isEmpty()) {
+            return $selectedServices->values();
+        }
+
+        $servicesById = $selectedServices->keyBy(fn ($service) => (string) $service->id);
+
+        $ordered = $orderedIds
+            ->map(fn ($id) => $servicesById->get($id))
+            ->filter();
+
+        $remaining = $selectedServices
+            ->filter(fn ($service) => ! $orderedIds->contains((string) $service->id))
+            ->values();
+
+        return $ordered->concat($remaining)->values();
+    }
+
+    private function buildServiceSchedules(Collection $selectedServices, Carbon $visitStart, string $arrangementMode): array
+    {
+        $schedules = [];
+
+        if ($arrangementMode === 'back_to_back') {
+            $cursor = $visitStart->copy();
+
+            foreach ($selectedServices as $service) {
+                $duration = max(30, (int) ($service->duration_minutes ?: 60));
+                $start = $cursor->copy();
+                $end = $cursor->copy()->addMinutes($duration);
+
+                $schedules[(string) $service->id] = [
+                    'start' => $start,
+                    'end' => $end,
+                    'duration_minutes' => $duration,
+                ];
+
+                $cursor = $end->copy();
+            }
+
+            return $schedules;
+        }
+
+        $duration = max(30, (int) $selectedServices->max(fn ($service) => $service->duration_minutes ?: 60));
+        $visitEnd = $visitStart->copy()->addMinutes($duration);
+
+        foreach ($selectedServices as $service) {
+            $schedules[(string) $service->id] = [
+                'start' => $visitStart->copy(),
+                'end' => $visitEnd->copy(),
+                'duration_minutes' => $duration,
+            ];
+        }
+
+        return $schedules;
+    }
+
+    private function normalizeArrangementMode(mixed $arrangementMode): string
+    {
+        return $arrangementMode === 'back_to_back' ? 'back_to_back' : 'same_slot';
     }
 }
