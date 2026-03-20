@@ -60,8 +60,10 @@
         .app-nav__group{ display: grid; gap: 6px; }
         .app-nav__group-head{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; color: #cbd5e1; font-size: 14px; font-weight: 700; border: 1px solid transparent; transition: .18s ease; }
         .app-nav__group-head.is-active{ background: rgba(255,255,255,0.06); color: #ffffff; border-color: rgba(255,255,255,0.06); }
-        .app-nav__group-badge{ display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.10); color: inherit; }
+        .app-nav__toggle{ width: 10px; height: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; opacity: .72; flex: 0 0 auto; margin-right: 2px; }
+        .app-nav__group.is-open .app-nav__toggle{ transform: rotate(225deg); margin-top: 4px; }
         .app-nav__subnav{ display: grid; gap: 6px; padding-left: 18px; border-left: 1px solid rgba(255,255,255,0.08); margin-left: 14px; }
+        .app-nav__subnav[hidden]{ display: none; }
         .app-nav__sublink{ display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; color: #94a3b8; font-size: 13px; font-weight: 600; border: 1px solid transparent; transition: .18s ease; }
         .app-nav__sublink:hover{ background: rgba(255,255,255,0.05); color: #ffffff; border-color: rgba(255,255,255,0.06); }
         .app-nav__sublink.is-active{ background: #ffffff; color: #0f172a; box-shadow: var(--shadow-sm); }
@@ -160,7 +162,6 @@
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
         $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
-        $customerNavCount = collect([$canCustomers, $canCustomerImport])->filter()->count();
     @endphp
 
     <div class="app-shell">
@@ -181,13 +182,6 @@
                     </a>
                 @endif
 
-                @if ($canAppointments)
-                    <a href="{{ $r('app.appointments.index') }}" class="app-nav__link {{ $is('app.appointments.*') ? 'is-active' : '' }}">
-                        <span class="app-nav__dot"></span>
-                        <span>Appointments</span>
-                    </a>
-                @endif
-
                 @if ($canCalendar)
                     <a href="{{ $r('app.calendar') }}" class="app-nav__link {{ $is('app.calendar') ? 'is-active' : '' }}">
                         <span class="app-nav__dot"></span>
@@ -195,17 +189,30 @@
                     </a>
                 @endif
 
+                @if ($canAppointments)
+                    <a href="{{ $r('app.appointments.index') }}" class="app-nav__link {{ $is('app.appointments.*') ? 'is-active' : '' }}">
+                        <span class="app-nav__dot"></span>
+                        <span>Appointments</span>
+                    </a>
+                @endif
+
                 @if ($canCustomers || $canCustomerImport)
-                    <div class="app-nav__group">
-                        <div class="app-nav__group-head {{ $customersNavActive ? 'is-active' : '' }}">
+                    <div class="app-nav__group {{ $customersNavActive ? 'is-open' : '' }}">
+                        <button
+                            type="button"
+                            class="app-nav__group-head {{ $customersNavActive ? 'is-active' : '' }}"
+                            data-nav-toggle="customers-subnav"
+                            aria-expanded="{{ $customersNavActive ? 'true' : 'false' }}"
+                            style="background:none; width:100%; cursor:pointer;"
+                        >
                             <span style="display:flex; align-items:center; gap:12px;">
                                 <span class="app-nav__dot"></span>
                                 <span>Customers</span>
                             </span>
-                            <span class="app-nav__group-badge">{{ $customerNavCount }}</span>
-                        </div>
+                            <span class="app-nav__toggle"></span>
+                        </button>
 
-                        <div class="app-nav__subnav">
+                        <div id="customers-subnav" class="app-nav__subnav" @if (! $customersNavActive) hidden @endif>
                             @if ($canCustomers)
                                 <a href="{{ $r('app.customers.index') }}" class="app-nav__sublink {{ $is('app.customers.index') || $is('app.customers.show') ? 'is-active' : '' }}">
                                     <span class="app-nav__subdot"></span>
@@ -279,5 +286,33 @@
             </section>
         </main>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-nav-toggle]').forEach(function (toggle) {
+                toggle.addEventListener('click', function () {
+                    const targetId = toggle.getAttribute('data-nav-toggle');
+                    const target = targetId ? document.getElementById(targetId) : null;
+                    const group = toggle.closest('.app-nav__group');
+
+                    if (! target || ! group) {
+                        return;
+                    }
+
+                    const isOpen = ! target.hasAttribute('hidden');
+
+                    if (isOpen) {
+                        target.setAttribute('hidden', 'hidden');
+                        toggle.setAttribute('aria-expanded', 'false');
+                        group.classList.remove('is-open');
+                    } else {
+                        target.removeAttribute('hidden');
+                        toggle.setAttribute('aria-expanded', 'true');
+                        group.classList.add('is-open');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
