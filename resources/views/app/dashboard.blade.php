@@ -5,6 +5,13 @@
     @php
         $selectedDate = request('date', $date ?? now()->toDateString());
         $selectedStaffId = request('staff_id');
+        $selectedPeriod = request('period', $period ?? 'day');
+        $periodOptions = [
+            'day' => 'Day',
+            'week' => 'Week',
+            'month' => 'Month',
+            'year' => 'Year',
+        ];
     @endphp
 
     <div class="stack">
@@ -24,13 +31,22 @@
             <div class="panel__header">
                 <h2 class="panel__title">Overview controls</h2>
                 <div class="panel__subtitle">
-                    Filter the dashboard by date and staff, then jump directly into the relevant operational pages.
+                    Switch between day, week, month, and year views, then narrow by staff when needed.
                 </div>
             </div>
 
             <div class="panel__body">
                 <form method="GET" action="{{ route('app.dashboard') }}" class="form-grid">
-                    <div class="col-4">
+                    <div class="col-3">
+                        <label class="field-label" for="period">Period</label>
+                        <select id="period" name="period" class="field-select">
+                            @foreach ($periodOptions as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedPeriod === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="col-3">
                         <label class="field-label" for="date">Date</label>
                         <input
                             id="date"
@@ -41,7 +57,7 @@
                         >
                     </div>
 
-                    <div class="col-4">
+                    <div class="col-3">
                         <label class="field-label" for="staff_id">Staff</label>
                         <select id="staff_id" name="staff_id" class="field-select">
                             <option value="">All staff</option>
@@ -53,7 +69,7 @@
                         </select>
                     </div>
 
-                    <div class="col-4" style="display:flex; align-items:end;">
+                    <div class="col-3" style="display:flex; align-items:end;">
                         <div class="btn-row">
                             <button type="submit" class="btn btn-primary">Apply Filters</button>
                             <a href="{{ route('app.dashboard') }}" class="btn btn-secondary">Reset</a>
@@ -67,6 +83,13 @@
             <div class="stat-card">
                 <div class="stat-card__label">Total appointments</div>
                 <div class="stat-card__value">{{ $kpi['total'] ?? 0 }}</div>
+                <div class="text-muted" style="margin-top:10px;">{{ $periodLabel ?? 'Selected period' }}</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card__label">Revenue</div>
+                <div class="stat-card__value">--</div>
+                <div class="text-muted" style="margin-top:10px;">Ready for payment gateway integration later.</div>
             </div>
 
             @foreach ($statusCases as $st)
@@ -80,6 +103,7 @@
                 <div class="stat-card">
                     <div class="stat-card__label">{{ $statusLabel }}</div>
                     <div class="stat-card__value">{{ $kpi['by_status'][$statusKey] ?? 0 }}</div>
+                    <div class="text-muted" style="margin-top:10px;">Within {{ strtolower($periodOptions[$selectedPeriod] ?? 'day') }} view.</div>
                 </div>
             @endforeach
         </div>
@@ -89,7 +113,7 @@
                 <div>
                     <h2 class="panel__title">Schedule</h2>
                     <div class="panel__subtitle">
-                        Appointment groups for {{ $selectedDate }}.
+                        Appointment groups for {{ $periodLabel ?? $selectedDate }}.
                     </div>
                 </div>
 
