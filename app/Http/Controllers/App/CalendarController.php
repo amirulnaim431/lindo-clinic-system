@@ -5,6 +5,7 @@ namespace App\Http\Controllers\App;
 use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
+use App\Models\AppointmentItem;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -188,7 +189,7 @@ class CalendarController extends Controller
             ->values();
 
         $dayEvents = $visibleTimelineGroups
-            ->map(fn (AppointmentGroup $group) => $this->mapGroupToEvent($group))
+            ->flatMap(fn (AppointmentGroup $group) => $group->items->map(fn (AppointmentItem $item) => $this->mapItemToEvent($group, $item)))
             ->filter()
             ->values();
 
@@ -304,10 +305,10 @@ class CalendarController extends Controller
         return $slots;
     }
 
-    private function mapGroupToEvent(AppointmentGroup $group): ?array
+    private function mapItemToEvent(AppointmentGroup $group, AppointmentItem $item): ?array
     {
-        $startsAt = $group->starts_at;
-        $endsAt = $group->ends_at;
+        $startsAt = $item->starts_at;
+        $endsAt = $item->ends_at;
 
         if (! $startsAt || ! $endsAt) {
             return null;
@@ -348,8 +349,10 @@ class CalendarController extends Controller
 
         $serviceNames = $services->all();
         $staffNames = $staffMembers->pluck('name')->filter()->values()->all();
-        $primaryService = $serviceNames[0] ?? 'General Service';
-        $serviceStyles = $this->serviceVisuals($primaryService);
+        $itemServiceName = optional($item->service)->name ?: 'General Service';
+        $itemStaffName = $item->staff?->full_name ?: 'Unassigned';
+        $itemStaffRole = $item->staff?->job_title ?: $item->staff?->role_key;
+        $serviceStyles = $this->serviceVisuals($itemServiceName);
         $statusValue = $group->status instanceof AppointmentStatus
             ? $group->status->value
             : (string) $group->status;
@@ -361,18 +364,32 @@ class CalendarController extends Controller
         $pixelsPerMinute = self::ROW_HEIGHT_PX / self::SLOT_MINUTES;
 
         return [
-            'id' => (string) $group->id,
+            'id' => (string) $item->id,
+            'group_id' => (string) $group->id,
+            'group_service_count' => $group->items->count(),
             'customer_name' => optional($group->customer)->full_name ?: 'Unknown Customer',
             'customer_phone' => optional($group->customer)->phone ?: 'No phone recorded',
             'membership_label' => $this->membershipLabel($group),
             'service_names' => $serviceNames,
-            'service_summary' => $this->summarizeNames($serviceNames, 'No service'),
+            'service_summary' => $itemServiceName,
+            'staff_ids' => $item->staff_id ? [(string) $item->staff_id] : [],
             'staff_names' => $staffNames,
-            'staff_summary' => $this->summarizeNames($staffNames, 'Unassigned'),
+            'staff_summary' => $itemStaffName,
             'staff_details' => $staffMembers
                 ->map(fn ($staff) => $staff['role'] ? $staff['name'].' - '.$staff['role'] : $staff['name'])
                 ->values()
                 ->all(),
+            'linked_visit_services' => $group->items
+                ->map(function ($linkedItem) {
+                    $serviceName = $linkedItem->service?->name ?: 'Service';
+                    $staffName = $linkedItem->staff?->full_name ?: 'Unassigned';
+                    $timeLabel = ($linkedItem->starts_at?->format('h:i A') ?: '-').' - '.($linkedItem->ends_at?->format('h:i A') ?: '-');
+
+                    return $serviceName.' | '.$timeLabel.' | '.$staffName;
+                })
+                ->values()
+                ->all(),
+            'visit_summary' => $this->summarizeNames($serviceNames, 'No service'),
             'start_time' => $startsAt->format('h:i A'),
             'end_time' => $endsAt->format('h:i A'),
             'date_label' => $startsAt->format('d M Y'),
@@ -382,10 +399,11 @@ class CalendarController extends Controller
             'source' => $group->source ? str($group->source)->replace('_', ' ')->title()->toString() : null,
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
             'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
-            'reschedule_url' => route('app.appointments.reschedule', $group),
+            'reschedule_url' => route('app.appointments.items.reschedule', $item),
+            'move_visit_url' => route('app.appointments.reschedule', $group),
             'service_styles' => $serviceStyles,
             'status_styles' => $statusStyles,
-            'primary_service' => $primaryService,
+            'primary_service' => $itemServiceName,
             'top_px' => (int) round($topMinutes * $pixelsPerMinute),
             'height_px' => max(60, (int) round($heightMinutes * $pixelsPerMinute) - 8),
             'start_minutes' => $dayStart->diffInMinutes($visibleStart),
@@ -393,6 +411,7 @@ class CalendarController extends Controller
             'duration_minutes' => $durationMinutes,
             'date_iso' => $startsAt->toDateString(),
             'start_24' => $startsAt->format('H:i'),
+            'item_role' => $itemStaffRole,
         ];
     }
 

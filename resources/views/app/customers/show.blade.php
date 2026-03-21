@@ -1,313 +1,184 @@
-<x-internal-layout>
-    <x-slot name="title">Customer Profile</x-slot>
-    <x-slot name="subtitle">
-        Consolidated patient, membership, and appointment information for this customer record.
-    </x-slot>
-
+<x-internal-layout :title="'Customer Profile'" :subtitle="'Consolidated patient, membership, and appointment information for this customer record.'">
     @php
         $statusLabel = function ($status) {
             if (is_object($status) && property_exists($status, 'value')) {
                 return (string) $status->value;
             }
-
             if (is_object($status) && method_exists($status, 'value')) {
                 return (string) $status->value();
             }
-
             return $status ? (string) $status : null;
         };
 
-        $badgeClass = function ($status) {
+        $badgeTone = function ($status) {
             $value = strtolower((string) $status);
-
             return match ($value) {
-                'booked', 'confirmed' => 'background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;',
-                'pending' => 'background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a;',
-                'cancelled', 'canceled' => 'background-color: #fff1f2; color: #be123c; border: 1px solid #fecdd3;',
-                'completed', 'done' => 'background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;',
-                default => 'background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1;',
+                'booked', 'pending' => 'warning',
+                'confirmed', 'completed' => 'success',
+                'checked_in' => 'info',
+                'cancelled', 'canceled', 'no_show' => 'danger',
+                default => 'neutral',
             };
         };
 
         $canEditCustomer = auth()->check() && method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin();
     @endphp
 
-    <div class="space-y-6">
+    <div class="stack">
         @if (session('success'))
-            <div class="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-                <p class="text-sm font-semibold text-emerald-800">{{ session('success') }}</p>
-            </div>
+            <div class="alert alert-success">{{ session('success') }}</div>
         @endif
 
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-                <a
-                    href="{{ route('app.customers.index') }}"
-                    class="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900"
-                >
-                    ← Back to Customers
-                </a>
+        <section class="hero-panel">
+            <div class="panel-body stack">
+                <div class="filter-bar__head">
+                    <div>
+                        <a href="{{ route('app.customers.index') }}" class="btn btn-secondary">Back to customers</a>
+                        <div class="page-kicker mt-4">Customer profile</div>
+                        <div class="page-title" style="font-size:2.35rem;">{{ $customer->full_name ?: 'Unnamed Customer' }}</div>
 
-                <div class="mt-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Customer profile</p>
-                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-                        {{ $customer->full_name ?: 'Unnamed Customer' }}
-                    </h1>
-
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        @if($customer->membership_type)
-                            <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                {{ $customer->membership_type }}
-                            </span>
-                        @endif
-
-                        @if($customer->current_package)
-                            <span class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" style="border: 1px solid #ddd6fe;">
-                                Package: {{ $customer->current_package }}
-                            </span>
-                        @endif
-
-                        @if($customer->membership_code)
-                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700" style="border: 1px solid #a7f3d0;">
-                                Code: {{ $customer->membership_code }}
-                            </span>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex flex-col gap-3 lg:items-end">
-                @if($canEditCustomer)
-                    <a
-                        href="{{ route('app.customers.edit', $customer) }}"
-                        class="inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-sm transition"
-                        style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a;"
-                        onmouseover="this.style.background='#1e293b';this.style.borderColor='#1e293b';"
-                        onmouseout="this.style.background='#0f172a';this.style.borderColor='#0f172a';"
-                    >
-                        Edit Customer
-                    </a>
-                @endif
-
-                <div class="grid gap-3 sm:grid-cols-2 lg:w-[28rem]">
-                    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming appointments</p>
-                        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $upcomingAppointments->count() }}</p>
-                    </div>
-
-                    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Appointment history</p>
-                        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $appointmentHistory->count() }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid gap-6 xl:grid-cols-3">
-            <div class="space-y-6 xl:col-span-2">
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Profile</h2>
-                        <p class="mt-1 text-sm text-slate-500">Core customer and identity information.</p>
-                    </div>
-
-                    <div class="grid gap-5 md:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Full name</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->full_name ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Phone</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->phone ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Email</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->email ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Date of birth</p>
-                            <p class="mt-2 text-sm text-slate-900">
-                                {{ $customer->dob ? \Illuminate\Support\Carbon::parse($customer->dob)->format('d M Y') : '—' }}
-                            </p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">IC / Passport</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->ic_passport ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Gender</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->gender ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Marital status</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->marital_status ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Nationality</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->nationality ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Occupation</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->occupation ?: '—' }}</p>
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Address</p>
-                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">{{ $customer->address ?: '—' }}</p>
+                        <div class="inline-chip-row mt-3">
+                            @if($customer->membership_type)
+                                <span class="chip">{{ $customer->membership_type }}</span>
+                            @endif
+                            @if($customer->current_package)
+                                <span class="status-chip status-chip--info">Package: {{ $customer->current_package }}</span>
+                            @endif
+                            @if($customer->membership_code)
+                                <span class="status-chip status-chip--success">Code: {{ $customer->membership_code }}</span>
+                            @endif
                         </div>
                     </div>
-                </div>
 
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Medical / Clinic Info</h2>
-                        <p class="mt-1 text-sm text-slate-500">Basic clinical information currently stored in CRM.</p>
-                    </div>
-
-                    <div class="grid gap-5 md:grid-cols-3">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Weight</p>
-                            <p class="mt-2 text-sm text-slate-900">
-                                {{ $customer->weight !== null ? rtrim(rtrim(number_format((float) $customer->weight, 2, '.', ''), '0'), '.') . ' kg' : '—' }}
-                            </p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Height</p>
-                            <p class="mt-2 text-sm text-slate-900">
-                                {{ $customer->height !== null ? rtrim(rtrim(number_format((float) $customer->height, 2, '.', ''), '0'), '.') . ' cm' : '—' }}
-                            </p>
-                        </div>
-
-                        <div class="md:col-span-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Allergies</p>
-                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">{{ $customer->allergies ?: '—' }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Operational</h2>
-                        <p class="mt-1 text-sm text-slate-500">Upcoming appointments and appointment history linked to this customer.</p>
-                    </div>
-
-                    <div class="grid gap-6 xl:grid-cols-2">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-sm font-semibold text-slate-900">Upcoming appointments</h3>
-                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700" style="border: 1px solid #cbd5e1;">
-                                    {{ $upcomingAppointments->count() }}
-                                </span>
+                    <div class="stack" style="width:min(100%, 28rem);">
+                        @if($canEditCustomer)
+                            <div class="btn-row" style="justify-content:flex-end;">
+                                <a href="{{ route('app.customers.edit', $customer) }}" class="btn btn-primary">Edit customer</a>
                             </div>
+                        @endif
 
-                            <div class="space-y-3">
+                        <div class="two-col">
+                            <x-stat-card label="Upcoming appointments" :value="$upcomingAppointments->count()" />
+                            <x-stat-card label="Appointment history" :value="$appointmentHistory->count()" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-grid">
+            <div class="stack">
+                <div class="panel">
+                    <div class="panel-header">
+                        <x-section-heading kicker="Profile" title="Core details" subtitle="Customer identity and contact information." />
+                    </div>
+                    <div class="panel-body">
+                        <div class="two-col">
+                            <div class="summary-card"><div class="micro-label">Full name</div><div class="selection-card__title mt-2">{{ $customer->full_name ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Phone</div><div class="selection-card__title mt-2">{{ $customer->phone ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Email</div><div class="selection-card__title mt-2">{{ $customer->email ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Date of birth</div><div class="selection-card__title mt-2">{{ $customer->dob ? \Illuminate\Support\Carbon::parse($customer->dob)->format('d M Y') : '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">IC / Passport</div><div class="selection-card__title mt-2">{{ $customer->ic_passport ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Gender</div><div class="selection-card__title mt-2">{{ $customer->gender ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Marital status</div><div class="selection-card__title mt-2">{{ $customer->marital_status ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Nationality</div><div class="selection-card__title mt-2">{{ $customer->nationality ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Occupation</div><div class="selection-card__title mt-2">{{ $customer->occupation ?: '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Address</div><div class="small-note mt-2">{{ $customer->address ?: '-' }}</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <x-section-heading kicker="Clinic info" title="Medical / clinic data" subtitle="Basic clinical information currently stored in CRM." />
+                    </div>
+                    <div class="panel-body">
+                        <div class="three-col">
+                            <div class="summary-card"><div class="micro-label">Weight</div><div class="selection-card__title mt-2">{{ $customer->weight !== null ? rtrim(rtrim(number_format((float) $customer->weight, 2, '.', ''), '0'), '.') . ' kg' : '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Height</div><div class="selection-card__title mt-2">{{ $customer->height !== null ? rtrim(rtrim(number_format((float) $customer->height, 2, '.', ''), '0'), '.') . ' cm' : '-' }}</div></div>
+                            <div class="summary-card"><div class="micro-label">Allergies</div><div class="small-note mt-2">{{ $customer->allergies ?: '-' }}</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <x-section-heading kicker="Operational history" title="Appointments" subtitle="Upcoming appointments and appointment history linked to this customer." />
+                    </div>
+                    <div class="panel-body">
+                        <div class="split-grid">
+                            <div class="stack">
+                                <div class="filter-bar__head">
+                                    <div class="selection-card__title">Upcoming appointments</div>
+                                    <span class="chip">{{ $upcomingAppointments->count() }}</span>
+                                </div>
                                 @forelse($upcomingAppointments as $group)
                                     @php $status = $statusLabel($group->status); @endphp
-
-                                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="queue-card">
+                                        <div class="filter-bar__head">
                                             <div>
-                                                <p class="text-sm font-semibold text-slate-900">
-                                                    {{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date not available' }}
-                                                </p>
-                                                <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $group->ends_at ? 'Until ' . $group->ends_at->format('h:i A') : 'End time not available' }}
-                                                </p>
+                                                <div class="selection-card__title">{{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date unavailable' }}</div>
+                                                <div class="small-note">{{ $group->ends_at ? 'Until '.$group->ends_at->format('h:i A') : 'End time unavailable' }}</div>
                                             </div>
-
                                             @if($status)
-                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" style="{{ $badgeClass($status) }}">
-                                                    {{ ucfirst($status) }}
-                                                </span>
+                                                <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
                                             @endif
                                         </div>
-
-                                        <div class="mt-4 space-y-2">
+                                        <div class="stack mt-3">
                                             @forelse($group->items as $item)
-                                                <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                                    <span class="font-medium text-slate-900">{{ $item->service->name ?? 'Service' }}</span>
-                                                    <span class="text-slate-400">·</span>
-                                                    <span>{{ $item->staff->full_name ?? 'Unassigned staff' }}</span>
+                                                <div class="summary-card">
+                                                    <div class="selection-card__title">{{ $item->service->name ?? 'Service' }}</div>
+                                                    <div class="small-note">{{ $item->staff->full_name ?? 'Unassigned staff' }}</div>
                                                 </div>
                                             @empty
-                                                <p class="text-sm text-slate-500">No appointment item details available.</p>
+                                                <div class="small-note">No appointment item details available.</div>
                                             @endforelse
                                         </div>
-
                                         @if($group->notes)
-                                            <div class="mt-4 border-t border-slate-100 pt-3 text-sm text-slate-500">
-                                                {{ $group->notes }}
-                                            </div>
+                                            <div class="small-note mt-3">{{ $group->notes }}</div>
                                         @endif
                                     </div>
                                 @empty
-                                    <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
-                                        No upcoming appointments found.
+                                    <div class="empty-state empty-state--dashed">
+                                        <div class="empty-state__title">No upcoming appointments</div>
                                     </div>
                                 @endforelse
                             </div>
-                        </div>
 
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-sm font-semibold text-slate-900">Appointment history</h3>
-                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700" style="border: 1px solid #cbd5e1;">
-                                    {{ $appointmentHistory->count() }}
-                                </span>
-                            </div>
-
-                            <div class="space-y-3">
+                            <div class="stack">
+                                <div class="filter-bar__head">
+                                    <div class="selection-card__title">Appointment history</div>
+                                    <span class="chip">{{ $appointmentHistory->count() }}</span>
+                                </div>
                                 @forelse($appointmentHistory as $group)
                                     @php $status = $statusLabel($group->status); @endphp
-
-                                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="queue-card">
+                                        <div class="filter-bar__head">
                                             <div>
-                                                <p class="text-sm font-semibold text-slate-900">
-                                                    {{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date not available' }}
-                                                </p>
-                                                <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $group->ends_at ? 'Until ' . $group->ends_at->format('h:i A') : 'End time not available' }}
-                                                </p>
+                                                <div class="selection-card__title">{{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date unavailable' }}</div>
+                                                <div class="small-note">{{ $group->ends_at ? 'Until '.$group->ends_at->format('h:i A') : 'End time unavailable' }}</div>
                                             </div>
-
                                             @if($status)
-                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" style="{{ $badgeClass($status) }}">
-                                                    {{ ucfirst($status) }}
-                                                </span>
+                                                <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
                                             @endif
                                         </div>
-
-                                        <div class="mt-4 space-y-2">
+                                        <div class="stack mt-3">
                                             @forelse($group->items as $item)
-                                                <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                                    <span class="font-medium text-slate-900">{{ $item->service->name ?? 'Service' }}</span>
-                                                    <span class="text-slate-400">·</span>
-                                                    <span>{{ $item->staff->full_name ?? 'Unassigned staff' }}</span>
+                                                <div class="summary-card">
+                                                    <div class="selection-card__title">{{ $item->service->name ?? 'Service' }}</div>
+                                                    <div class="small-note">{{ $item->staff->full_name ?? 'Unassigned staff' }}</div>
                                                 </div>
                                             @empty
-                                                <p class="text-sm text-slate-500">No appointment item details available.</p>
+                                                <div class="small-note">No appointment item details available.</div>
                                             @endforelse
                                         </div>
-
                                         @if($group->notes)
-                                            <div class="mt-4 border-t border-slate-100 pt-3 text-sm text-slate-500">
-                                                {{ $group->notes }}
-                                            </div>
+                                            <div class="small-note mt-3">{{ $group->notes }}</div>
                                         @endif
                                     </div>
                                 @empty
-                                    <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
-                                        No appointment history found.
+                                    <div class="empty-state empty-state--dashed">
+                                        <div class="empty-state__title">No appointment history</div>
                                     </div>
                                 @endforelse
                             </div>
@@ -316,80 +187,32 @@
                 </div>
             </div>
 
-            <div class="space-y-6">
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Emergency Contact</h2>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Name</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->emergency_contact_name ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Phone</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->emergency_contact_phone ?: '—' }}</p>
-                        </div>
+            <div class="stack">
+                <div class="panel">
+                    <div class="panel-header"><div class="panel-title">Emergency contact</div></div>
+                    <div class="panel-body stack">
+                        <div class="summary-card"><div class="micro-label">Name</div><div class="selection-card__title mt-2">{{ $customer->emergency_contact_name ?: '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Phone</div><div class="selection-card__title mt-2">{{ $customer->emergency_contact_phone ?: '-' }}</div></div>
                     </div>
                 </div>
 
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Membership</h2>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Membership code</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->membership_code ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Membership type</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->membership_type ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Current package</p>
-                            <p class="mt-2 text-sm text-slate-900">{{ $customer->current_package ?: '—' }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Current package since</p>
-                            <p class="mt-2 text-sm text-slate-900">
-                                {{ $customer->current_package_since ? \Illuminate\Support\Carbon::parse($customer->current_package_since)->format('d M Y') : '—' }}
-                            </p>
-                        </div>
+                <div class="panel">
+                    <div class="panel-header"><div class="panel-title">Membership</div></div>
+                    <div class="panel-body stack">
+                        <div class="summary-card"><div class="micro-label">Membership code</div><div class="selection-card__title mt-2">{{ $customer->membership_code ?: '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Membership type</div><div class="selection-card__title mt-2">{{ $customer->membership_type ?: '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Current package</div><div class="selection-card__title mt-2">{{ $customer->current_package ?: '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Current package since</div><div class="selection-card__title mt-2">{{ $customer->current_package_since ? \Illuminate\Support\Carbon::parse($customer->current_package_since)->format('d M Y') : '-' }}</div></div>
                     </div>
                 </div>
 
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-slate-900">Administrative</h2>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Notes</p>
-                        <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-900">
-                            {{ $customer->notes ?: 'No administrative notes recorded.' }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="rounded-3xl border border-dashed border-slate-300 bg-white p-6 shadow-sm">
-                    <div class="mb-3">
-                        <h2 class="text-lg font-semibold text-slate-900">Future Expansion</h2>
-                    </div>
-
-                    <div class="space-y-3 text-sm text-slate-500">
-                        <p>Payments and billing history placeholder</p>
-                        <p>Package history placeholder</p>
-                        <p>Treatment / claims / clinical documents placeholder</p>
+                <div class="panel">
+                    <div class="panel-header"><div class="panel-title">Administrative notes</div></div>
+                    <div class="panel-body">
+                        <div class="small-note">{{ $customer->notes ?: 'No administrative notes recorded.' }}</div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </x-internal-layout>

@@ -1,30 +1,90 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+    <title>{{ config('app.name', 'Lindo Clinic') }}</title>
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body>
+    <div class="auth-shell">
+        <section class="auth-showcase">
             <div>
-                <a href="/">
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+                <a href="{{ url('/') }}" class="auth-brand">
+                    <span class="auth-brand__mark" aria-hidden="true">LC</span>
+                    <span>
+                        <span class="auth-kicker">Lindo Clinic</span>
+                        <span class="auth-brand__name">Clinic Operations</span>
+                        <span class="auth-brand__tag">Secure access for front desk, admin, and clinic staff.</span>
+                    </span>
                 </a>
+
+                <div class="auth-copy">
+                    <div class="auth-kicker">Premium workflow</div>
+                    <h1 class="auth-title">High-clarity access for a premium clinic team.</h1>
+                    <p class="auth-subtitle">
+                        The internal system follows the Lindo brand language while staying focused on speed, accuracy, and daily patient operations.
+                    </p>
+
+                    <div class="auth-points">
+                        <div class="auth-point">
+                            <span class="auth-point__dot"></span>
+                            <div>
+                                <div class="auth-point__title">Operational first</div>
+                                <div class="auth-point__body">Appointments, customer records, and staff coordination stay readable and fast under pressure.</div>
+                            </div>
+                        </div>
+                        <div class="auth-point">
+                            <span class="auth-point__dot"></span>
+                            <div>
+                                <div class="auth-point__title">Brand aligned</div>
+                                <div class="auth-point__body">Dark clinic styling, warm copper accents, and selective serif presentation mirror the public identity.</div>
+                            </div>
+                        </div>
+                        <div class="auth-point">
+                            <span class="auth-point__dot"></span>
+                            <div>
+                                <div class="auth-point__title">Asset ready</div>
+                                <div class="auth-point__body">Drop optional visuals into `public/assets/branding/` or `public/assets/clinic/` without changing layout code.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
+            <div class="auth-image-slot">
+                @php
+                    $authBrandImage = public_path('assets/branding/auth-side.jpg');
+                    $authClinicImage = public_path('assets/clinic/auth-side.jpg');
+                    $authImage = file_exists($authBrandImage)
+                        ? asset('assets/branding/auth-side.jpg')
+                        : (file_exists($authClinicImage) ? asset('assets/clinic/auth-side.jpg') : null);
+                @endphp
+
+                @if ($authImage)
+                    <img src="{{ $authImage }}" alt="Lindo Clinic interior branding">
+                @else
+                    <div class="auth-image-slot__placeholder">
+                        <div class="auth-image-slot__frame">
+                            <div class="page-kicker">Optional brand image</div>
+                            <div class="panel-title-display">Drop a branded visual here later.</div>
+                            <p class="panel-subtitle">
+                                Supported placeholder paths: `public/assets/branding/auth-side.jpg` or `public/assets/clinic/auth-side.jpg`.
+                            </p>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </section>
+
+        <section class="auth-panel">
+            <div class="auth-card">
                 {{ $slot }}
             </div>
-        </div>
-    </body>
+        </section>
+    </div>
+</body>
 </html>

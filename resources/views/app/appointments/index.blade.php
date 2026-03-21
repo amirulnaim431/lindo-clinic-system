@@ -74,81 +74,6 @@
         })->all();
     @endphp
 
-    <style>
-        .ops-shell{display:grid;gap:22px}
-        .ops-card{border:1px solid #e2e8f0;border-radius:28px;background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);box-shadow:0 1px 2px rgba(15,23,42,.05)}
-        .ops-card--hero{background:radial-gradient(circle at top left, rgba(14,165,233,.12), transparent 32%),radial-gradient(circle at top right, rgba(15,23,42,.06), transparent 28%),linear-gradient(180deg,#ffffff 0%,#f8fbff 100%)}
-        .ops-card__header{padding:22px 24px;border-bottom:1px solid #e2e8f0}
-        .ops-card__body{padding:24px}
-        .ops-kicker{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#64748b}
-        .ops-title{margin:8px 0 0;font-size:28px;line-height:1.05;font-weight:800;letter-spacing:-.04em;color:#0f172a}
-        .ops-subtitle{margin-top:10px;font-size:14px;color:#64748b;max-width:780px}
-        .ops-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:22px}
-        .metrics-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
-        .metric-card{border:1px solid #e2e8f0;border-radius:20px;padding:16px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
-        .metric-card__label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
-        .metric-card__value{margin-top:8px;font-size:28px;line-height:1;font-weight:800;letter-spacing:-.04em;color:#0f172a}
-        .metric-card__meta{margin-top:6px;font-size:12px;color:#64748b}
-        .form-stack{display:grid;gap:18px}
-        .booking-grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:22px}
-        .service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-        .service-card{position:relative;border:1px solid #dbe4ef;border-radius:22px;padding:16px 18px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);box-shadow:0 1px 2px rgba(15,23,42,.05);cursor:pointer;transition:.18s ease}
-        .service-card:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(15,23,42,.08);border-color:#c5d3e3}
-        .service-card.is-selected{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08);background:radial-gradient(circle at top right, rgba(59,130,246,.10), transparent 34%),linear-gradient(180deg,#ffffff 0%,#eef4ff 100%)}
-        .service-card__title{font-size:15px;font-weight:800;color:#0f172a}
-        .service-card__meta{margin-top:6px;font-size:12px;color:#64748b}
-        .service-card__badge{display:inline-flex;align-items:center;justify-content:center;min-width:76px;border-radius:999px;border:1px solid #dbe4ef;background:#ffffff;padding:7px 10px;font-size:11px;font-weight:800;color:#475569}
-        .selection-input{position:absolute;opacity:0;pointer-events:none}
-        .field-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:end}
-        .field-block{display:grid;gap:8px}
-        .field-block label{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
-        .field-input{width:100%;border:1px solid #cbd5e1;border-radius:18px;background:#ffffff;padding:13px 14px;font-size:14px;color:#0f172a;outline:none;transition:.18s ease}
-        .field-input:focus{border-color:#94a3b8;box-shadow:0 0 0 4px rgba(148,163,184,.14)}
-        .select-input{appearance:none;background:#ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:42px}
-        .action-btn{appearance:none;border:1px solid transparent;border-radius:18px;padding:13px 18px;font-size:14px;font-weight:800;cursor:pointer;transition:.18s ease;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
-        .action-btn--primary{background:#0f172a;border-color:#0f172a;color:#ffffff;box-shadow:0 10px 22px rgba(15,23,42,.16)}
-        .action-btn--primary:hover{background:#1e293b;border-color:#1e293b}
-        .action-btn--secondary{background:#ffffff;border-color:#cbd5e1;color:#0f172a}
-        .action-btn--secondary:hover{background:#f8fafc}
-        .helper-note{border:1px solid #dbe4ef;border-radius:20px;background:#f8fafc;padding:16px}
-        .helper-note__title{font-size:13px;font-weight:800;color:#0f172a}
-        .helper-note__body{margin-top:6px;font-size:13px;color:#64748b}
-        .summary-list{display:grid;gap:10px}
-        .summary-pill{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;padding:12px 14px}
-        .summary-pill__label{font-size:13px;font-weight:700;color:#334155}
-        .summary-pill__value{font-size:12px;font-weight:800;color:#0f172a;text-align:right}
-        .flash{border-radius:18px;padding:14px 16px;font-size:14px;font-weight:700}
-        .flash--success{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
-        .flash--error{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
-        .flash--warn{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
-        .hidden{display:none !important}
-        .customer-picker{position:relative}
-        .customer-suggestions{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:20;border:1px solid #dbe4ef;border-radius:18px;background:#ffffff;box-shadow:0 18px 36px rgba(15,23,42,.14);overflow:hidden}
-        .customer-suggestion{padding:12px 14px;border-bottom:1px solid #eef2f7;cursor:pointer;transition:.16s ease}
-        .customer-suggestion:last-child{border-bottom:none}
-        .customer-suggestion:hover,.customer-suggestion.is-active{background:#f8fbff}
-        .customer-suggestion__name{font-size:13px;font-weight:800;color:#0f172a}
-        .customer-suggestion__meta{margin-top:4px;font-size:12px;color:#64748b}
-        .customer-picked{margin-top:8px;border:1px solid #dbe4ef;border-radius:16px;background:#f8fafc;padding:10px 12px;font-size:12px;color:#475569}
-        .arrangement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-        .arrangement-card{position:relative;border:1px solid #dbe4ef;border-radius:20px;padding:16px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);cursor:pointer;transition:.18s ease}
-        .arrangement-card:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(15,23,42,.08);border-color:#c5d3e3}
-        .arrangement-card.is-selected{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08);background:radial-gradient(circle at top right, rgba(14,165,233,.10), transparent 36%),linear-gradient(180deg,#ffffff 0%,#eef4ff 100%)}
-        .arrangement-card__title{font-size:14px;font-weight:800;color:#0f172a}
-        .arrangement-card__meta{margin-top:6px;font-size:12px;color:#64748b}
-        .workflow-panel{border:1px solid #dbe4ef;border-radius:20px;background:#f8fafc;padding:16px}
-        .workflow-list{display:grid;gap:10px;margin-top:12px}
-        .workflow-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dbe4ef;border-radius:16px;background:#ffffff;padding:10px 12px}
-        .workflow-item__name{font-size:13px;font-weight:800;color:#0f172a}
-        .workflow-item__meta{font-size:11px;color:#64748b}
-        .workflow-actions{display:flex;gap:8px}
-        .workflow-btn{appearance:none;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;border-radius:12px;padding:6px 9px;font-size:11px;font-weight:800;cursor:pointer;transition:.16s ease}
-        .workflow-btn:hover{background:#f8fafc}
-        .workflow-btn[disabled]{opacity:.4;cursor:not-allowed}
-        @media (max-width: 1280px){.ops-grid,.booking-grid{grid-template-columns:1fr}}
-        @media (max-width: 960px){.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-grid,.field-row,.arrangement-grid{grid-template-columns:1fr}}
-        @media (max-width: 640px){.metrics-grid{grid-template-columns:1fr}}
-    </style>
 
     <div class="ops-shell">
         @if (session('success'))
@@ -339,29 +264,6 @@
                 </div>
 
                 <div class="ops-card__body">
-                    <style>
-                        .availability-grid{display:grid;gap:22px}
-                        .eligibility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-                        .eligibility-card{border:1px solid #e2e8f0;border-radius:22px;background:#f8fafc;padding:16px}
-                        .eligibility-card__title{font-size:14px;font-weight:800;color:#0f172a}
-                        .staff-chip-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-                        .staff-chip{display:inline-flex;align-items:center;border-radius:999px;border:1px solid #dbe4ef;background:#ffffff;padding:8px 11px;font-size:12px;font-weight:700;color:#475569}
-                        .slot-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-                        .slot-button{appearance:none;border:none;background:none;padding:0;cursor:pointer}
-                        .slot-card{border:1px solid #dbe4ef;border-radius:22px;min-height:74px;padding:12px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);box-shadow:0 1px 2px rgba(15,23,42,.05);transition:.18s ease;display:flex;align-items:center;justify-content:center;text-align:center}
-                        .slot-button:hover .slot-card{transform:translateY(-1px);box-shadow:0 14px 28px rgba(15,23,42,.08);border-color:#c5d3e3}
-                        .slot-card.is-selected{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08);background:radial-gradient(circle at top right, rgba(14,165,233,.10), transparent 34%),linear-gradient(180deg,#ffffff 0%,#eef4ff 100%)}
-                        .slot-card__time{font-size:16px;font-weight:800;color:#0f172a}
-                        .slot-card__meta{margin-top:4px;font-size:11px;color:#64748b}
-                        .booking-panel{border:1px solid #dbe4ef;border-radius:24px;background:radial-gradient(circle at top left, rgba(14,165,233,.08), transparent 34%),linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);padding:22px}
-                        .booking-panel__title{font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-.02em}
-                        .booking-panel__subtitle{margin-top:6px;font-size:13px;color:#64748b}
-                        .booking-form{display:grid;gap:16px;margin-top:18px}
-                        .booking-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-                        .select-input{appearance:none;background:#ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:42px}
-                        .booking-textarea{min-height:112px;resize:vertical}
-                        @media (max-width: 960px){.eligibility-grid,.booking-form-grid,.slot-grid{grid-template-columns:1fr}}
-                    </style>
 
                     <div class="availability-grid">
                         @if (! empty($availability['services_without_eligible_staff']))
@@ -492,23 +394,6 @@
                 </div>
 
                 <div class="ops-card__body">
-                    <style>
-                        .schedule-list{display:grid;gap:14px}
-                        .schedule-card{border:1px solid #e2e8f0;border-radius:24px;background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
-                        .schedule-card__head{display:flex;align-items:start;justify-content:space-between;gap:16px}
-                        .schedule-card__time{font-size:16px;font-weight:800;color:#0f172a}
-                        .schedule-card__name{margin-top:8px;font-size:16px;font-weight:800;color:#0f172a}
-                        .schedule-card__phone{margin-top:4px;font-size:13px;color:#64748b}
-                        .status-chip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid transparent;padding:7px 11px;font-size:11px;font-weight:800}
-                        .status-dot{width:8px;height:8px;border-radius:999px;background:currentColor;opacity:.78}
-                        .service-line{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;padding:11px 12px}
-                        .service-line__name{font-size:13px;font-weight:800;color:#0f172a}
-                        .service-line__staff{font-size:12px;color:#64748b;text-align:right}
-                        .empty-card{border:1px dashed #cbd5e1;border-radius:24px;background:#f8fafc;padding:42px 24px;text-align:center}
-                        .empty-card__title{font-size:16px;font-weight:800;color:#0f172a}
-                        .empty-card__body{margin-top:8px;font-size:13px;color:#64748b}
-                        .pagination-wrap{margin-top:18px}
-                    </style>
 
                     <div class="schedule-list">
                         @forelse ($appointmentGroups as $group)

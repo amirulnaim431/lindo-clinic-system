@@ -503,6 +503,68 @@ class AppointmentController extends Controller
         ]);
     }
 
+    public function rescheduleItem(Request $request, AppointmentItem $appointmentItem)
+    {
+        $validated = $request->validate([
+            'starts_at' => ['required', 'date_format:Y-m-d H:i'],
+        ]);
+
+        $appointmentItem->loadMissing([
+            'group:id,starts_at,ends_at',
+            'staff:id,full_name',
+        ]);
+
+        if (! $appointmentItem->starts_at || ! $appointmentItem->ends_at) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'This service item is missing its current schedule window.',
+            ]);
+        }
+
+        $newStart = Carbon::createFromFormat('Y-m-d H:i', $validated['starts_at']);
+        $durationMinutes = max(30, $appointmentItem->starts_at->diffInMinutes($appointmentItem->ends_at));
+        $newEnd = $newStart->copy()->addMinutes($durationMinutes);
+        $clinicStart = $newStart->copy()->setTime(9, 0);
+        $clinicEnd = $newStart->copy()->setTime(18, 0);
+
+        if ($newStart->lt($clinicStart) || $newEnd->gt($clinicEnd)) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'Appointments can only be moved within clinic hours from 09:00 to 18:00.',
+            ]);
+        }
+
+        if ($appointmentItem->staff_id) {
+            $hasConflict = AppointmentItem::query()
+                ->where('staff_id', $appointmentItem->staff_id)
+                ->where('id', '!=', $appointmentItem->id)
+                ->where('starts_at', '<', $newEnd)
+                ->where('ends_at', '>', $newStart)
+                ->exists();
+
+            if ($hasConflict) {
+                $staffName = $appointmentItem->staff?->full_name ?? 'Assigned staff';
+
+                throw ValidationException::withMessages([
+                    'starts_at' => "{$staffName} is already occupied in that time block. Choose another empty slot.",
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($appointmentItem, $newStart, $newEnd) {
+            $appointmentItem->update([
+                'starts_at' => $newStart,
+                'ends_at' => $newEnd,
+            ]);
+
+            $this->syncAppointmentGroupWindow($appointmentItem->group);
+        });
+
+        return response()->json([
+            'message' => 'Service item rescheduled successfully.',
+            'starts_at' => $newStart->format('Y-m-d H:i:s'),
+            'ends_at' => $newEnd->format('Y-m-d H:i:s'),
+        ]);
+    }
+
     private function sanitizeSlot(mixed $slot): ?string
     {
         if (! is_string($slot) || trim($slot) === '') {
@@ -746,5 +808,35 @@ class AppointmentController extends Controller
     private function normalizeArrangementMode(mixed $arrangementMode): string
     {
         return $arrangementMode === 'back_to_back' ? 'back_to_back' : 'same_slot';
+    }
+
+    private function syncAppointmentGroupWindow(?AppointmentGroup $group): void
+    {
+        if (! $group) {
+            return;
+        }
+
+        $group->loadMissing('items:id,appointment_group_id,starts_at,ends_at');
+
+        $startsAt = $group->items
+            ->pluck('starts_at')
+            ->filter()
+            ->sort()
+            ->first();
+
+        $endsAt = $group->items
+            ->pluck('ends_at')
+            ->filter()
+            ->sortDesc()
+            ->first();
+
+        if (! $startsAt || ! $endsAt) {
+            return;
+        }
+
+        $group->update([
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ]);
     }
 }
