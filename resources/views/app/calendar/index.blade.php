@@ -10,15 +10,15 @@
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <div class="compact-label">Operational Board</div>
-                    <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-slate-950">{{ $selectedDateLabel }}</h2>
-                    <p class="mt-1 text-sm text-slate-500">The live day board is the primary workspace. Service color shows treatment type, and the badge shows appointment status.</p>
+                    <h2 class="panel-title-display">{{ $selectedDateLabel }}</h2>
+                    <p class="panel-subtitle">The live day board is the primary workspace. Service color shows treatment type, and the badge shows appointment status.</p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $previousWeek, 'date' => \Carbon\Carbon::parse($previousWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"><- Week</a>
-                    <a href="{{ route('app.calendar', array_merge(request()->except(['week', 'date']), ['week' => $currentWeek, 'date' => now()->startOfWeek(\Carbon\Carbon::TUESDAY)->toDateString()])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Today</a>
-                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $nextWeek, 'date' => \Carbon\Carbon::parse($nextWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Week -></a>
-                    <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="inline-flex items-center rounded-2xl bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Booking Queue</a>
+                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $previousWeek, 'date' => \Carbon\Carbon::parse($previousWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">&larr; Week</a>
+                    <a href="{{ route('app.calendar', array_merge(request()->except(['week', 'date']), ['week' => $currentWeek, 'date' => now()->startOfWeek(\Carbon\Carbon::TUESDAY)->toDateString()])) }}" class="btn btn-secondary">Today</a>
+                    <a href="{{ route('app.calendar', array_merge($weekQueryBase, ['week' => $nextWeek, 'date' => \Carbon\Carbon::parse($nextWeek)->format('Y-m-d'), 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Week &rarr;</a>
+                    <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-primary">Booking Queue</a>
                 </div>
             </div>
 
@@ -32,33 +32,33 @@
                     <div class="metric-chip"><div class="metric-chip__label">Cancelled</div><div class="metric-chip__value">{{ $daySummary['cancelled_or_no_show'] }}</div><div class="metric-chip__meta">Released / lost</div></div>
                 </div>
 
-                <form method="GET" action="{{ route('app.calendar') }}" class="rounded-[18px] border border-slate-200 bg-slate-50 p-3">
+                <form method="GET" action="{{ route('app.calendar') }}" class="summary-card p-3">
                     <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
                     <input type="hidden" name="date" value="{{ $selectedDateIso }}">
-                    <label for="staff_id" class="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Staff filter</label>
+                    <label for="staff_id" class="mb-2 block compact-label">Staff filter</label>
                     <div class="flex gap-2">
-                        <select id="staff_id" name="staff_id" class="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200">
+                        <select id="staff_id" name="staff_id" class="form-select">
                             <option value="">All staff</option>
                             @foreach ($staffList as $staff)
                                 <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}</option>
                             @endforeach
                         </select>
-                        <button type="submit" class="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Go</button>
+                        <button type="submit" class="btn btn-primary">Go</button>
                     </div>
-                    <div class="mt-2 text-xs text-slate-500">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'Staff') : 'Showing full clinic workload' }}</div>
+                    <div class="mt-2 small-note">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'Staff') : 'Showing full clinic workload' }}</div>
                 </form>
             </div>
         </section>
 
         <section class="timeline-wrap">
             <div class="timeline-panel surface-card overflow-hidden">
-                <div class="border-b border-slate-200 px-5 py-4">
+                <div class="panel-header">
                     <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div>
                             <div class="compact-label">Live Day Board</div>
-                            <h3 class="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-slate-950">Daily operations timeline</h3>
+                            <h3 class="panel-title-display">Daily operations timeline</h3>
                             @if ($canManageAppointments)
-                                <p class="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Drag individual service blocks to reschedule. Occupied staff blocks are rejected automatically.</p>
+                                <p class="small-note" style="text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700;">Drag individual service blocks to reschedule. Occupied staff blocks are rejected automatically.</p>
                             @endif
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -86,15 +86,15 @@
                                         <span class="calendar-event__service-chip" style="background: {{ $event['service_styles']['chip_bg'] }}; color: {{ $event['service_styles']['chip_text'] }}; border-color: {{ $event['service_styles']['border'] }};">{{ $event['service_summary'] }}</span>
                                         <span class="calendar-event__status-chip" style="background: {{ $event['status_styles']['badge_bg'] }}; border-color: {{ $event['status_styles']['badge_border'] }}; color: {{ $event['status_styles']['badge_text'] }};"><span class="calendar-event__status-dot" style="background: {{ $event['status_styles']['dot'] }};"></span>{{ $event['status_label'] }}</span>
                                     </div>
-                                    <div class="mt-3 truncate text-sm font-extrabold text-slate-950">{{ $event['customer_name'] }}</div>
-                                    <div class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
-                                    <div class="mt-3 space-y-1 text-xs text-slate-700">
-                                        <div class="truncate"><span class="font-bold text-slate-900">Staff:</span> {{ $event['staff_summary'] }}</div>
+                                    <div class="calendar-event__name truncate">{{ $event['customer_name'] }}</div>
+                                    <div class="calendar-event__time truncate">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
+                                    <div class="mt-3 space-y-1 text-xs">
+                                        <div class="calendar-event__meta truncate"><span class="font-bold text-white">Staff:</span> {{ $event['staff_summary'] }}</div>
                                         @if ($event['group_service_count'] > 1)
-                                            <div class="truncate"><span class="font-bold text-slate-900">Visit:</span> {{ $event['visit_summary'] }}</div>
+                                            <div class="calendar-event__meta truncate"><span class="font-bold text-white">Visit:</span> {{ $event['visit_summary'] }}</div>
                                         @endif
                                         @if ($event['membership_label'])
-                                            <div class="truncate"><span class="font-bold text-slate-900">Package:</span> {{ $event['membership_label'] }}</div>
+                                            <div class="calendar-event__meta truncate"><span class="font-bold text-white">Package:</span> {{ $event['membership_label'] }}</div>
                                         @endif
                                     </div>
                                 </button>
@@ -104,11 +104,11 @@
                         @if (! $timelineHasEvents)
                             <div class="timeline-empty-overlay">
                                 <div class="timeline-empty-overlay__card">
-                                    <div class="text-lg font-extrabold text-slate-900">No appointments on this day</div>
-                            <p class="mt-2 text-sm text-slate-500">This still behaves like a real live board. Hover any time row to quick-create a booking directly from the empty schedule.</p>
-                            <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="mt-5 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 pointer-events-auto">Create Appointment</a>
-                        </div>
-                    </div>
+                                    <div class="empty-state__title">No appointments on this day</div>
+                                    <p class="empty-state__body">This still behaves like a real live board. Hover any time row to quick-create a booking directly from the empty schedule.</p>
+                                    <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-primary mt-5 pointer-events-auto">Create Appointment</a>
+                                </div>
+                            </div>
                         @endif
                     </div>
                 </div>
@@ -119,24 +119,24 @@
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <div class="compact-label">Staff Load</div>
-                            <h3 class="mt-1 text-lg font-extrabold tracking-[-0.03em] text-slate-950">Booked staff</h3>
+                            <h3 class="panel-title-display" style="font-size: 1.45rem;">Booked staff</h3>
                         </div>
-                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{{ $staffLoad->count() }} staff</span>
+                        <span class="soft-pill">{{ $staffLoad->count() }} staff</span>
                     </div>
                     <div class="mt-3 space-y-3">
                         @forelse ($staffLoad as $load)
                             <div class="load-card">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
-                                        <div class="text-sm font-extrabold text-slate-950">{{ $load['name'] }}</div>
-                                        <div class="mt-1 text-xs uppercase tracking-[0.08em] text-slate-500">{{ $load['job_title'] ?: 'Operational staff' }}</div>
+                                        <div class="text-sm font-extrabold text-white">{{ $load['name'] }}</div>
+                                        <div class="mt-1 small-note" style="text-transform: uppercase; letter-spacing: 0.08em;">{{ $load['job_title'] ?: 'Operational staff' }}</div>
                                     </div>
-                                    <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">{{ $load['appointments'] }} item{{ $load['appointments'] === 1 ? '' : 's' }}</span>
+                                    <span class="soft-pill">{{ $load['appointments'] }} item{{ $load['appointments'] === 1 ? '' : 's' }}</span>
                                 </div>
-                                <div class="mt-3 text-sm text-slate-600">{{ $load['hours_label'] }}</div>
+                                <div class="mt-3 text-sm text-[var(--app-text)]">{{ $load['hours_label'] }}</div>
                             </div>
                         @empty
-                            <div class="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">No active staff assignments in the selected day and filter.</div>
+                            <div class="summary-card px-4 py-5 text-center text-sm text-[var(--app-muted)]">No active staff assignments in the selected day and filter.</div>
                         @endforelse
                     </div>
                 </div>
@@ -148,14 +148,14 @@
                             <a href="{{ $day['url'] }}" class="day-link {{ $day['is_selected'] ? 'is-selected' : '' }}">
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
-                                        <div class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{{ $day['full_label'] }}</div>
-                                        <div class="mt-1 text-sm font-extrabold text-slate-950">{{ $day['display_date'] }}</div>
+                                        <div class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--app-muted)]">{{ $day['full_label'] }}</div>
+                                        <div class="mt-1 text-sm font-extrabold text-white">{{ $day['display_date'] }}</div>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         @if ($day['is_today'])
-                                            <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">Today</span>
+                                            <span class="soft-pill" style="border-color: rgba(94, 190, 145, 0.35); background: rgba(24, 80, 60, 0.42); color: #b9f1d2;">Today</span>
                                         @endif
-                                        <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600">{{ $day['appointment_count'] }}</span>
+                                        <span class="soft-pill">{{ $day['appointment_count'] }}</span>
                                     </div>
                                 </div>
                             </a>
@@ -177,7 +177,7 @@
                             <h3 id="modal-customer-name" class="modal-title">-</h3>
                             <p id="modal-service-summary" class="modal-subtitle">-</p>
                         </div>
-                        <button type="button" id="calendar-detail-close-top" class="modal-close" aria-label="Close">×</button>
+                        <button type="button" id="calendar-detail-close-top" class="modal-close" aria-label="Close">&times;</button>
                     </div>
                 </div>
                 <div class="modal-body">
