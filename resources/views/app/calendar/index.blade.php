@@ -260,7 +260,7 @@
                 setText('modal-notes', eventData.notes, 'No notes recorded.');
                 manageLink.href = eventData.manage_url || '#';
                 createLink.href = eventData.create_url || '#';
-                modalHeader.style.background = `linear-gradient(180deg, ${eventData.service_styles.surface} 0%, #ffffff 100%)`;
+                modalHeader.style.background = `radial-gradient(circle at top left, ${eventData.service_styles.surface_strong || eventData.service_styles.surface} 0%, rgba(39, 29, 29, 0.18) 24%, transparent 42%), linear-gradient(180deg, rgba(44, 34, 34, 0.98) 0%, rgba(28, 22, 22, 0.98) 100%)`;
                 modal.classList.remove('hidden');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('overflow-hidden');
