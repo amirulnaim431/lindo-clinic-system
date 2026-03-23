@@ -1036,7 +1036,10 @@
 
     .form-input,
     .form-select,
-    .form-textarea {
+    .form-textarea,
+    .field-input,
+    .select-input,
+    .booking-textarea {
         width: 100%;
         border: 1px solid var(--app-border);
         border-radius: 1rem;
@@ -1048,11 +1051,14 @@
     }
 
     .form-input::placeholder,
-    .form-textarea::placeholder {
+    .form-textarea::placeholder,
+    .field-input::placeholder,
+    .booking-textarea::placeholder {
         color: rgba(188, 174, 166, 0.7);
     }
 
-    .form-select {
+    .form-select,
+    .select-input {
         appearance: none;
         background-image:
             linear-gradient(45deg, transparent 50%, var(--app-muted) 50%),
@@ -1063,6 +1069,13 @@
         background-size: 6px 6px, 6px 6px;
         background-repeat: no-repeat;
         padding-right: 2.6rem;
+    }
+
+    .field-block > label {
+        color: var(--app-text-strong);
+        font-size: 0.92rem;
+        font-weight: 700;
+        line-height: 1.4;
     }
 
     .table-shell {

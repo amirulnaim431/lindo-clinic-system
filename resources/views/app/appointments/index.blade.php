@@ -140,7 +140,7 @@
             <div class="ops-card">
                 <div class="ops-card__header">
                     <div class="ops-kicker">Availability Desk</div>
-                    <h3 style="margin:8px 0 0;font-size:24px;font-weight:800;letter-spacing:-.03em;color:#0f172a;">Build a booking in three steps</h3>
+                    <h3 class="panel-title-display" style="font-size:24px;">Build a booking in three steps</h3>
                     <div class="ops-subtitle" style="max-width:none;">Select the services, choose the clinic date, then review only viable combinations and time slots. If the calendar launched this page with a slot, we keep that preference in focus.</div>
                 </div>
 
@@ -154,8 +154,8 @@
                         </div>
 
                         <div>
-                            <div class="ops-kicker" style="color:#475569;">Step 1</div>
-                            <h4 style="margin:6px 0 0;font-size:18px;font-weight:800;color:#0f172a;">Choose services</h4>
+                            <div class="ops-kicker">Step 1</div>
+                            <h4 class="panel-title-display" style="font-size:18px;">Choose services</h4>
                             <div class="service-grid" style="margin-top:14px;">
                                 @forelse ($services as $service)
                                     @php $isSelected = in_array((string) $service->id, $selectedServiceIds, true); @endphp
@@ -176,8 +176,8 @@
                         </div>
 
                         <div>
-                            <div class="ops-kicker" style="color:#475569;">Step 1B</div>
-                            <h4 style="margin:6px 0 0;font-size:18px;font-weight:800;color:#0f172a;">Choose service arrangement</h4>
+                            <div class="ops-kicker">Step 1B</div>
+                            <h4 class="panel-title-display" style="font-size:18px;">Choose service arrangement</h4>
                             <div class="arrangement-grid" style="margin-top:14px;">
                                 <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
                                     <input type="radio" name="arrangement_mode" value="same_slot" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'same_slot' ? 'checked' : '' }}>
@@ -193,15 +193,15 @@
                         </div>
 
                         <div class="workflow-panel">
-                            <div class="ops-kicker" style="color:#475569;">Service workflow</div>
-                            <div style="margin-top:6px;font-size:14px;font-weight:800;color:#0f172a;">Set the service order used for back-to-back visits</div>
-                            <div style="margin-top:6px;font-size:12px;color:#64748b;">This order matters only for sequential visits. Same-slot visits still keep the service lineup for staff awareness.</div>
+                            <div class="ops-kicker">Service workflow</div>
+                            <div class="selection-card__title" style="margin-top:6px;">Set the service order used for back-to-back visits</div>
+                            <div class="small-note" style="margin-top:6px;">This order matters only for sequential visits. Same-slot visits still keep the service lineup for staff awareness.</div>
                             <div id="workflow-list" class="workflow-list"></div>
                         </div>
 
                         <div>
-                            <div class="ops-kicker" style="color:#475569;">Step 2</div>
-                            <h4 style="margin:6px 0 0;font-size:18px;font-weight:800;color:#0f172a;">Choose the clinic day</h4>
+                            <div class="ops-kicker">Step 2</div>
+                            <h4 class="panel-title-display" style="font-size:18px;">Choose the clinic day</h4>
                             <div class="field-row" style="margin-top:14px;">
                                 <div class="field-block">
                                     <label for="date">Appointment date</label>
@@ -219,7 +219,7 @@
                 <div class="ops-card">
                     <div class="ops-card__body">
                         <div class="ops-kicker">Current Focus</div>
-                        <h3 style="margin:8px 0 0;font-size:22px;font-weight:800;letter-spacing:-.03em;color:#0f172a;">{{ \Carbon\Carbon::parse($selectedDate)->format('l, d M Y') }}</h3>
+                        <h3 class="panel-title-display" style="font-size:22px;">{{ \Carbon\Carbon::parse($selectedDate)->format('l, d M Y') }}</h3>
                         <div class="ops-subtitle" style="margin-top:8px;max-width:none;">{{ $prefilledSlot ? 'Calendar slot preselected at '.$prefilledSlot.'. Choose services and we will hold that preference if it remains viable.' : 'No slot preselected. Use the availability result below to choose the best operational gap.' }}</div>
                         <div class="summary-list" style="margin-top:18px;">
                             <div class="summary-pill">
@@ -259,7 +259,7 @@
             <section class="ops-card">
                 <div class="ops-card__header">
                     <div class="ops-kicker">Step 3</div>
-                    <h3 style="margin:8px 0 0;font-size:24px;font-weight:800;letter-spacing:-.03em;color:#0f172a;">Review viable staff and time options</h3>
+                    <h3 class="panel-title-display" style="font-size:24px;">Review viable staff and time options</h3>
                     <div class="ops-subtitle" style="max-width:none;">Only valid combinations are shown. This keeps front desk decisions fast and prevents impossible bookings from being created.</div>
                 </div>
 
@@ -278,9 +278,9 @@
                             @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
                                 <div class="eligibility-card">
                                     <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
-                                    <div style="margin-top:6px;font-size:12px;color:#64748b;">Eligible staff pool</div>
+                                    <div class="small-note" style="margin-top:6px;">Eligible staff pool</div>
                                     @if (empty($serviceSummary['eligible_staff']))
-                                        <div style="margin-top:10px;font-size:13px;font-weight:700;color:#be123c;">No active staff assigned.</div>
+                                        <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
                                     @else
                                         <div class="staff-chip-wrap">
                                             @foreach ($serviceSummary['eligible_staff'] as $staff)
@@ -296,8 +296,8 @@
                             <div>
                                 <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                                     <div>
-                                        <div class="ops-kicker" style="color:#475569;">Choose a viable time</div>
-                                        <h4 style="margin:6px 0 0;font-size:18px;font-weight:800;color:#0f172a;">Available booking windows</h4>
+                                        <div class="ops-kicker">Choose a viable time</div>
+                                        <h4 class="panel-title-display" style="font-size:18px;">Available booking windows</h4>
                                     </div>
                                     @if ($selectedSlotRow)
                                         <div class="summary-pill" style="padding:10px 12px;">
@@ -323,7 +323,7 @@
                         @endif
 
                         <div id="selected-slot-card" class="booking-panel hidden">
-                            <div class="ops-kicker" style="color:#475569;">Confirm booking</div>
+                            <div class="ops-kicker">Confirm booking</div>
                             <div class="booking-panel__title">Create appointment at <span id="selected-slot-time-label">-</span></div>
                             <div class="booking-panel__subtitle">Pick the valid staff combination, then capture customer details. This preserves the operational staffing logic from the availability engine.</div>
 
@@ -389,7 +389,7 @@
             <div class="ops-card">
                 <div class="ops-card__header">
                     <div class="ops-kicker">Live Booking Queue</div>
-                    <h3 style="margin:8px 0 0;font-size:24px;font-weight:800;letter-spacing:-.03em;color:#0f172a;">Schedule for {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
+                    <h3 class="panel-title-display" style="font-size:24px;">Schedule for {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
                     <div class="ops-subtitle" style="max-width:none;">Current appointment groups for the selected day. Front desk can review service allocations and update status without leaving the booking desk.</div>
                 </div>
 
@@ -432,7 +432,7 @@
                                 <form method="POST" action="{{ route('app.appointments.status', $group) }}" style="margin-top:16px;display:grid;gap:8px;">
                                     @csrf
                                     @method('PATCH')
-                                    <label for="status-{{ $group->id }}" style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">Update status</label>
+                                    <label for="status-{{ $group->id }}" class="field-label" style="color: var(--app-accent-strong);">Update status</label>
                                     <select id="status-{{ $group->id }}" name="status" onchange="this.form.submit()" class="field-input select-input">
                                         @foreach ($statusOptions as $option)
                                             @php
@@ -486,7 +486,7 @@
                 <div class="ops-card">
                     <div class="ops-card__body">
                         <div class="ops-kicker">Navigate</div>
-                        <h3 style="margin:8px 0 0;font-size:20px;font-weight:800;color:#0f172a;">Need the timeline instead?</h3>
+                        <h3 class="panel-title-display" style="font-size:20px;">Need the timeline instead?</h3>
                         <div class="ops-subtitle" style="margin-top:8px;max-width:none;">Use the live calendar for drag rescheduling and visual occupancy. Use this booking desk when you need service-to-staff matching and quick appointment intake.</div>
                         <div style="margin-top:18px;">
                             <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" style="width:100%;">Open Calendar View</a>
