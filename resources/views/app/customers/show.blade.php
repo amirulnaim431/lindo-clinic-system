@@ -52,7 +52,7 @@
 
                     <div class="stack" style="width:min(100%, 28rem);">
                         @if($canEditCustomer)
-                            <div class="btn-row" style="justify-content:flex-end;">
+                            <div class="btn-row btn-row--end">
                                 <a href="{{ route('app.customers.edit', $customer) }}" class="btn btn-primary">Edit customer</a>
                             </div>
                         @endif

@@ -150,7 +150,7 @@
                                             </td>
                                             <td class="text-right">
                                                 @if ($canManageStaff)
-                                                    <div class="btn-row" style="justify-content:flex-end;">
+                                                    <div class="btn-row btn-row--end">
                                                         <a href="{{ route('app.staff.edit', $member) }}" class="btn btn-secondary">Edit</a>
                                                         <form method="POST" action="{{ route('app.staff.status', $member) }}">
                                                             @csrf

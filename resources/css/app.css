@@ -335,6 +335,19 @@
         align-items: center;
     }
 
+    .btn-row--start {
+        justify-content: flex-start;
+    }
+
+    .btn-row--end,
+    .page-actions {
+        justify-content: flex-end;
+    }
+
+    .btn-row--between {
+        justify-content: space-between;
+    }
+
     .app-main {
         min-width: 0;
         margin-left: var(--sidebar-width);
@@ -395,6 +408,7 @@
         color: var(--app-text);
         font-size: 0.77rem;
         font-weight: 700;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
 
     .app-content {
@@ -877,6 +891,14 @@
         padding: 1rem 1.1rem;
     }
 
+    .summary-card > :first-child {
+        margin-top: 0;
+    }
+
+    .summary-card > * + * {
+        margin-top: 0.5rem;
+    }
+
     .sidebar-card,
     .load-card,
     .day-link,
@@ -1107,6 +1129,7 @@
         border: 1px solid var(--app-border);
         border-radius: var(--radius-lg);
         background: rgba(11, 9, 9, 0.22);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
     .table-wrap {
@@ -1139,8 +1162,15 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
+    tbody tr {
+        transition: background-color 160ms ease, box-shadow 160ms ease;
+    }
+
     tbody tr:hover {
-        background: rgba(255, 255, 255, 0.025);
+        background:
+            linear-gradient(90deg, rgba(201, 146, 115, 0.05), transparent 22%),
+            rgba(255, 255, 255, 0.028);
+        box-shadow: inset 3px 0 0 rgba(201, 146, 115, 0.34);
     }
 
     tbody tr:last-child td {
@@ -1154,6 +1184,10 @@
 
     .empty-state--dashed {
         border-style: dashed;
+        background:
+            radial-gradient(circle at top center, rgba(201, 146, 115, 0.08), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+            var(--app-panel);
     }
 
     .empty-state__title {
@@ -1182,10 +1216,10 @@
     .alert-error { border-color: rgba(222, 127, 138, 0.32); background: rgba(222, 127, 138, 0.16); color: #ffdce2; }
     .alert-warning { border-color: rgba(224, 182, 111, 0.32); background: rgba(224, 182, 111, 0.16); color: #ffedd0; }
 
-    .status-chip--success { background: rgba(112, 194, 159, 0.16); border-color: rgba(112, 194, 159, 0.24); color: #d1ffeb; }
-    .status-chip--warning { background: rgba(224, 182, 111, 0.16); border-color: rgba(224, 182, 111, 0.24); color: #fff0d5; }
-    .status-chip--danger { background: rgba(222, 127, 138, 0.16); border-color: rgba(222, 127, 138, 0.24); color: #ffd8df; }
-    .status-chip--info { background: rgba(140, 184, 217, 0.16); border-color: rgba(140, 184, 217, 0.24); color: #dbf0ff; }
+    .status-chip--success { background: rgba(112, 194, 159, 0.11); border-color: rgba(112, 194, 159, 0.22); color: #c9f7e1; }
+    .status-chip--warning { background: rgba(224, 182, 111, 0.11); border-color: rgba(224, 182, 111, 0.22); color: #ffe8c2; }
+    .status-chip--danger { background: rgba(222, 127, 138, 0.11); border-color: rgba(222, 127, 138, 0.22); color: #ffd2da; }
+    .status-chip--info { background: rgba(140, 184, 217, 0.11); border-color: rgba(140, 184, 217, 0.22); color: #d5ebfa; }
     .status-chip--neutral { background: rgba(255, 255, 255, 0.04); border-color: var(--app-border); color: var(--app-text); }
 
     .selection-grid {

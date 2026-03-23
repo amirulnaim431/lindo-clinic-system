@@ -98,7 +98,7 @@
                 </div>
             </div>
 
-            <div class="btn-row" style="justify-content:flex-end;">
+            <div class="btn-row btn-row--end">
                 <a href="{{ route('app.customers.show', $customer) }}" class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary">Save customer changes</button>
             </div>

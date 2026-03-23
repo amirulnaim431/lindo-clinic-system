@@ -22,7 +22,7 @@
                         </div>
 
                         <div class="field-block" style="align-self:end;">
-                            <div class="btn-row" style="justify-content:flex-end;">
+                            <div class="btn-row btn-row--end">
                                 <button type="submit" class="btn btn-primary">Search</button>
                                 @if($search !== '')
                                     <a href="{{ route('app.customers.index') }}" class="btn btn-secondary">Reset</a>

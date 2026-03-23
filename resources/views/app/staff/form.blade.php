@@ -41,7 +41,7 @@
                         <div class="col-4 field-block"><label class="field-label" for="phone">Phone</label><input id="phone" name="phone" type="text" class="form-input" value="{{ old('phone', $staff->phone) }}" placeholder="Optional"></div>
                         <div class="col-8 field-block"><label class="field-label" for="notes">Notes</label><textarea id="notes" name="notes" class="form-textarea" rows="4" placeholder="Optional admin notes about operations, coverage, or internal handling.">{{ old('notes', $staff->notes) }}</textarea></div>
                         <div class="col-12">
-                            <label class="btn-row" style="justify-content:flex-start;">
+                            <label class="btn-row btn-row--start">
                                 <input type="hidden" name="is_active" value="0">
                                 <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $staff->is_active))>
                                 <span class="helper-text">Active staff record</span>
@@ -72,7 +72,7 @@
                         </div>
 
                         <div class="col-6 field-block" style="align-self:end;">
-                            <label class="btn-row" style="justify-content:flex-start;">
+                            <label class="btn-row btn-row--start">
                                 <input type="hidden" name="can_login" value="0">
                                 <input type="checkbox" name="can_login" value="1" @checked(old('can_login', $staff->can_login))>
                                 <span class="helper-text">Allow linked staff login</span>
@@ -135,7 +135,7 @@
                 </div>
             </div>
 
-            <div class="btn-row" style="justify-content:space-between;">
+            <div class="btn-row btn-row--between">
                 <a href="{{ route('app.staff.index') }}" class="btn btn-secondary">Back to staff</a>
                 <button type="submit" class="btn btn-primary">{{ $mode === 'create' ? 'Create staff' : 'Save changes' }}</button>
             </div>

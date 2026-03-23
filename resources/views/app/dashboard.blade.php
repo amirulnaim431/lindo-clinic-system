@@ -58,7 +58,7 @@
                     </div>
 
                     <div class="col-3 field-block" style="align-self:end;">
-                        <div class="btn-row" style="justify-content:flex-end;">
+                        <div class="btn-row btn-row--end">
                             <button type="submit" class="btn btn-primary">Apply filters</button>
                             <a href="{{ route('app.dashboard') }}" class="btn btn-secondary">Reset</a>
                         </div>
