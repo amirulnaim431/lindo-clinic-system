@@ -89,12 +89,12 @@
                                     <div class="calendar-event__name truncate">{{ $event['customer_name'] }}</div>
                                     <div class="calendar-event__time truncate">{{ $event['start_time'] }} - {{ $event['end_time'] }}</div>
                                     <div class="mt-3 space-y-1 text-xs">
-                                        <div class="calendar-event__meta truncate"><span class="font-bold text-white">Staff:</span> {{ $event['staff_summary'] }}</div>
+                                        <div class="calendar-event__meta truncate"><span class="calendar-event__meta-label">Staff:</span> {{ $event['staff_summary'] }}</div>
                                         @if ($event['group_service_count'] > 1)
-                                            <div class="calendar-event__meta truncate"><span class="font-bold text-white">Visit:</span> {{ $event['visit_summary'] }}</div>
+                                            <div class="calendar-event__meta truncate"><span class="calendar-event__meta-label">Visit:</span> {{ $event['visit_summary'] }}</div>
                                         @endif
                                         @if ($event['membership_label'])
-                                            <div class="calendar-event__meta truncate"><span class="font-bold text-white">Package:</span> {{ $event['membership_label'] }}</div>
+                                            <div class="calendar-event__meta truncate"><span class="calendar-event__meta-label">Package:</span> {{ $event['membership_label'] }}</div>
                                         @endif
                                     </div>
                                 </button>

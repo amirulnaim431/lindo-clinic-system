@@ -1352,7 +1352,7 @@
 
     .calendar-event__name {
         margin-top: 0.7rem;
-        color: #fff;
+        color: inherit;
         font-size: 0.92rem;
         font-weight: 800;
     }
@@ -1360,9 +1360,16 @@
     .calendar-event__time,
     .calendar-event__meta {
         margin-top: 0.35rem;
-        color: rgba(255, 255, 255, 0.78);
+        color: inherit;
+        opacity: 0.84;
         font-size: 0.76rem;
         line-height: 1.45;
+    }
+
+    .calendar-event__meta-label {
+        color: inherit;
+        font-weight: 700;
+        opacity: 1;
     }
 
     .timeline-empty-overlay {
