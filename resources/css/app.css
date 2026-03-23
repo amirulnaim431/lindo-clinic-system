@@ -873,6 +873,10 @@
         box-shadow: var(--app-shadow-sm);
     }
 
+    .summary-card {
+        padding: 1rem 1.1rem;
+    }
+
     .hero-panel {
         background:
             radial-gradient(circle at top left, rgba(201, 146, 115, 0.16), transparent 24%),
@@ -1048,6 +1052,7 @@
         color: var(--app-text-strong);
         font-size: 0.92rem;
         transition: 180ms ease;
+        color-scheme: dark;
     }
 
     .form-input::placeholder,
@@ -1069,6 +1074,12 @@
         background-size: 6px 6px, 6px 6px;
         background-repeat: no-repeat;
         padding-right: 2.6rem;
+    }
+
+    .form-select option,
+    .select-input option {
+        background: #231d1c;
+        color: var(--app-text-strong);
     }
 
     .field-block > label {
