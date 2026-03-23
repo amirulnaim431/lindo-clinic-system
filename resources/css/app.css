@@ -877,6 +877,19 @@
         padding: 1rem 1.1rem;
     }
 
+    .sidebar-card,
+    .load-card,
+    .day-link,
+    .queue-card,
+    .helper-note,
+    .workflow-panel,
+    .eligibility-card,
+    .booking-panel,
+    .schedule-card,
+    .empty-card {
+        padding: 1rem 1.1rem;
+    }
+
     .hero-panel {
         background:
             radial-gradient(circle at top left, rgba(201, 146, 115, 0.16), transparent 24%),
@@ -922,7 +935,7 @@
 
     .panel-title-display {
         font-size: 1.7rem;
-        line-height: 1;
+        line-height: 1.08;
         margin-top: 0.45rem;
     }
 
