@@ -26,29 +26,29 @@
                     <div class="auth-kicker">Lindo workspace</div>
                     <h1 class="auth-title">Elegant, live-ready access for the clinic team.</h1>
                     <p class="auth-subtitle">
-                        The internal system keeps daily patient operations clear, calm, and polished from login through every operational screen.
+                        A calm operational workspace for reception, scheduling, customer handling, and staff coordination from the first login onward.
                     </p>
 
                     <div class="auth-points">
                         <div class="auth-point">
                             <span class="auth-point__dot"></span>
                             <div>
-                                <div class="auth-point__title">Reception ready</div>
-                                <div class="auth-point__body">Appointments, customer records, and staff coordination stay readable and fast under pressure.</div>
+                                <div class="auth-point__title">Clear under pressure</div>
+                                <div class="auth-point__body">Appointments, calendar movement, and customer handling stay readable even during peak operational hours.</div>
                             </div>
                         </div>
                         <div class="auth-point">
                             <span class="auth-point__dot"></span>
                             <div>
                                 <div class="auth-point__title">Brand aligned</div>
-                                <div class="auth-point__body">A white workspace with dusty pink accents keeps the internal system aligned with Lindo's updated direction.</div>
+                                <div class="auth-point__body">A white workspace with dusty pink accents keeps the internal system polished and aligned with Lindo's direction.</div>
                             </div>
                         </div>
                         <div class="auth-point">
                             <span class="auth-point__dot"></span>
                             <div>
-                                <div class="auth-point__title">Asset ready</div>
-                                <div class="auth-point__body">Drop optional visuals into `public/assets/branding/` or `public/assets/clinic/` without changing layout code.</div>
+                                <div class="auth-point__title">Operationally focused</div>
+                                <div class="auth-point__body">Designed for the people managing bookings, check-ins, customer records, and daily clinic flow.</div>
                             </div>
                         </div>
                     </div>
@@ -57,22 +57,21 @@
 
             <div class="auth-image-slot">
                 @php
-                    $authBrandImage = public_path('assets/branding/auth-side.jpg');
-                    $authClinicImage = public_path('assets/clinic/auth-side.jpg');
+                    $authBrandImage = public_path('assets/branding/sidebar-logo.png');
                     $authImage = file_exists($authBrandImage)
-                        ? asset('assets/branding/auth-side.jpg')
-                        : (file_exists($authClinicImage) ? asset('assets/clinic/auth-side.jpg') : null);
+                        ? asset('assets/branding/sidebar-logo.png')
+                        : null;
                 @endphp
 
                 @if ($authImage)
-                    <img src="{{ $authImage }}" alt="Lindo Clinic interior branding">
+                    <img src="{{ $authImage }}" alt="Lindo Clinic logo">
                 @else
                     <div class="auth-image-slot__placeholder">
                         <div class="auth-image-slot__frame">
-                            <div class="page-kicker">Optional brand image</div>
-                            <div class="panel-title-display">Drop a branded visual here later.</div>
+                            <div class="page-kicker">Brand image</div>
+                            <div class="panel-title-display">Add the login logo here later.</div>
                             <p class="panel-subtitle">
-                                Supported placeholder paths: `public/assets/branding/auth-side.jpg` or `public/assets/clinic/auth-side.jpg`.
+                                Supported file path: `public/assets/branding/sidebar-logo.png`.
                             </p>
                         </div>
                     </div>
