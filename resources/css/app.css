@@ -105,6 +105,14 @@
         align-items: center;
     }
 
+    .app-brand__image {
+        display: block;
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+        object-fit: contain;
+    }
+
     .app-brand__mark,
     .auth-brand__mark {
         display: flex;

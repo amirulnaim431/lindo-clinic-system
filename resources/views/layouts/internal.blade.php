@@ -35,18 +35,24 @@
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
         $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
+        $sidebarLogoPath = public_path('assets/branding/sidebar-logo.png');
+        $sidebarLogoUrl = file_exists($sidebarLogoPath) ? asset('assets/branding/sidebar-logo.png') : null;
     @endphp
 
     <div class="app-shell">
         <aside class="app-sidebar">
             <div class="app-sidebar__brand">
                 <a href="{{ $r('app.dashboard') }}" class="app-brand">
-                    <span class="app-brand__mark" aria-hidden="true">LC</span>
-                    <span>
-                        <span class="app-brand__eyebrow">Lindo Clinic</span>
-                        <span class="app-brand__title">Clinic Workspace</span>
-                        <span class="app-brand__subtitle">Daily operations, scheduling, CRM, and staff coordination in one live workspace.</span>
-                    </span>
+                    @if ($sidebarLogoUrl)
+                        <img src="{{ $sidebarLogoUrl }}" alt="Lindo Clinic" class="app-brand__image">
+                    @else
+                        <span class="app-brand__mark" aria-hidden="true">LC</span>
+                        <span>
+                            <span class="app-brand__eyebrow">Lindo Clinic</span>
+                            <span class="app-brand__title">Clinic Workspace</span>
+                            <span class="app-brand__subtitle">Daily operations, scheduling, CRM, and staff coordination in one live workspace.</span>
+                        </span>
+                    @endif
                 </a>
             </div>
 
