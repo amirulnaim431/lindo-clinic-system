@@ -221,41 +221,6 @@
                 </div>
             </div>
 
-            <div class="form-stack">
-                <div class="ops-card">
-                    <div class="ops-card__body">
-                        <div class="ops-kicker">Booking summary</div>
-                        <h3 class="panel-title-display" style="font-size:22px;">{{ \Carbon\Carbon::parse($selectedDate)->format('l, d M Y') }}</h3>
-                        <div class="ops-subtitle" style="margin-top:8px;max-width:none;">{{ $prefilledSlot ? 'Calendar slot preselected at '.$prefilledSlot.'. We will keep it in focus if it remains available.' : 'Choose services and date first, then select the best available time below.' }}</div>
-                        <div class="summary-list" style="margin-top:18px;">
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Selected services</span>
-                                <span class="summary-pill__value">{{ count($selectedServiceLabels) ? implode(', ', $selectedServiceLabels) : 'None yet' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Arrangement</span>
-                                <span class="summary-pill__value">{{ $selectedArrangementMode === 'back_to_back' ? 'Back-to-back visit' : 'Same-slot visit' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Calendar slot</span>
-                                <span class="summary-pill__value">{{ $prefilledSlot ?: 'Not prefilled' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Viable slots</span>
-                                <span class="summary-pill__value">{{ count($slotOptions) ? count($slotOptions) : 'Check first' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Workflow order</span>
-                                <span class="summary-pill__value">{{ count($selectedServiceOrderLabels) ? implode(' -> ', $selectedServiceOrderLabels) : 'Select services' }}</span>
-                            </div>
-                        </div>
-
-                        <div style="margin-top:18px;">
-                            <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" style="width:100%;">Open Calendar for {{ \Carbon\Carbon::parse($selectedDate)->format('d M') }}</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </section>
         @endif
 
