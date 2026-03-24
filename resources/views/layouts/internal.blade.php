@@ -62,13 +62,6 @@
                         @endif
 
                         @if ($canAppointments)
-                            <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'booking' ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
-                                <span>Appointments</span>
-                            </a>
-                        @endif
-
-                        @if ($canAppointments)
                             <a href="{{ $r('app.appointments.index', ['mode' => 'checkin']) }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'checkin' ? 'is-active' : '' }}">
                                 <span class="app-nav-dot"></span>
                                 <span>Customer Check-In</span>
@@ -79,6 +72,13 @@
                             <a href="{{ $r('app.calendar') }}" class="app-nav-link {{ $is('app.calendar') ? 'is-active' : '' }}">
                                 <span class="app-nav-dot"></span>
                                 <span>Calendar Board</span>
+                            </a>
+                        @endif
+
+                        @if ($canAppointments)
+                            <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'booking' ? 'is-active' : '' }}">
+                                <span class="app-nav-dot"></span>
+                                <span>Appointments</span>
                             </a>
                         @endif
                     </div>

@@ -194,16 +194,20 @@ class CalendarController extends Controller
         $cursor = $selectedDate->copy()->setTime(self::DAY_START_HOUR, 0);
         $end = $selectedDate->copy()->setTime(self::DAY_END_HOUR, 0);
 
-        while ($cursor->lt($end)) {
+        while ($cursor->lte($end)) {
             $slotTime = $cursor->format('H:i');
+            $isClosingMarker = $cursor->equalTo($end);
 
             $slots[] = [
                 'time' => $slotTime,
                 'label' => $cursor->format('h:i A'),
-                'create_url' => route('app.appointments.index', [
-                    'date' => $selectedDate->toDateString(),
-                    'slot' => $slotTime,
-                ]),
+                'is_closing_marker' => $isClosingMarker,
+                'create_url' => $isClosingMarker
+                    ? null
+                    : route('app.appointments.index', [
+                        'date' => $selectedDate->toDateString(),
+                        'slot' => $slotTime,
+                    ]),
             ];
 
             $cursor->addMinutes(self::SLOT_MINUTES);

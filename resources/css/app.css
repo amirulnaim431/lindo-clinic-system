@@ -1069,12 +1069,12 @@
         width: 100%;
         border: 1px solid var(--app-border);
         border-radius: 1rem;
-        background: rgba(255, 255, 255, 0.04);
+        background: #fffdfd;
         padding: 0.9rem 1rem;
         color: var(--app-text-strong);
         font-size: 0.92rem;
         transition: 180ms ease;
-        color-scheme: dark;
+        color-scheme: light;
     }
 
     .form-input::placeholder,
@@ -1100,8 +1100,16 @@
 
     .form-select option,
     .select-input option {
-        background: #231d1c;
-        color: var(--app-text-strong);
+        background: #fff7f9;
+        color: #36242d;
+    }
+
+    .form-select option:checked,
+    .select-input option:checked,
+    .form-select option:hover,
+    .select-input option:hover {
+        background: #f0d3dd;
+        color: #36242d;
     }
 
     .field-block > label {

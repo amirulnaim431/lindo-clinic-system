@@ -135,7 +135,9 @@
                         @php $rowTop = $index * $rowHeightPx; @endphp
                         <div class="timeline-time" style="top: {{ $rowTop + 18 }}px;">{{ $slot['label'] }}</div>
                         <div class="timeline-row" style="height: {{ $rowHeightPx }}px;">
-                            <a href="{{ $slot['create_url'] }}" class="timeline-slot-link"><span>+ Create</span></a>
+                            @if (! ($slot['is_closing_marker'] ?? false) && ! empty($slot['create_url']))
+                                <a href="{{ $slot['create_url'] }}" class="timeline-slot-link"><span>+ Create</span></a>
+                            @endif
                         </div>
                     @endforeach
 

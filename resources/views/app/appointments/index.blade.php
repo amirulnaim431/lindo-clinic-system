@@ -389,6 +389,7 @@
             </section>
         @endif
 
+        @if ($isCheckInMode)
         <section class="ops-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
@@ -463,6 +464,7 @@
             </div>
 
         </section>
+        @endif
     </div>
 
     <script>
