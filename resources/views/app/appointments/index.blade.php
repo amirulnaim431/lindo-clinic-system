@@ -1,4 +1,4 @@
-<x-internal-layout :title="'Appointments'" :subtitle="'Cleaner front desk flow for booking, availability, and same-day follow-up.'">
+<x-internal-layout :title="'Customer Check-In'" :subtitle="'Cleaner front desk flow for booking, status updates, and same-day follow-up.'">
     @php
         $filters = $filters ?? ['date' => now()->format('Y-m-d'), 'service_ids' => [], 'slot' => null];
         $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->values()->all();

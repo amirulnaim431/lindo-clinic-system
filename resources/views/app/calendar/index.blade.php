@@ -32,10 +32,22 @@
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => \Carbon\Carbon::parse($nextMonth)->startOfMonth()->toDateString(), 'anchor' => $nextMonth, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Next month &rarr;</a>
                                 </div>
                             @else
-                                <div class="btn-row">
+                                <div class="btn-row" style="align-items: flex-end;">
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'week', 'date' => \Carbon\Carbon::parse($previousWeek)->toDateString(), 'anchor' => $previousWeek, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">&larr; Previous week</a>
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'week', 'date' => now()->toDateString(), 'anchor' => $currentWeek, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Today</a>
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'week', 'date' => \Carbon\Carbon::parse($nextWeek)->toDateString(), 'anchor' => $nextWeek, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Next week &rarr;</a>
+                                    <form method="GET" action="{{ route('app.calendar') }}" style="display:flex;align-items:end;gap:0.65rem;">
+                                        <input type="hidden" name="view" value="{{ $viewMode }}">
+                                        <input type="hidden" name="anchor" value="{{ $weekAnchor }}">
+                                        @if ($staffId)
+                                            <input type="hidden" name="staff_id" value="{{ $staffId }}">
+                                        @endif
+                                        <div class="field-block" style="min-width: 170px;">
+                                            <label for="board_date" class="field-label">Pick date</label>
+                                            <input id="board_date" name="date" type="date" value="{{ $selectedDateIso }}" class="form-input" style="padding: 0.8rem 0.9rem;">
+                                        </div>
+                                        <button type="submit" class="btn btn-secondary">Go</button>
+                                    </form>
                                 </div>
                             @endif
                         </div>

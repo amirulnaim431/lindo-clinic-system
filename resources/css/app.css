@@ -1406,7 +1406,9 @@
         width: min(520px, calc(100% - 48px));
         border: 1px dashed var(--app-border-strong);
         border-radius: var(--radius-lg);
-        background: rgba(25, 20, 20, 0.88);
+        background:
+            radial-gradient(circle at top center, rgba(201, 141, 159, 0.18), transparent 58%),
+            rgba(255, 244, 247, 0.98);
         padding: 1.6rem;
         text-align: center;
         box-shadow: var(--app-shadow-md);
