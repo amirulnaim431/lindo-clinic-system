@@ -30,6 +30,7 @@
         $canDashboard = $can('dashboard.view');
         $canAppointments = $can('appointments.view');
         $canCalendar = $can('calendar.view');
+        $appointmentsMode = request()->input('mode') === 'checkin' ? 'checkin' : 'booking';
         $canCustomers = $can('customers.view');
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
@@ -61,7 +62,14 @@
                         @endif
 
                         @if ($canAppointments)
-                            <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') ? 'is-active' : '' }}">
+                            <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'booking' ? 'is-active' : '' }}">
+                                <span class="app-nav-dot"></span>
+                                <span>Appointments</span>
+                            </a>
+                        @endif
+
+                        @if ($canAppointments)
+                            <a href="{{ $r('app.appointments.index', ['mode' => 'checkin']) }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'checkin' ? 'is-active' : '' }}">
                                 <span class="app-nav-dot"></span>
                                 <span>Customer Check-In</span>
                             </a>

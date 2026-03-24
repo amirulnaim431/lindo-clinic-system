@@ -21,6 +21,8 @@ class AppointmentController extends Controller
 {
     public function index(Request $request)
     {
+        $mode = $request->input('mode') === 'checkin' ? 'checkin' : 'booking';
+
         $filters = [
             'date' => $request->input('date') ?: now()->format('Y-m-d'),
             'service_ids' => $request->input('service_ids', []),
@@ -128,6 +130,7 @@ class AppointmentController extends Controller
         $statusOptions = AppointmentStatus::cases();
 
         return view('app.appointments.index', compact(
+            'mode',
             'filters',
             'services',
             'staffList',

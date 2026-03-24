@@ -1,4 +1,9 @@
-<x-internal-layout :title="'Customer Check-In'" :subtitle="'Cleaner front desk flow for booking, status updates, and same-day follow-up.'">
+@php
+    $mode = $mode ?? 'booking';
+    $isCheckInMode = $mode === 'checkin';
+@endphp
+
+<x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="$isCheckInMode ? 'Front desk status control for check-in, completion, no-show, and same-day follow-up.' : 'Cleaner front desk flow for booking, availability, and same-day follow-up.'">
     @php
         $filters = $filters ?? ['date' => now()->format('Y-m-d'), 'service_ids' => [], 'slot' => null];
         $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->values()->all();
@@ -91,15 +96,15 @@
             </div>
         @endif
 
-        @if ($quickCreate['message'])
+        @if (! $isCheckInMode && $quickCreate['message'])
             <div class="flash flash--warn">{{ $quickCreate['message'] }}</div>
         @endif
 
         <section class="ops-card ops-card--hero">
             <div class="ops-card__body">
-                <div class="ops-kicker">Front desk</div>
-                <h2 class="ops-title">Book and manage today's appointments</h2>
-                <div class="ops-subtitle">Choose services, find an available team member, and confirm the booking without jumping between screens.</div>
+                <div class="ops-kicker">{{ $isCheckInMode ? 'Status control' : 'Front desk' }}</div>
+                <h2 class="ops-title">{{ $isCheckInMode ? "Manage today's appointment statuses" : "Book and manage today's appointments" }}</h2>
+                <div class="ops-subtitle">{{ $isCheckInMode ? 'Review today\'s queue and update pending, confirmed, checked-in, completed, cancelled, or no-show statuses from one place.' : 'Choose services, find an available team member, and confirm the booking without jumping between screens.' }}</div>
 
                 <div class="metrics-grid" style="margin-top:22px;">
                     <div class="metric-card">
@@ -136,6 +141,7 @@
             </div>
         </section>
 
+        @if (! $isCheckInMode)
         <section class="booking-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
@@ -251,8 +257,9 @@
                 </div>
             </div>
         </section>
+        @endif
 
-        @if (! empty($availability))
+        @if (! $isCheckInMode && ! empty($availability))
             <section class="ops-card">
                 <div class="ops-card__header">
                     <div class="ops-kicker">Availability</div>
@@ -385,9 +392,9 @@
         <section class="ops-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
-                    <div class="ops-kicker">Live Booking Queue</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">Schedule for {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
-                    <div class="ops-subtitle" style="max-width:none;">Current appointment groups for the selected day. Front desk can review service allocations and update status without leaving the booking desk.</div>
+                    <div class="ops-kicker">{{ $isCheckInMode ? 'Customer status queue' : 'Live Booking Queue' }}</div>
+                    <h3 class="panel-title-display" style="font-size:24px;">{{ $isCheckInMode ? 'Check-in and status control for '.\Carbon\Carbon::parse($selectedDate)->format('d M Y') : 'Schedule for '.\Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
+                    <div class="ops-subtitle" style="max-width:none;">{{ $isCheckInMode ? 'Use this queue only for status changes and same-day customer handling.' : 'Current appointment groups for the selected day. Front desk can review service allocations and update status without leaving the booking desk.' }}</div>
                 </div>
 
                 <div class="ops-card__body">
