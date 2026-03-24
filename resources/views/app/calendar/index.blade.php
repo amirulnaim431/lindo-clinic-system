@@ -108,14 +108,6 @@
             </div>
         </section>
 
-        <section class="summary-stat-grid">
-            <x-stat-card label="Total" :value="$daySummary['total']" :meta="$selectedDate->format('d M Y')" />
-            <x-stat-card label="Pending" :value="$daySummary['pending']" meta="Awaiting action" />
-            <x-stat-card label="Confirmed" :value="$daySummary['confirmed']" meta="Reserved" />
-            <x-stat-card label="Checked In" :value="$daySummary['checked_in']" meta="On site" />
-            <x-stat-card label="Completed" :value="$daySummary['completed']" :meta="$daySummary['cancelled_or_no_show'].' cancelled / no-show'" />
-        </section>
-
         <section class="panel">
             <div class="panel-header">
                 <div class="filter-bar__head">
