@@ -1662,18 +1662,14 @@
     .auth-image-slot {
         margin-top: 1.5rem;
         max-width: 34rem;
-        border-radius: 2rem;
-        border: 1px solid var(--app-border);
-        background: rgba(33, 25, 25, 0.9);
-        overflow: hidden;
-        box-shadow: var(--app-shadow-md);
+        padding: 0.5rem 0;
     }
 
     .auth-image-slot img {
         display: block;
         width: 100%;
-        height: 100%;
-        object-fit: cover;
+        height: auto;
+        object-fit: contain;
     }
 
     .auth-image-slot__placeholder {
