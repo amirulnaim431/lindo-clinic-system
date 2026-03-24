@@ -158,6 +158,19 @@
                                 </div>
                             </button>
                         @endforeach
+
+                        @foreach ($overflowSummaries as $overflow)
+                            <button
+                                type="button"
+                                class="calendar-overflow-btn"
+                                style="top: {{ $overflow['top_px'] }}px; height: {{ $overflow['height_px'] }}px; left: calc({{ $overflow['left_pct'] }}% + 8px); width: calc({{ $overflow['width_pct'] }}% - 12px);"
+                                data-overflow='@json($overflow)'
+                                title="Open hidden appointments"
+                            >
+                                <span class="calendar-overflow-btn__count">+{{ $overflow['count'] }}</span>
+                                <span class="calendar-overflow-btn__label">more appointments</span>
+                            </button>
+                        @endforeach
                     </div>
 
                     @if (! $timelineHasEvents)
@@ -214,16 +227,59 @@
         </div>
     </div>
 
+    <div id="calendar-overflow-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-header__row">
+                        <div>
+                            <div class="modal-kicker">Busy time slot</div>
+                            <h3 id="overflow-modal-title" class="modal-title">More appointments</h3>
+                            <p class="modal-subtitle">Extra appointments hidden to keep the board readable.</p>
+                        </div>
+                        <button type="button" id="calendar-overflow-close-top" class="modal-close" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="table-shell">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Time</th>
+                                        <th>Staff</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overflow-modal-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="calendar-overflow-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         (() => {
             const modal = document.getElementById('calendar-detail-modal');
+            const overflowModal = document.getElementById('calendar-overflow-modal');
             const modalHeader = document.getElementById('modal-header');
             const closeTop = document.getElementById('calendar-detail-close-top');
             const closeBottom = document.getElementById('calendar-detail-close-bottom');
+            const overflowCloseTop = document.getElementById('calendar-overflow-close-top');
+            const overflowCloseBottom = document.getElementById('calendar-overflow-close-bottom');
             const manageLink = document.getElementById('modal-manage-link');
             const createLink = document.getElementById('modal-create-link');
             const timelineGrid = document.querySelector('.timeline-grid');
             const timelineButtons = Array.from(document.querySelectorAll('.calendar-event-btn'));
+            const overflowButtons = Array.from(document.querySelectorAll('.calendar-overflow-btn'));
             const canManageAppointments = @json($canManageAppointments);
             const rowHeightPx = @json($rowHeightPx);
             const selectedDateIso = @json($selectedDateIso);
@@ -277,6 +333,12 @@
             const closeModal = () => {
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            const closeOverflowModal = () => {
+                overflowModal.classList.add('hidden');
+                overflowModal.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('overflow-hidden');
             };
 
@@ -475,7 +537,34 @@
             };
 
             timelineButtons.forEach((button) => attachDragBehavior(button));
+            overflowButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    let payload = {};
+
+                    try {
+                        payload = JSON.parse(button.dataset.overflow || '{}');
+                    } catch (error) {
+                        payload = {};
+                    }
+
+                    document.getElementById('overflow-modal-title').textContent = `+${payload.count || 0} more appointments`;
+                    document.getElementById('overflow-modal-list').innerHTML = (payload.items || []).map((item) => `
+                        <tr>
+                            <td>${item.customer_name || '-'}</td>
+                            <td>${item.service_summary || '-'}</td>
+                            <td>${item.start_time || '-'} - ${item.end_time || '-'}</td>
+                            <td>${item.staff_summary || '-'}</td>
+                            <td>${item.status_label || '-'}</td>
+                        </tr>
+                    `).join('');
+
+                    overflowModal.classList.remove('hidden');
+                    overflowModal.setAttribute('aria-hidden', 'false');
+                    document.body.classList.add('overflow-hidden');
+                });
+            });
             [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
+            [overflowCloseTop, overflowCloseBottom].forEach((button) => button?.addEventListener('click', closeOverflowModal));
 
             modal?.addEventListener('click', (event) => {
                 if (event.target === modal || event.target === modal.firstElementChild) {
@@ -483,9 +572,19 @@
                 }
             });
 
+            overflowModal?.addEventListener('click', (event) => {
+                if (event.target === overflowModal || event.target === overflowModal.firstElementChild) {
+                    closeOverflowModal();
+                }
+            });
+
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
                     closeModal();
+                }
+
+                if (event.key === 'Escape' && overflowModal && !overflowModal.classList.contains('hidden')) {
+                    closeOverflowModal();
                 }
             });
         })();

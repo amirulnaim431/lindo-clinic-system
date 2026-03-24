@@ -17,6 +17,7 @@ class CalendarController extends Controller
     private const DAY_START_HOUR = 9;
     private const DAY_END_HOUR = 18;
     private const ROW_HEIGHT_PX = 72;
+    private const MAX_VISIBLE_COLUMNS = 4;
 
     private const SERVICE_PALETTES = [
         ['surface' => '#fff6fa', 'surface_strong' => '#fde7ee', 'border' => '#efbfd0', 'accent' => '#c0718a', 'accent_soft' => '#e4a9bc', 'chip_bg' => '#fde7ee', 'chip_text' => '#9f546c', 'text' => '#5e3946'],
@@ -84,7 +85,7 @@ class CalendarController extends Controller
             ->filter()
             ->values();
 
-        $timelineEvents = $this->applyTimelineLayout($dayEvents);
+        [$timelineEvents, $overflowSummaries] = $this->applyTimelineLayout($dayEvents);
         $slots = $this->buildSlots($selectedDate);
         $weekDays = $this->buildWeekDays($weekStart, $groups, $selectedDate, $staffId, $viewMode);
         $monthDays = $this->buildMonthDays($monthStart, $groups, $selectedDate, $staffId, $viewMode);
@@ -99,6 +100,7 @@ class CalendarController extends Controller
             'monthDays' => $monthDays,
             'slots' => $slots,
             'timelineEvents' => $timelineEvents,
+            'overflowSummaries' => $overflowSummaries,
             'timelineHeightPx' => count($slots) * self::ROW_HEIGHT_PX,
             'rowHeightPx' => self::ROW_HEIGHT_PX,
             'staffList' => $staffList,
@@ -307,7 +309,7 @@ class CalendarController extends Controller
         ];
     }
 
-    private function applyTimelineLayout(Collection $events): Collection
+    private function applyTimelineLayout(Collection $events): array
     {
         $sorted = $events->sortBy('start_minutes')->values();
         $clusters = [];
@@ -330,6 +332,7 @@ class CalendarController extends Controller
         }
 
         $positioned = collect();
+        $overflowSummaries = collect();
 
         foreach ($clusters as $cluster) {
             $lanes = [];
@@ -353,15 +356,53 @@ class CalendarController extends Controller
             }
 
             $columns = max(1, $maxLaneIndex + 1);
+            $usesOverflow = $columns > self::MAX_VISIBLE_COLUMNS;
+            $visibleColumns = $usesOverflow ? self::MAX_VISIBLE_COLUMNS - 1 : $columns;
+            $renderedColumns = $usesOverflow ? self::MAX_VISIBLE_COLUMNS : $columns;
+
+            $hiddenEvents = collect();
 
             foreach ($cluster as $event) {
-                $event['width_pct'] = round(100 / $columns, 4);
+                if ($usesOverflow && $event['lane_index'] >= $visibleColumns) {
+                    $hiddenEvents->push($event);
+                    continue;
+                }
+
+                $event['width_pct'] = round(100 / $renderedColumns, 4);
                 $event['left_pct'] = round($event['lane_index'] * $event['width_pct'], 4);
                 $positioned->push($event);
             }
+
+            if ($usesOverflow && $hiddenEvents->isNotEmpty()) {
+                $topPx = $hiddenEvents->min('top_px');
+                $bottomPx = $hiddenEvents->max(fn ($event) => $event['top_px'] + $event['height_px']);
+
+                $overflowSummaries->push([
+                    'id' => 'overflow-'.md5(json_encode($hiddenEvents->pluck('id')->values()->all())),
+                    'count' => $hiddenEvents->count(),
+                    'top_px' => $topPx,
+                    'height_px' => max(60, $bottomPx - $topPx),
+                    'width_pct' => round(100 / $renderedColumns, 4),
+                    'left_pct' => round(($renderedColumns - 1) * (100 / $renderedColumns), 4),
+                    'items' => $hiddenEvents->map(function ($event) {
+                        return [
+                            'customer_name' => $event['customer_name'],
+                            'service_summary' => $event['service_summary'],
+                            'start_time' => $event['start_time'],
+                            'end_time' => $event['end_time'],
+                            'staff_summary' => $event['staff_summary'],
+                            'status_label' => $event['status_label'],
+                            'manage_url' => $event['manage_url'],
+                        ];
+                    })->values()->all(),
+                ]);
+            }
         }
 
-        return $positioned->sortBy('start_minutes')->values();
+        return [
+            $positioned->sortBy('start_minutes')->values(),
+            $overflowSummaries->sortBy('top_px')->values(),
+        ];
     }
 
     private function buildDaySummary(Collection $groups): array

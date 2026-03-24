@@ -1372,6 +1372,36 @@
     .calendar-event.is-dragging { cursor: grabbing; z-index: 40; }
     .calendar-event.is-conflict { outline: 3px solid rgba(222, 127, 138, 0.26); }
 
+    .calendar-overflow-btn {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        border: 1px dashed var(--app-border-strong);
+        border-radius: 1rem;
+        background: linear-gradient(180deg, rgba(201, 141, 159, 0.16), rgba(255, 247, 250, 0.96));
+        color: var(--app-text-strong);
+        box-shadow: var(--app-shadow-sm);
+        cursor: pointer;
+        padding: 0.75rem;
+        text-align: center;
+    }
+
+    .calendar-overflow-btn__count {
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .calendar-overflow-btn__label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
     .calendar-event__head {
         display: flex;
         justify-content: space-between;
