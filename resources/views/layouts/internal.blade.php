@@ -43,8 +43,8 @@
                     <span class="app-brand__mark" aria-hidden="true">LC</span>
                     <span>
                         <span class="app-brand__eyebrow">Lindo Clinic</span>
-                        <span class="app-brand__title">Internal Workspace</span>
-                        <span class="app-brand__subtitle">Premium clinic operations for appointments, CRM, and staff coordination.</span>
+                        <span class="app-brand__title">Clinic Workspace</span>
+                        <span class="app-brand__subtitle">Daily operations, scheduling, CRM, and staff coordination in one live workspace.</span>
                     </span>
                 </a>
             </div>
@@ -157,7 +157,7 @@
                     </div>
 
                     <div class="topbar-badges">
-                        <span class="topbar-badge">Staging</span>
+                        <span class="topbar-badge">Live operations</span>
                         <span class="topbar-badge">{{ now()->format('d M Y, H:i') }}</span>
                     </div>
                 </div>

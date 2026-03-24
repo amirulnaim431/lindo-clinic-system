@@ -17,23 +17,23 @@
                     <span class="auth-brand__mark" aria-hidden="true">LC</span>
                     <span>
                         <span class="auth-kicker">Lindo Clinic</span>
-                        <span class="auth-brand__name">Clinic Operations</span>
-                        <span class="auth-brand__tag">Secure access for front desk, admin, and clinic staff.</span>
+                        <span class="auth-brand__name">Clinic Workspace</span>
+                        <span class="auth-brand__tag">Secure access for live front desk, admin, and clinic operations.</span>
                     </span>
                 </a>
 
                 <div class="auth-copy">
-                    <div class="auth-kicker">Premium workflow</div>
-                    <h1 class="auth-title">High-clarity access for a premium clinic team.</h1>
+                    <div class="auth-kicker">Lindo workspace</div>
+                    <h1 class="auth-title">Elegant, live-ready access for the clinic team.</h1>
                     <p class="auth-subtitle">
-                        The internal system follows the Lindo brand language while staying focused on speed, accuracy, and daily patient operations.
+                        The internal system keeps daily patient operations clear, calm, and polished from login through every operational screen.
                     </p>
 
                     <div class="auth-points">
                         <div class="auth-point">
                             <span class="auth-point__dot"></span>
                             <div>
-                                <div class="auth-point__title">Operational first</div>
+                                <div class="auth-point__title">Reception ready</div>
                                 <div class="auth-point__body">Appointments, customer records, and staff coordination stay readable and fast under pressure.</div>
                             </div>
                         </div>
@@ -41,7 +41,7 @@
                             <span class="auth-point__dot"></span>
                             <div>
                                 <div class="auth-point__title">Brand aligned</div>
-                                <div class="auth-point__body">Dark clinic styling, warm copper accents, and selective serif presentation mirror the public identity.</div>
+                                <div class="auth-point__body">A white workspace with dusty pink accents keeps the internal system aligned with Lindo's updated direction.</div>
                             </div>
                         </div>
                         <div class="auth-point">

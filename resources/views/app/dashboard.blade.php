@@ -1,11 +1,12 @@
 <x-internal-layout
     :title="'Dashboard'"
-    :subtitle="'Premium operational overview for appointments, clinic load, and staff activity.'">
+    :subtitle="'Live-ready reporting for appointments, customer mix, and staff utilisation.'">
 
     @php
         $selectedDate = request('date', $date ?? now()->toDateString());
         $selectedStaffId = request('staff_id');
         $selectedPeriod = request('period', $period ?? 'day');
+        $topFocus = $serviceFocus->first();
         $periodOptions = [
             'day' => 'Day',
             'week' => 'Week',
@@ -25,10 +26,18 @@
 
         <section class="hero-panel">
             <div class="panel-body stack">
-                <x-section-heading
-                    kicker="Clinic summary"
-                    title="Operational overview"
-                    subtitle="Use the shared dashboard filters to inspect appointment volume, staff coverage, and live scheduling for the selected period." />
+                <div class="filter-bar__head">
+                    <x-section-heading
+                        kicker="Executive view"
+                        title="Operations reporting"
+                        :subtitle="'Track customer mix, sales, service demand, and staff workload for '.$periodLabel.'.'" />
+
+                    <div class="page-actions">
+                        <a href="{{ route('app.dashboard', array_filter(['period' => $selectedPeriod, 'date' => $selectedDate, 'staff_id' => $selectedStaffId, 'export' => 'csv'])) }}" class="btn btn-secondary">Export CSV</a>
+                        <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
+                        <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="btn btn-secondary">Open calendar</a>
+                    </div>
+                </div>
 
                 <form method="GET" action="{{ route('app.dashboard') }}" class="form-grid">
                     <div class="col-3 field-block">
@@ -46,12 +55,12 @@
                     </div>
 
                     <div class="col-3 field-block">
-                        <label class="field-label" for="staff_id">Staff focus</label>
+                        <label class="field-label" for="staff_id">Staff review filter</label>
                         <select id="staff_id" name="staff_id" class="form-select">
                             <option value="">All staff</option>
                             @foreach ($staffList as $s)
                                 <option value="{{ $s->id }}" @selected((string) $selectedStaffId === (string) $s->id)>
-                                    {{ $s->full_name }} ({{ $s->role_key }})
+                                    {{ $s->full_name }} ({{ $s->job_title ?: $s->role_key }})
                                 </option>
                             @endforeach
                         </select>
@@ -67,22 +76,82 @@
             </div>
         </section>
 
-        <section class="stats-grid">
-            <x-stat-card label="Total appointments" :value="$kpi['total'] ?? 0" :meta="$periodLabel ?? 'Selected period'" />
-            <x-stat-card label="Revenue" value="--" meta="Reserved for future billing integration." />
+        <section class="summary-stat-grid">
+            <x-stat-card label="Appointments" :value="$kpi['total'] ?? 0" :meta="$periodLabel" />
+            <x-stat-card label="New Customers" :value="$kpi['new_customers'] ?? 0" meta="First visit in this period" />
+            <x-stat-card label="Existing Customers" :value="$kpi['existing_customers'] ?? 0" meta="Returning customers in this period" />
+            <x-stat-card label="Total Sales" :value="'RM '.number_format($kpi['total_sales'] ?? 0, 0)" meta="Based on scheduled service prices" />
+            <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />
+        </section>
 
-            @foreach ($statusCases as $st)
-                @php
-                    $statusKey = is_object($st) ? $st->value : (string) $st;
-                    $statusLabel = method_exists($st, 'label')
-                        ? $st->label()
-                        : ucfirst(str_replace('_', ' ', $statusKey));
-                @endphp
-                <x-stat-card
-                    :label="$statusLabel"
-                    :value="$kpi['by_status'][$statusKey] ?? 0"
-                    :meta="'Within '.strtolower($periodOptions[$selectedPeriod] ?? 'day').' view.'" />
-            @endforeach
+        <section class="report-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <x-section-heading
+                        kicker="Service demand"
+                        title="Appointment focus"
+                        subtitle="Where the clinic load is concentrating for the selected reporting window." />
+                </div>
+
+                <div class="panel-body">
+                    @if ($serviceFocus->isNotEmpty())
+                        <div class="table-shell">
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Service</th>
+                                            <th style="width: 160px;">Appointments</th>
+                                            <th style="width: 160px;">Sales</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($serviceFocus->take(8) as $service)
+                                            <tr>
+                                                <td>{{ $service['service_name'] }}</td>
+                                                <td>{{ $service['appointments'] }}</td>
+                                                <td>RM {{ number_format($service['sales_amount'], 0) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @else
+                        <div class="empty-state empty-state--dashed">
+                            <div class="empty-state__title">No service activity yet</div>
+                            <div class="empty-state__body">Once appointments exist in this period, the demand ranking will appear here.</div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <div class="stack">
+                <div class="report-card">
+                    <div class="metric-label">Sales snapshot</div>
+                    <div class="report-card__value">RM {{ number_format($kpi['total_sales'] ?? 0, 0) }}</div>
+                    <div class="report-card__meta">Scheduled service value across all matching appointments.</div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <x-section-heading
+                            kicker="Channel mix"
+                            title="Booking sources"
+                            subtitle="Useful for reviewing where current demand is coming from." />
+                    </div>
+                    <div class="panel-body stack">
+                        @forelse ($sourceBreakdown as $source)
+                            <div class="summary-pill">
+                                <span class="summary-pill__label">{{ $source['source'] }}</span>
+                                <span class="summary-pill__value">{{ $source['appointments'] }} appointment{{ $source['appointments'] === 1 ? '' : 's' }}</span>
+                            </div>
+                        @empty
+                            <div class="small-note">No source data recorded for this period.</div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="dashboard-grid">
@@ -90,13 +159,12 @@
                 <div class="panel-header">
                     <div class="filter-bar__head">
                         <x-section-heading
-                            kicker="Schedule"
-                            title="Appointments in focus"
-                            :subtitle="'Appointment groups for '.($periodLabel ?? $selectedDate).'.'" />
+                            kicker="Recent activity"
+                            title="Appointments in scope"
+                            :subtitle="'Latest appointment groups inside '.$periodLabel.'.'" />
 
                         <div class="page-actions">
-                            <a href="{{ route('app.appointments.index') }}" class="btn btn-secondary">Manage appointments</a>
-                            <a href="{{ route('app.calendar') }}" class="btn btn-secondary">Open calendar</a>
+                            <a href="{{ route('app.appointments.index', ['date' => $selectedDate]) }}" class="btn btn-secondary">Manage appointments</a>
                         </div>
                     </div>
                 </div>
@@ -112,6 +180,7 @@
                                             <th>Customer</th>
                                             <th>Services</th>
                                             <th>Staff</th>
+                                            <th style="width: 130px;">Sales</th>
                                             <th style="width: 170px;">Status</th>
                                         </tr>
                                     </thead>
@@ -120,6 +189,7 @@
                                             @php
                                                 $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
                                                 $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
+                                                $salesAmount = (int) $g->items?->sum(fn($i) => (int) ($i->service?->price ?? 0));
                                                 $currentStatus = is_object($g->status) ? $g->status->value : (string) $g->status;
                                                 $currentStatusLabel = is_object($g->status) && method_exists($g->status, 'label')
                                                     ? $g->status->label()
@@ -144,9 +214,8 @@
                                                 </td>
                                                 <td>{{ $servicesSummary }}</td>
                                                 <td>{{ $staffSummary }}</td>
-                                                <td>
-                                                    <x-status-pill :label="$currentStatusLabel" :tone="$tone" />
-                                                </td>
+                                                <td>RM {{ number_format($salesAmount, 0) }}</td>
+                                                <td><x-status-pill :label="$currentStatusLabel" :tone="$tone" /></td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -156,38 +225,143 @@
                     @else
                         <div class="empty-state empty-state--dashed">
                             <div class="empty-state__title">No appointments found</div>
-                            <div class="empty-state__body">Adjust the period or staff filter to inspect another section of the clinic workload.</div>
+                            <div class="empty-state__body">Adjust the filters to review another window of operational activity.</div>
                         </div>
                     @endif
                 </div>
             </div>
 
-            <div class="stack">
-                <div class="panel">
-                    <div class="panel-header">
-                        <x-section-heading
-                            kicker="Workflow"
-                            title="How to use this view"
-                            subtitle="This page is the high-level checkpoint before moving into the booking desk or live calendar." />
+            <div class="panel">
+                <div class="panel-header">
+                    <x-section-heading
+                        kicker="Boss review"
+                        title="Staff workload"
+                        subtitle="Tap any staff card to open their appointment details for this reporting window." />
+                </div>
+
+                <div class="panel-body">
+                    <div class="staff-review-grid">
+                        @forelse ($staffReview as $review)
+                            <button
+                                type="button"
+                                class="staff-review-card"
+                                data-staff-review='@json($review)'
+                            >
+                                <div class="metric-label">{{ $review['job_title'] }}</div>
+                                <div class="staff-review-card__value">{{ $review['staff_name'] }}</div>
+                                <div class="staff-review-card__meta">{{ $review['appointments'] }} appointments | {{ $review['hours_label'] }} | RM {{ number_format($review['sales_amount'], 0) }}</div>
+                            </button>
+                        @empty
+                            <div class="empty-state empty-state--dashed" style="grid-column: 1 / -1;">
+                                <div class="empty-state__title">No staff load found</div>
+                                <div class="empty-state__body">This view fills automatically once matching appointments exist.</div>
+                            </div>
+                        @endforelse
                     </div>
-                    <div class="panel-body stack">
-                        <div class="summary-card">
-                            <div class="selection-card__title">Use filters for decision making</div>
-                            <div class="small-note">Switch between day, week, month, and year to understand demand and staff load.</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="print-only small-note">
+            Printed from Lindo Clinic dashboard for {{ $periodLabel }}.
+        </div>
+    </div>
+
+    <div id="staff-review-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-header__row">
+                        <div>
+                            <div class="modal-kicker">Staff review</div>
+                            <h3 id="staff-review-name" class="modal-title">-</h3>
+                            <p id="staff-review-summary" class="modal-subtitle">-</p>
                         </div>
-                        <div class="summary-card">
-                            <div class="selection-card__title">Open the calendar for live movement</div>
-                            <div class="small-note">Drag-based rescheduling and quick-create actions remain in the calendar board.</div>
-                        </div>
-                        <div class="summary-card">
-                            <div class="selection-card__title">Use appointments for intake</div>
-                            <div class="small-note">The booking desk remains the operational screen for service matching and slot confirmation.</div>
+                        <button type="button" id="staff-review-close-top" class="modal-close" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="table-shell">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="staff-review-details"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
-
-                <x-stat-card label="Selected period" :value="$periodOptions[$selectedPeriod] ?? 'Day'" :meta="$periodLabel ?? 'Current scope'" />
+                <div class="modal-actions">
+                    <button type="button" id="staff-review-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
+                </div>
             </div>
-        </section>
+        </div>
     </div>
+
+    <script>
+        (() => {
+            const modal = document.getElementById('staff-review-modal');
+            const closeTop = document.getElementById('staff-review-close-top');
+            const closeBottom = document.getElementById('staff-review-close-bottom');
+            const nameTarget = document.getElementById('staff-review-name');
+            const summaryTarget = document.getElementById('staff-review-summary');
+            const detailTarget = document.getElementById('staff-review-details');
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            document.querySelectorAll('[data-staff-review]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    let payload = {};
+
+                    try {
+                        payload = JSON.parse(button.dataset.staffReview || '{}');
+                    } catch (error) {
+                        payload = {};
+                    }
+
+                    nameTarget.textContent = payload.staff_name || '-';
+                    summaryTarget.textContent = `${payload.job_title || 'Operational staff'} | ${payload.appointments || 0} appointments | ${payload.hours_label || '-'}`;
+                    detailTarget.innerHTML = (payload.details || []).map((detail) => `
+                        <tr>
+                            <td>${detail.customer_name || '-'}</td>
+                            <td>${detail.service_name || '-'}</td>
+                            <td>${detail.time_label || '-'}</td>
+                            <td>${detail.status_label || '-'}</td>
+                            <td>${detail.sales_label || '-'}</td>
+                        </tr>
+                    `).join('');
+
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.classList.add('overflow-hidden');
+                });
+            });
+
+            [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
+
+            modal?.addEventListener('click', (event) => {
+                if (event.target === modal || event.target === modal.firstElementChild) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
 </x-internal-layout>

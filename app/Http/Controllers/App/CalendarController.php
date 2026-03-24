@@ -19,138 +19,29 @@ class CalendarController extends Controller
     private const ROW_HEIGHT_PX = 72;
 
     private const SERVICE_PALETTES = [
-        [
-            'surface' => '#f3f8ff',
-            'surface_strong' => '#dbeafe',
-            'border' => '#bfdbfe',
-            'accent' => '#2563eb',
-            'accent_soft' => '#93c5fd',
-            'chip_bg' => '#dbeafe',
-            'chip_text' => '#1d4ed8',
-            'text' => '#172554',
-        ],
-        [
-            'surface' => '#f5fbfa',
-            'surface_strong' => '#d1fae5',
-            'border' => '#a7f3d0',
-            'accent' => '#059669',
-            'accent_soft' => '#6ee7b7',
-            'chip_bg' => '#d1fae5',
-            'chip_text' => '#047857',
-            'text' => '#064e3b',
-        ],
-        [
-            'surface' => '#fff7ed',
-            'surface_strong' => '#fed7aa',
-            'border' => '#fdba74',
-            'accent' => '#ea580c',
-            'accent_soft' => '#fb923c',
-            'chip_bg' => '#fed7aa',
-            'chip_text' => '#c2410c',
-            'text' => '#7c2d12',
-        ],
-        [
-            'surface' => '#fdf4ff',
-            'surface_strong' => '#f5d0fe',
-            'border' => '#f0abfc',
-            'accent' => '#c026d3',
-            'accent_soft' => '#e879f9',
-            'chip_bg' => '#f5d0fe',
-            'chip_text' => '#a21caf',
-            'text' => '#701a75',
-        ],
-        [
-            'surface' => '#fff8f1',
-            'surface_strong' => '#fde68a',
-            'border' => '#fcd34d',
-            'accent' => '#d97706',
-            'accent_soft' => '#fbbf24',
-            'chip_bg' => '#fef3c7',
-            'chip_text' => '#b45309',
-            'text' => '#78350f',
-        ],
-        [
-            'surface' => '#f5f3ff',
-            'surface_strong' => '#ddd6fe',
-            'border' => '#c4b5fd',
-            'accent' => '#7c3aed',
-            'accent_soft' => '#a78bfa',
-            'chip_bg' => '#ddd6fe',
-            'chip_text' => '#6d28d9',
-            'text' => '#4c1d95',
-        ],
-        [
-            'surface' => '#ecfeff',
-            'surface_strong' => '#bae6fd',
-            'border' => '#7dd3fc',
-            'accent' => '#0891b2',
-            'accent_soft' => '#38bdf8',
-            'chip_bg' => '#bae6fd',
-            'chip_text' => '#0e7490',
-            'text' => '#164e63',
-        ],
-        [
-            'surface' => '#fff1f2',
-            'surface_strong' => '#fecdd3',
-            'border' => '#fda4af',
-            'accent' => '#e11d48',
-            'accent_soft' => '#fb7185',
-            'chip_bg' => '#fecdd3',
-            'chip_text' => '#be123c',
-            'text' => '#881337',
-        ],
+        ['surface' => '#fff6fa', 'surface_strong' => '#fde7ee', 'border' => '#efbfd0', 'accent' => '#c0718a', 'accent_soft' => '#e4a9bc', 'chip_bg' => '#fde7ee', 'chip_text' => '#9f546c', 'text' => '#5e3946'],
+        ['surface' => '#f8fbff', 'surface_strong' => '#ddeaf7', 'border' => '#bdd0e6', 'accent' => '#6f90b4', 'accent_soft' => '#a5bfd9', 'chip_bg' => '#ddeaf7', 'chip_text' => '#48617e', 'text' => '#31465f'],
+        ['surface' => '#fff8f1', 'surface_strong' => '#f8dfca', 'border' => '#edc5a1', 'accent' => '#c48a5a', 'accent_soft' => '#e0b58d', 'chip_bg' => '#f8dfca', 'chip_text' => '#9f6b41', 'text' => '#69462d'],
+        ['surface' => '#faf6ff', 'surface_strong' => '#e9def8', 'border' => '#d0bce9', 'accent' => '#9a79bf', 'accent_soft' => '#bea4da', 'chip_bg' => '#e9def8', 'chip_text' => '#795a9a', 'text' => '#523b6f'],
     ];
 
     private const STATUS_STYLES = [
-        'booked' => [
-            'label' => 'Pending',
-            'dot' => '#f59e0b',
-            'badge_bg' => '#fff7ed',
-            'badge_border' => '#fed7aa',
-            'badge_text' => '#c2410c',
-        ],
-        'confirmed' => [
-            'label' => 'Confirmed',
-            'dot' => '#0284c7',
-            'badge_bg' => '#f0f9ff',
-            'badge_border' => '#bae6fd',
-            'badge_text' => '#0369a1',
-        ],
-        'checked_in' => [
-            'label' => 'Checked In',
-            'dot' => '#7c3aed',
-            'badge_bg' => '#f5f3ff',
-            'badge_border' => '#ddd6fe',
-            'badge_text' => '#6d28d9',
-        ],
-        'completed' => [
-            'label' => 'Completed',
-            'dot' => '#059669',
-            'badge_bg' => '#ecfdf5',
-            'badge_border' => '#a7f3d0',
-            'badge_text' => '#047857',
-        ],
-        'cancelled' => [
-            'label' => 'Cancelled',
-            'dot' => '#e11d48',
-            'badge_bg' => '#fff1f2',
-            'badge_border' => '#fecdd3',
-            'badge_text' => '#be123c',
-        ],
-        'no_show' => [
-            'label' => 'No-show',
-            'dot' => '#475569',
-            'badge_bg' => '#f8fafc',
-            'badge_border' => '#cbd5e1',
-            'badge_text' => '#475569',
-        ],
+        'booked' => ['label' => 'Pending', 'dot' => '#d79d68', 'badge_bg' => '#fff4ea', 'badge_border' => '#efd3b7', 'badge_text' => '#9f6b41'],
+        'confirmed' => ['label' => 'Confirmed', 'dot' => '#7d9abb', 'badge_bg' => '#f2f7fc', 'badge_border' => '#cbd9e8', 'badge_text' => '#48617e'],
+        'checked_in' => ['label' => 'Checked In', 'dot' => '#9a79bf', 'badge_bg' => '#f6f1fc', 'badge_border' => '#ddcfef', 'badge_text' => '#795a9a'],
+        'completed' => ['label' => 'Completed', 'dot' => '#79ab91', 'badge_bg' => '#f0f8f3', 'badge_border' => '#c6dece', 'badge_text' => '#4c7a60'],
+        'cancelled' => ['label' => 'Cancelled', 'dot' => '#cf7d95', 'badge_bg' => '#fff3f6', 'badge_border' => '#ebc0cf', 'badge_text' => '#9a4f67'],
+        'no_show' => ['label' => 'No-show', 'dot' => '#9f8a91', 'badge_bg' => '#fbf8f9', 'badge_border' => '#dfd2d7', 'badge_text' => '#7d666e'],
     ];
 
     public function index(Request $request)
     {
         $selectedDate = $this->resolveSelectedDate($request);
+        $viewMode = $request->input('view') === 'month' ? 'month' : 'week';
         $weekStart = $selectedDate->copy()->startOfWeek(Carbon::TUESDAY)->startOfDay();
         $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
+        $monthStart = $selectedDate->copy()->startOfMonth()->startOfDay();
+        $monthEnd = $selectedDate->copy()->endOfMonth()->endOfDay();
         $staffId = trim((string) $request->input('staff_id', ''));
 
         $staffList = Staff::query()
@@ -159,13 +50,16 @@ class CalendarController extends Controller
             ->orderBy('full_name')
             ->get();
 
-        $weekGroups = AppointmentGroup::query()
+        $rangeStart = $viewMode === 'month' ? $monthStart : $weekStart;
+        $rangeEnd = $viewMode === 'month' ? $monthEnd : $weekEnd;
+
+        $groups = AppointmentGroup::query()
             ->with([
                 'customer:id,full_name,phone,membership_type,membership_code,current_package',
                 'items.service:id,name',
                 'items.staff:id,full_name,role_key,job_title',
             ])
-            ->whereBetween('starts_at', [$weekStart, $weekEnd])
+            ->whereBetween('starts_at', [$rangeStart, $rangeEnd])
             ->when($staffId !== '', function ($query) use ($staffId) {
                 $query->whereHas('items', function ($itemQuery) use ($staffId) {
                     $itemQuery->where('staff_id', $staffId);
@@ -174,16 +68,13 @@ class CalendarController extends Controller
             ->orderBy('starts_at')
             ->get();
 
-        $groupsForSelectedDay = $weekGroups
+        $groupsForSelectedDay = $groups
             ->filter(fn ($group) => optional($group->starts_at)?->isSameDay($selectedDate))
             ->values();
 
         $visibleTimelineGroups = $groupsForSelectedDay
             ->reject(function ($group) {
-                $status = $group->status instanceof AppointmentStatus
-                    ? $group->status->value
-                    : (string) $group->status;
-
+                $status = $group->status instanceof AppointmentStatus ? $group->status->value : (string) $group->status;
                 return in_array($status, ['cancelled', 'no_show'], true);
             })
             ->values();
@@ -195,35 +86,17 @@ class CalendarController extends Controller
 
         $timelineEvents = $this->applyTimelineLayout($dayEvents);
         $slots = $this->buildSlots($selectedDate);
-
-        $days = collect(range(0, 4))->map(function (int $offset) use ($weekStart, $weekGroups, $selectedDate, $staffId) {
-            $date = $weekStart->copy()->addDays($offset);
-            $count = $weekGroups->filter(fn ($group) => optional($group->starts_at)?->isSameDay($date))->count();
-
-            return [
-                'date' => $date->toDateString(),
-                'label' => $date->format('D'),
-                'full_label' => $date->format('l'),
-                'display_date' => $date->format('d M'),
-                'is_today' => $date->isToday(),
-                'is_selected' => $date->isSameDay($selectedDate),
-                'appointment_count' => $count,
-                'url' => route('app.calendar', array_filter([
-                    'week' => $weekStart->toDateString(),
-                    'date' => $date->toDateString(),
-                    'staff_id' => $staffId !== '' ? $staffId : null,
-                ])),
-            ];
-        });
-
+        $weekDays = $this->buildWeekDays($weekStart, $groups, $selectedDate, $staffId, $viewMode);
+        $monthDays = $this->buildMonthDays($monthStart, $groups, $selectedDate, $staffId, $viewMode);
         $daySummary = $this->buildDaySummary($groupsForSelectedDay);
-        $staffLoad = $this->buildStaffLoad($groupsForSelectedDay);
         $selectedStaff = $staffList->firstWhere('id', $staffId);
 
         return view('app.calendar.index', [
             'title' => 'Calendar',
-            'subtitle' => 'Live operational schedule for front desk, treatment coordination, and quick booking.',
-            'days' => $days,
+            'subtitle' => 'Operational board for live daily scheduling.',
+            'viewMode' => $viewMode,
+            'weekDays' => $weekDays,
+            'monthDays' => $monthDays,
             'slots' => $slots,
             'timelineEvents' => $timelineEvents,
             'timelineHeightPx' => count($slots) * self::ROW_HEIGHT_PX,
@@ -235,14 +108,14 @@ class CalendarController extends Controller
             'selectedDateLabel' => $selectedDate->format('l, d M Y'),
             'selectedDateIso' => $selectedDate->toDateString(),
             'weekStart' => $weekStart,
-            'weekEnd' => $weekEnd,
+            'monthStart' => $monthStart,
             'previousWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
+            'previousMonth' => $monthStart->copy()->subMonthNoOverflow()->toDateString(),
+            'nextMonth' => $monthStart->copy()->addMonthNoOverflow()->toDateString(),
             'currentWeek' => now()->startOfWeek(Carbon::TUESDAY)->toDateString(),
+            'currentMonth' => now()->startOfMonth()->toDateString(),
             'daySummary' => $daySummary,
-            'staffLoad' => $staffLoad,
-            'totalAppointments' => $groupsForSelectedDay->count(),
-            'statusLegend' => $this->statusLegend(),
             'canManageAppointments' => auth()->user()?->hasAppPermission('appointments.manage') ?? false,
         ]);
     }
@@ -250,35 +123,69 @@ class CalendarController extends Controller
     private function resolveSelectedDate(Request $request): Carbon
     {
         $dateInput = trim((string) $request->input('date', ''));
-        $weekInput = trim((string) $request->input('week', ''));
+        $anchorInput = trim((string) $request->input('anchor', ''));
 
         $anchor = $dateInput !== ''
             ? Carbon::parse($dateInput)
-            : ($weekInput !== '' ? Carbon::parse($weekInput) : now());
+            : ($anchorInput !== '' ? Carbon::parse($anchorInput) : now());
 
-        $weekStart = $anchor->copy()->startOfWeek(Carbon::TUESDAY);
-        $selectedDate = $dateInput !== ''
-            ? Carbon::parse($dateInput)
-            : $this->clampToClinicWeek($anchor, $weekStart);
-
-        if ($selectedDate->lt($weekStart)) {
-            return $weekStart->startOfDay();
-        }
-
-        if ($selectedDate->gt($weekStart->copy()->addDays(4))) {
-            return $weekStart->copy()->addDays(4)->startOfDay();
-        }
-
-        return $selectedDate->startOfDay();
+        return $anchor->startOfDay();
     }
 
-    private function clampToClinicWeek(Carbon $date, Carbon $weekStart): Carbon
+    private function buildWeekDays(Carbon $weekStart, Collection $groups, Carbon $selectedDate, string $staffId, string $viewMode): Collection
     {
-        if ($date->betweenIncluded($weekStart, $weekStart->copy()->addDays(4))) {
-            return $date->copy();
+        return collect(range(0, 4))->map(function (int $offset) use ($weekStart, $groups, $selectedDate, $staffId, $viewMode) {
+            $date = $weekStart->copy()->addDays($offset);
+            $count = $groups->filter(fn ($group) => optional($group->starts_at)?->isSameDay($date))->count();
+
+            return [
+                'date' => $date->toDateString(),
+                'full_label' => $date->format('l'),
+                'display_date' => $date->format('d M'),
+                'appointment_count' => $count,
+                'is_today' => $date->isToday(),
+                'is_selected' => $date->isSameDay($selectedDate),
+                'url' => route('app.calendar', array_filter([
+                    'view' => $viewMode,
+                    'date' => $date->toDateString(),
+                    'anchor' => $viewMode === 'month' ? $selectedDate->copy()->startOfMonth()->toDateString() : $weekStart->toDateString(),
+                    'staff_id' => $staffId !== '' ? $staffId : null,
+                ])),
+            ];
+        });
+    }
+
+    private function buildMonthDays(Carbon $monthStart, Collection $groups, Carbon $selectedDate, string $staffId, string $viewMode): Collection
+    {
+        $gridStart = $monthStart->copy()->startOfWeek();
+        $gridEnd = $monthStart->copy()->endOfMonth()->endOfWeek();
+        $cursor = $gridStart->copy();
+        $days = collect();
+
+        while ($cursor->lte($gridEnd)) {
+            $date = $cursor->copy();
+            $count = $groups->filter(fn ($group) => optional($group->starts_at)?->isSameDay($date))->count();
+
+            $days->push([
+                'date' => $date->toDateString(),
+                'day_number' => $date->format('j'),
+                'label' => $date->format('D'),
+                'appointment_count' => $count,
+                'is_selected' => $date->isSameDay($selectedDate),
+                'is_today' => $date->isToday(),
+                'is_outside_month' => ! $date->isSameMonth($monthStart),
+                'url' => route('app.calendar', array_filter([
+                    'view' => $viewMode,
+                    'date' => $date->toDateString(),
+                    'anchor' => $monthStart->toDateString(),
+                    'staff_id' => $staffId !== '' ? $staffId : null,
+                ])),
+            ]);
+
+            $cursor->addDay();
         }
 
-        return $weekStart->copy();
+        return $days;
     }
 
     private function buildSlots(Carbon $selectedDate): array
@@ -316,7 +223,6 @@ class CalendarController extends Controller
 
         $dayStart = $startsAt->copy()->setTime(self::DAY_START_HOUR, 0);
         $dayEnd = $startsAt->copy()->setTime(self::DAY_END_HOUR, 0);
-
         $visibleStart = $startsAt->copy()->max($dayStart);
         $visibleEnd = $endsAt->copy()->min($dayEnd);
 
@@ -324,16 +230,10 @@ class CalendarController extends Controller
             return null;
         }
 
-        $services = $group->items
-            ->map(fn ($item) => optional($item->service)->name)
-            ->filter()
-            ->unique()
-            ->values();
-
+        $services = $group->items->map(fn ($appointmentItem) => optional($appointmentItem->service)->name)->filter()->unique()->values();
         $staffMembers = $group->items
-            ->map(function ($item) {
-                $staff = $item->staff;
-
+            ->map(function ($appointmentItem) {
+                $staff = $appointmentItem->staff;
                 if (! $staff) {
                     return null;
                 }
@@ -347,16 +247,12 @@ class CalendarController extends Controller
             ->unique(fn ($staff) => ($staff['name'] ?? '').'|'.($staff['role'] ?? ''))
             ->values();
 
-        $serviceNames = $services->all();
-        $staffNames = $staffMembers->pluck('name')->filter()->values()->all();
         $itemServiceName = optional($item->service)->name ?: 'General Service';
         $itemStaffName = $item->staff?->full_name ?: 'Unassigned';
         $itemStaffRole = $item->staff?->job_title ?: $item->staff?->role_key;
-        $serviceStyles = $this->serviceVisuals($itemServiceName);
-        $statusValue = $group->status instanceof AppointmentStatus
-            ? $group->status->value
-            : (string) $group->status;
+        $statusValue = $group->status instanceof AppointmentStatus ? $group->status->value : (string) $group->status;
         $statusStyles = $this->statusVisuals($statusValue);
+        $serviceStyles = $this->serviceVisuals($itemServiceName);
 
         $topMinutes = $dayStart->diffInMinutes($visibleStart);
         $heightMinutes = max(self::SLOT_MINUTES, $visibleStart->diffInMinutes($visibleEnd));
@@ -370,26 +266,20 @@ class CalendarController extends Controller
             'customer_name' => optional($group->customer)->full_name ?: 'Unknown Customer',
             'customer_phone' => optional($group->customer)->phone ?: 'No phone recorded',
             'membership_label' => $this->membershipLabel($group),
-            'service_names' => $serviceNames,
+            'service_names' => $services->all(),
             'service_summary' => $itemServiceName,
             'staff_ids' => $item->staff_id ? [(string) $item->staff_id] : [],
-            'staff_names' => $staffNames,
+            'staff_names' => $staffMembers->pluck('name')->filter()->values()->all(),
             'staff_summary' => $itemStaffName,
-            'staff_details' => $staffMembers
-                ->map(fn ($staff) => $staff['role'] ? $staff['name'].' - '.$staff['role'] : $staff['name'])
-                ->values()
-                ->all(),
-            'linked_visit_services' => $group->items
-                ->map(function ($linkedItem) {
-                    $serviceName = $linkedItem->service?->name ?: 'Service';
-                    $staffName = $linkedItem->staff?->full_name ?: 'Unassigned';
-                    $timeLabel = ($linkedItem->starts_at?->format('h:i A') ?: '-').' - '.($linkedItem->ends_at?->format('h:i A') ?: '-');
+            'staff_details' => $staffMembers->map(fn ($staff) => $staff['role'] ? $staff['name'].' - '.$staff['role'] : $staff['name'])->values()->all(),
+            'linked_visit_services' => $group->items->map(function ($linkedItem) {
+                $serviceName = $linkedItem->service?->name ?: 'Service';
+                $staffName = $linkedItem->staff?->full_name ?: 'Unassigned';
+                $timeLabel = ($linkedItem->starts_at?->format('h:i A') ?: '-').' - '.($linkedItem->ends_at?->format('h:i A') ?: '-');
 
-                    return $serviceName.' | '.$timeLabel.' | '.$staffName;
-                })
-                ->values()
-                ->all(),
-            'visit_summary' => $this->summarizeNames($serviceNames, 'No service'),
+                return $serviceName.' | '.$timeLabel.' | '.$staffName;
+            })->values()->all(),
+            'visit_summary' => $this->summarizeNames($services->all(), 'No service'),
             'start_time' => $startsAt->format('h:i A'),
             'end_time' => $endsAt->format('h:i A'),
             'date_label' => $startsAt->format('d M Y'),
@@ -400,10 +290,8 @@ class CalendarController extends Controller
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
             'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
             'reschedule_url' => route('app.appointments.items.reschedule', $item),
-            'move_visit_url' => route('app.appointments.reschedule', $group),
             'service_styles' => $serviceStyles,
             'status_styles' => $statusStyles,
-            'primary_service' => $itemServiceName,
             'top_px' => (int) round($topMinutes * $pixelsPerMinute),
             'height_px' => max(60, (int) round($heightMinutes * $pixelsPerMinute) - 8),
             'start_minutes' => $dayStart->diffInMinutes($visibleStart),
@@ -425,9 +313,7 @@ class CalendarController extends Controller
         foreach ($sorted as $event) {
             if ($clusterEnd === null || $event['start_minutes'] < $clusterEnd) {
                 $currentCluster[] = $event;
-                $clusterEnd = $clusterEnd === null
-                    ? $event['end_minutes']
-                    : max($clusterEnd, $event['end_minutes']);
+                $clusterEnd = $clusterEnd === null ? $event['end_minutes'] : max($clusterEnd, $event['end_minutes']);
             } else {
                 $clusters[] = $currentCluster;
                 $currentCluster = [$event];
@@ -485,9 +371,7 @@ class CalendarController extends Controller
         ];
 
         foreach ($groups as $group) {
-            $status = $group->status instanceof AppointmentStatus
-                ? $group->status->value
-                : (string) $group->status;
+            $status = $group->status instanceof AppointmentStatus ? $group->status->value : (string) $group->status;
 
             match ($status) {
                 'confirmed' => $statusCounts['confirmed']++,
@@ -506,33 +390,6 @@ class CalendarController extends Controller
             'completed' => $statusCounts['completed'],
             'cancelled_or_no_show' => $statusCounts['cancelled_or_no_show'],
         ];
-    }
-
-    private function buildStaffLoad(Collection $groups): Collection
-    {
-        return $groups
-            ->flatMap(fn ($group) => $group->items)
-            ->groupBy('staff_id')
-            ->map(function (Collection $items) {
-                $staff = optional($items->first())->staff;
-                $minutes = $items->sum(function ($item) {
-                    if (! $item->starts_at || ! $item->ends_at) {
-                        return 0;
-                    }
-
-                    return $item->starts_at->diffInMinutes($item->ends_at);
-                });
-
-                return [
-                    'name' => $staff?->full_name ?? 'Unassigned',
-                    'job_title' => $staff?->job_title ?: $staff?->role_key,
-                    'appointments' => $items->count(),
-                    'minutes' => $minutes,
-                    'hours_label' => number_format($minutes / 60, 1).'h booked',
-                ];
-            })
-            ->sortByDesc('minutes')
-            ->values();
     }
 
     private function membershipLabel(AppointmentGroup $group): ?string
@@ -567,29 +424,14 @@ class CalendarController extends Controller
         return $names[0].' +'.(count($names) - 1);
     }
 
-    private function statusLegend(): array
-    {
-        return collect(self::STATUS_STYLES)
-            ->map(fn ($style, $key) => [
-                'key' => $key,
-                'label' => $style['label'],
-                'dot' => $style['dot'],
-                'badge_bg' => $style['badge_bg'],
-                'badge_border' => $style['badge_border'],
-                'badge_text' => $style['badge_text'],
-            ])
-            ->values()
-            ->all();
-    }
-
     private function statusVisuals(string $status): array
     {
         return self::STATUS_STYLES[$status] ?? [
             'label' => str($status)->replace('_', ' ')->title()->toString(),
-            'dot' => '#475569',
-            'badge_bg' => '#f8fafc',
-            'badge_border' => '#cbd5e1',
-            'badge_text' => '#475569',
+            'dot' => '#9f8a91',
+            'badge_bg' => '#fbf8f9',
+            'badge_border' => '#dfd2d7',
+            'badge_text' => '#7d666e',
         ];
     }
 
@@ -598,11 +440,9 @@ class CalendarController extends Controller
         $normalized = mb_strtolower(trim($serviceName));
 
         $palette = match (true) {
-            str_contains($normalized, 'consult') => self::SERVICE_PALETTES[0],
-            str_contains($normalized, 'facial'), str_contains($normalized, 'beauty'), str_contains($normalized, 'aesthetic') => self::SERVICE_PALETTES[7],
-            str_contains($normalized, 'nail') => self::SERVICE_PALETTES[6],
-            str_contains($normalized, 'inject') => self::SERVICE_PALETTES[5],
-            str_contains($normalized, 'weight'), str_contains($normalized, 'detox') => self::SERVICE_PALETTES[4],
+            str_contains($normalized, 'consult') => self::SERVICE_PALETTES[1],
+            str_contains($normalized, 'facial'), str_contains($normalized, 'beauty'), str_contains($normalized, 'aesthetic') => self::SERVICE_PALETTES[0],
+            str_contains($normalized, 'nail') => self::SERVICE_PALETTES[3],
             default => self::SERVICE_PALETTES[abs(crc32($normalized)) % count(self::SERVICE_PALETTES)],
         };
 

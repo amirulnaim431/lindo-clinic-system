@@ -1,4 +1,4 @@
-<x-internal-layout :title="'Appointments'" :subtitle="'Operational booking desk for same-day scheduling, availability checks, and quick front desk handoff.'">
+<x-internal-layout :title="'Appointments'" :subtitle="'Cleaner front desk flow for booking, availability, and same-day follow-up.'">
     @php
         $filters = $filters ?? ['date' => now()->format('Y-m-d'), 'service_ids' => [], 'slot' => null];
         $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->values()->all();
@@ -97,9 +97,9 @@
 
         <section class="ops-card ops-card--hero">
             <div class="ops-card__body">
-                <div class="ops-kicker">Front Desk Flow</div>
-                <h2 class="ops-title">Fast booking, availability, and live day control</h2>
-                <div class="ops-subtitle">Choose services, check eligible staff instantly, then confirm the booking from one operational workspace. This page is tuned for speed at reception, not generic admin scaffolding.</div>
+                <div class="ops-kicker">Front desk</div>
+                <h2 class="ops-title">Book and manage today's appointments</h2>
+                <div class="ops-subtitle">Choose services, find an available team member, and confirm the booking without jumping between screens.</div>
 
                 <div class="metrics-grid" style="margin-top:22px;">
                     <div class="metric-card">
@@ -139,9 +139,9 @@
         <section class="booking-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
-                    <div class="ops-kicker">Availability Desk</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">Build a booking in three steps</h3>
-                    <div class="ops-subtitle" style="max-width:none;">Select the services, choose the clinic date, then review only viable combinations and time slots. If the calendar launched this page with a slot, we keep that preference in focus.</div>
+                    <div class="ops-kicker">Booking builder</div>
+                    <h3 class="panel-title-display" style="font-size:24px;">Create a booking</h3>
+                    <div class="ops-subtitle" style="max-width:none;">Start with the service selection, then review only the workable time and staff combinations.</div>
                 </div>
 
                 <div class="ops-card__body">
@@ -154,7 +154,7 @@
                         </div>
 
                         <div>
-                            <div class="ops-kicker">Step 1</div>
+                            <div class="ops-kicker">Services</div>
                             <h4 class="panel-title-display" style="font-size:18px;">Choose services</h4>
                             <div class="service-grid" style="margin-top:14px;">
                                 @forelse ($services as $service)
@@ -176,7 +176,7 @@
                         </div>
 
                         <div>
-                            <div class="ops-kicker">Step 1B</div>
+                            <div class="ops-kicker">Visit setup</div>
                             <h4 class="panel-title-display" style="font-size:18px;">Choose service arrangement</h4>
                             <div class="arrangement-grid" style="margin-top:14px;">
                                 <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
@@ -200,7 +200,7 @@
                         </div>
 
                         <div>
-                            <div class="ops-kicker">Step 2</div>
+                            <div class="ops-kicker">Date</div>
                             <h4 class="panel-title-display" style="font-size:18px;">Choose the clinic day</h4>
                             <div class="field-row" style="margin-top:14px;">
                                 <div class="field-block">
@@ -218,9 +218,9 @@
             <div class="form-stack">
                 <div class="ops-card">
                     <div class="ops-card__body">
-                        <div class="ops-kicker">Current Focus</div>
+                        <div class="ops-kicker">Booking summary</div>
                         <h3 class="panel-title-display" style="font-size:22px;">{{ \Carbon\Carbon::parse($selectedDate)->format('l, d M Y') }}</h3>
-                        <div class="ops-subtitle" style="margin-top:8px;max-width:none;">{{ $prefilledSlot ? 'Calendar slot preselected at '.$prefilledSlot.'. Choose services and we will hold that preference if it remains viable.' : 'No slot preselected. Use the availability result below to choose the best operational gap.' }}</div>
+                        <div class="ops-subtitle" style="margin-top:8px;max-width:none;">{{ $prefilledSlot ? 'Calendar slot preselected at '.$prefilledSlot.'. We will keep it in focus if it remains available.' : 'Choose services and date first, then select the best available time below.' }}</div>
                         <div class="summary-list" style="margin-top:18px;">
                             <div class="summary-pill">
                                 <span class="summary-pill__label">Selected services</span>
@@ -243,24 +243,21 @@
                                 <span class="summary-pill__value">{{ count($selectedServiceOrderLabels) ? implode(' -> ', $selectedServiceOrderLabels) : 'Select services' }}</span>
                             </div>
                         </div>
+
+                        <div style="margin-top:18px;">
+                            <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" style="width:100%;">Open Calendar for {{ \Carbon\Carbon::parse($selectedDate)->format('d M') }}</a>
+                        </div>
                     </div>
                 </div>
-
-                <div class="helper-note">
-                    <div class="helper-note__title">Operational guidance</div>
-                    <div class="helper-note__body">Front desk should start here, not in the calendar, whenever the booking needs service-based staff matching. The calendar stays best for visual rescheduling and same-day workload awareness.</div>
-                </div>
-
-                <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" style="width:100%;">Open Live Calendar for {{ \Carbon\Carbon::parse($selectedDate)->format('d M') }}</a>
             </div>
         </section>
 
         @if (! empty($availability))
             <section class="ops-card">
                 <div class="ops-card__header">
-                    <div class="ops-kicker">Step 3</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">Review viable staff and time options</h3>
-                    <div class="ops-subtitle" style="max-width:none;">Only valid combinations are shown. This keeps front desk decisions fast and prevents impossible bookings from being created.</div>
+                    <div class="ops-kicker">Availability</div>
+                    <h3 class="panel-title-display" style="font-size:24px;">Available staff and times</h3>
+                    <div class="ops-subtitle" style="max-width:none;">Only workable combinations are shown, so the front desk can pick and confirm quickly.</div>
                 </div>
 
                 <div class="ops-card__body">
@@ -458,42 +455,6 @@
                 </div>
             </div>
 
-            <div class="form-stack">
-                <div class="ops-card">
-                    <div class="ops-card__body">
-                        <div class="ops-kicker">What this page tells staff</div>
-                        <div style="margin-top:10px;display:grid;gap:10px;">
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Which services are selected</span>
-                                <span class="summary-pill__value">{{ count($selectedServiceLabels) ? count($selectedServiceLabels) : 0 }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">Who can perform them</span>
-                                <span class="summary-pill__value">{{ ! empty($availability['selected_services']) ? 'Mapped live' : 'Check availability' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">What slots remain viable</span>
-                                <span class="summary-pill__value">{{ count($slotOptions) ?: 'Pending' }}</span>
-                            </div>
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">How busy the day already is</span>
-                                <span class="summary-pill__value">{{ $dailyStatusCounts['total'] }} booked</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ops-card">
-                    <div class="ops-card__body">
-                        <div class="ops-kicker">Navigate</div>
-                        <h3 class="panel-title-display" style="font-size:20px;">Need the timeline instead?</h3>
-                        <div class="ops-subtitle" style="margin-top:8px;max-width:none;">Use the live calendar for drag rescheduling and visual occupancy. Use this booking desk when you need service-to-staff matching and quick appointment intake.</div>
-                        <div style="margin-top:18px;">
-                            <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" style="width:100%;">Open Calendar View</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </section>
     </div>
 
