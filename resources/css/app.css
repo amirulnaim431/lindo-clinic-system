@@ -1372,7 +1372,25 @@
     .status-chip--warning { background: rgba(224, 182, 111, 0.11); border-color: rgba(224, 182, 111, 0.22); color: #ffe8c2; }
     .status-chip--danger { background: rgba(222, 127, 138, 0.11); border-color: rgba(222, 127, 138, 0.22); color: #ffd2da; }
     .status-chip--info { background: rgba(140, 184, 217, 0.11); border-color: rgba(140, 184, 217, 0.22); color: #d5ebfa; }
-    .status-chip--neutral { background: rgba(255, 255, 255, 0.04); border-color: var(--app-border); color: var(--app-text); }
+.status-chip--neutral { background: rgba(255, 255, 255, 0.04); border-color: var(--app-border); color: var(--app-text); }
+
+.staff-directory-status-pill.status-chip--success {
+    background: rgba(112, 194, 159, 0.08);
+    border-color: rgba(112, 194, 159, 0.18);
+    color: #86b59d;
+}
+
+.staff-directory-remove-btn.btn-danger {
+    border-color: rgba(207, 125, 149, 0.2);
+    background: rgba(207, 125, 149, 0.08);
+    color: #d9a3b1;
+}
+
+.staff-directory-remove-btn.btn-danger:hover {
+    border-color: rgba(207, 125, 149, 0.28);
+    background: rgba(207, 125, 149, 0.12);
+    color: #c27f92;
+}
 
     .selection-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

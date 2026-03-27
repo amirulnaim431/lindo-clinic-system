@@ -146,7 +146,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <x-status-pill :label="$member->is_active ? 'Active' : 'Inactive'" :tone="$member->is_active ? 'success' : 'neutral'" />
+                                                <x-status-pill :label="$member->is_active ? 'Active' : 'Inactive'" :tone="$member->is_active ? 'success' : 'neutral'" class="staff-directory-status-pill" />
                                             </td>
                                             <td class="text-right">
                                                 @if ($canManageStaff)
@@ -173,7 +173,7 @@
                                                             <input type="hidden" name="status" value="{{ $filters['status'] }}">
                                                             <input type="hidden" name="login" value="{{ $filters['login'] }}">
                                                             <input type="hidden" name="page" value="{{ request('page', 1) }}">
-                                                            <button type="submit" class="btn btn-danger">Remove</button>
+                                                            <button type="submit" class="btn btn-danger staff-directory-remove-btn">Remove</button>
                                                         </form>
                                                     </div>
                                                 @else
