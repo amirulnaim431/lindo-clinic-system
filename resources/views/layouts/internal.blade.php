@@ -35,8 +35,9 @@
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
         $canHrSchedule = $user && method_exists($user, 'canAccessHrSchedule') ? $user->canAccessHrSchedule() : false;
+        $canHrNav = $canHrSchedule || $canStaff;
         $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
-        $hrNavActive = request()->routeIs('app.hr.*');
+        $hrNavActive = request()->routeIs('app.hr.*') || request()->routeIs('app.staff.*');
         $sidebarLogoPath = public_path('assets/branding/sidebar-logo.png');
         $sidebarLogoUrl = file_exists($sidebarLogoPath) ? asset('assets/branding/sidebar-logo.png') : null;
     @endphp
@@ -67,28 +68,28 @@
                     <div class="app-nav-list">
                         @if ($canDashboard)
                             <a href="{{ $r('app.dashboard') }}" class="app-nav-link {{ $is('app.dashboard') ? 'is-active' : '' }}">
-                                <span class="app-nav-icon" aria-hidden="true">⌂</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#8962;</span>
                                 <span>Dashboard</span>
                             </a>
                         @endif
 
                         @if ($canAppointments)
                             <a href="{{ $r('app.appointments.index', ['mode' => 'checkin']) }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'checkin' ? 'is-active' : '' }}">
-                                <span class="app-nav-icon" aria-hidden="true">✓</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#10003;</span>
                                 <span>Customer Check-In</span>
                             </a>
                         @endif
 
                         @if ($canCalendar)
                             <a href="{{ $r('app.calendar') }}" class="app-nav-link {{ $is('app.calendar') ? 'is-active' : '' }}">
-                                <span class="app-nav-icon" aria-hidden="true">▦</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#9706;</span>
                                 <span>Calendar Board</span>
                             </a>
                         @endif
 
                         @if ($canAppointments)
                             <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'booking' ? 'is-active' : '' }}">
-                                <span class="app-nav-icon" aria-hidden="true">✦</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#10022;</span>
                                 <span>Appointments</span>
                             </a>
                         @endif
@@ -104,7 +105,7 @@
                                 data-nav-toggle="customers-subnav"
                                 aria-expanded="{{ $customersNavActive ? 'true' : 'false' }}"
                             >
-                                <span class="app-nav-icon" aria-hidden="true">◫</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#9711;</span>
                                 <span>Customers</span>
                                 <span class="app-nav-toggle"></span>
                             </button>
@@ -112,14 +113,14 @@
                             <div id="customers-subnav" class="app-nav-subnav" @if (! $customersNavActive) hidden @endif>
                                 @if ($canCustomers)
                                     <a href="{{ $r('app.customers.index') }}" class="app-nav-sublink {{ $is('app.customers.index') || $is('app.customers.show') || $is('app.customers.edit') ? 'is-active' : '' }}">
-                                        <span class="app-nav-subicon" aria-hidden="true">⌕</span>
+                                        <span class="app-nav-subicon" aria-hidden="true">&#8981;</span>
                                         <span>Customer Directory</span>
                                     </a>
                                 @endif
 
                                 @if ($canCustomerImport)
                                     <a href="{{ $r('app.customers.import.index') }}" class="app-nav-sublink {{ $is('app.customers.import.*') ? 'is-active' : '' }}">
-                                        <span class="app-nav-subicon" aria-hidden="true">⇪</span>
+                                        <span class="app-nav-subicon" aria-hidden="true">&#8658;</span>
                                         <span>Import Customers</span>
                                     </a>
                                 @endif
@@ -128,7 +129,7 @@
                     </div>
                 @endif
 
-                @if ($canHrSchedule)
+                @if ($canHrNav)
                     <div class="app-nav-section">
                         <div class="app-nav-group {{ $hrNavActive ? 'is-open' : '' }}">
                             <button
@@ -137,29 +138,26 @@
                                 data-nav-toggle="hr-subnav"
                                 aria-expanded="{{ $hrNavActive ? 'true' : 'false' }}"
                             >
-                                <span class="app-nav-icon" aria-hidden="true">⌘</span>
+                                <span class="app-nav-icon" aria-hidden="true">&#8984;</span>
                                 <span>HR</span>
                                 <span class="app-nav-toggle"></span>
                             </button>
 
                             <div id="hr-subnav" class="app-nav-subnav" @if (! $hrNavActive) hidden @endif>
-                                <a href="{{ $r('app.hr.schedule') }}" class="app-nav-sublink {{ $is('app.hr.schedule') ? 'is-active' : '' }}">
-                                    <span class="app-nav-subicon" aria-hidden="true">◔</span>
-                                    <span>Staff Schedule</span>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                @endif
+                                @if ($canHrSchedule)
+                                    <a href="{{ $r('app.hr.schedule') }}" class="app-nav-sublink {{ $is('app.hr.schedule') ? 'is-active' : '' }}">
+                                        <span class="app-nav-subicon" aria-hidden="true">&#9716;</span>
+                                        <span>Staff Schedule</span>
+                                    </a>
+                                @endif
 
-                @if ($canStaff)
-                    <div class="app-nav-section">
-                        <div class="app-nav-section__label">Clinic Team</div>
-                        <div class="app-nav-list">
-                            <a href="{{ $r('app.staff.index') }}" class="app-nav-link {{ $is('app.staff.*') ? 'is-active' : '' }}">
-                                <span class="app-nav-icon" aria-hidden="true">♟</span>
-                                <span>Staff Directory</span>
-                            </a>
+                                @if ($canStaff)
+                                    <a href="{{ $r('app.staff.index') }}" class="app-nav-sublink {{ $is('app.staff.*') ? 'is-active' : '' }}">
+                                        <span class="app-nav-subicon" aria-hidden="true">&#8981;</span>
+                                        <span>Staff Directory</span>
+                                    </a>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endif
