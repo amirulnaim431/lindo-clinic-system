@@ -184,7 +184,7 @@
                                     </div>
                                     <x-status-pill :label="$linkedUser ? $staff->accessLevelLabel() : $accessPreviewLabel" :tone="$selectedAccessLevel === 'admin' ? 'warning' : 'info'" />
                                 </div>
-                                <div class="field-note mt-2">
+                                <div class="field-note staff-access-status-card__note">
                                     @if ($linkedUser)
                                         Linked account: {{ $linkedUser->email }}{{ $linkedUser->last_password_reset_sent_at ? ' - setup link generated '.$linkedUser->last_password_reset_sent_at->diffForHumans() : '' }}
                                     @else
