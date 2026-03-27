@@ -70,22 +70,14 @@ class HrScheduleController extends Controller
             ];
         })->values();
 
-        $monthRows = $staff->map(function (Staff $member) use ($monthDays) {
+        $monthScheduleRows = $staff->map(function (Staff $member) use ($monthDays) {
             $days = $monthDays->map(fn (Carbon $date) => $this->buildMockShift($member, $date))->values();
 
             return [
                 'staff' => $member,
-                'working_days' => $days->where('status', 'working')->count(),
-                'half_days' => $days->where('status', 'half_day')->count(),
-                'training_days' => $days->where('status', 'training')->count(),
                 'leave_days' => $days->where('status', 'leave')->count(),
-                'off_days' => $days->whereIn('status', ['off', 'unavailable'])->count(),
-                'leave_dates' => $days
-                    ->where('status', 'leave')
-                    ->map(fn (array $shift) => Carbon::parse($shift['date'])->format('d M'))
-                    ->take(3)
-                    ->values(),
-                'services' => $member->services->pluck('name')->take(3)->values(),
+                'working_days' => $days->whereIn('status', ['working', 'half_day', 'training'])->count(),
+                'days' => $days,
             ];
         })->values();
 
@@ -242,7 +234,7 @@ class HrScheduleController extends Controller
             'selectedDateIso' => $selectedDate->toDateString(),
             'selectedDateLabel' => $selectedDateLabel,
             'scheduleRows' => $scheduleRows,
-            'monthRows' => $monthRows,
+            'monthScheduleRows' => $monthScheduleRows,
             'weekDays' => $weekDays,
             'monthDays' => $monthDays,
             'weekStart' => $weekStart,

@@ -162,112 +162,50 @@
             <div class="panel-header">
                 <x-section-heading
                     kicker="{{ $viewMode === 'month' ? 'Monthly roster' : 'Weekly roster' }}"
-                    title="{{ $viewMode === 'month' ? 'Monthly staff outlook' : 'Mock staff schedule board' }}"
-                    subtitle="{{ $viewMode === 'month' ? 'Monthly view is the planning default, giving HR a quicker scan of workdays, leave, and training across the month.' : 'A premium planning board mockup built from your current staff list. Final editing tools can plug into this layout later.' }}" />
+                    title="{{ $viewMode === 'month' ? 'Monthly schedule board' : 'Weekly schedule board' }}"
+                    subtitle="{{ $viewMode === 'month' ? 'Monthly view now uses the same board layout as weekly, expanded across all clinic operating days in the selected month.' : 'A premium planning board mockup built from your current staff list. Final editing tools can plug into this layout later.' }}" />
             </div>
             <div class="panel-body">
-                @if ($viewMode === 'month')
-                    @if ($monthRows->count())
-                        <div class="hr-month-grid">
-                            @foreach ($monthRows as $row)
-                                <article class="panel hr-month-card">
-                                    <div class="panel-body">
-                                        <div class="hr-month-card__head">
-                                            <div>
-                                                <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
-                                                <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
-                                                <div class="small-note">{{ $row['staff']->department ?: 'No department' }}</div>
-                                            </div>
-                                            <div class="hr-schedule-board__meta">
-                                                <span class="chip">{{ $row['staff']->operational_role_label }}</span>
-                                                @if (! $row['staff']->is_active)
-                                                    <span class="chip">Inactive</span>
-                                                @endif
-                                            </div>
-                                        </div>
+                @php
+                    $activeBoardRows = $viewMode === 'month' ? $monthScheduleRows : $scheduleRows;
+                    $activeBoardDays = $viewMode === 'month' ? $monthDays : $weekDays;
+                    $dayCount = max(1, $activeBoardDays->count());
+                @endphp
 
-                                        <div class="hr-month-card__stats">
-                                            <span class="hr-mini-pill hr-mini-pill--working">{{ $row['working_days'] }} working</span>
-                                            <span class="hr-mini-pill">{{ $row['half_days'] }} half day</span>
-                                            <span class="hr-mini-pill">{{ $row['training_days'] }} training</span>
-                                            <span class="hr-mini-pill hr-mini-pill--leave">{{ $row['leave_days'] }} leave</span>
-                                            <span class="hr-mini-pill">{{ $row['off_days'] }} off / inactive</span>
-                                        </div>
+                @if ($activeBoardRows->count())
+                    <div class="hr-schedule-board-wrap">
+                        <div class="hr-schedule-board hr-schedule-board--{{ $viewMode }}" style="grid-template-columns: minmax(240px, 1.2fr) repeat({{ $dayCount }}, minmax({{ $viewMode === 'month' ? '140px' : '170px' }}, 1fr));">
+                            <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
+                            @foreach ($activeBoardDays as $day)
+                                <div class="hr-schedule-board__header">
+                                    <div>{{ $day->format('D') }}</div>
+                                    <div class="small-note">{{ $day->format('d M') }}</div>
+                                </div>
+                            @endforeach
 
-                                        <div class="hr-month-card__section">
-                                            <div class="metric-label">Services</div>
-                                            <div class="inline-chip-row">
-                                                @forelse ($row['services'] as $service)
-                                                    <span class="chip">{{ $service }}</span>
-                                                @empty
-                                                    <span class="small-note">No services assigned</span>
-                                                @endforelse
-                                            </div>
-                                        </div>
-
-                                        <div class="hr-month-card__section">
-                                            <div class="metric-label">Leave Dates</div>
-                                            @if ($row['leave_dates']->count())
-                                                <div class="inline-chip-row">
-                                                    @foreach ($row['leave_dates'] as $leaveDate)
-                                                        <span class="chip">{{ $leaveDate }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @else
-                                                <div class="small-note">No leave recorded in this month preview.</div>
-                                            @endif
-                                        </div>
+                            @foreach ($activeBoardRows as $row)
+                                <div class="hr-schedule-board__staff">
+                                    <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
+                                    <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
+                                    <div class="small-note">{{ $row['staff']->department ?: 'No department' }}</div>
+                                    <div class="hr-schedule-board__meta">
+                                        <span class="chip">{{ $row['staff']->operational_role_label }}</span>
+                                        @if (! $row['staff']->is_active)
+                                            <span class="chip">Inactive</span>
+                                        @endif
                                     </div>
-                                </article>
+                                </div>
+
+                                @foreach ($row['days'] as $shift)
+                                    <div class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}">
+                                        <div class="hr-schedule-cell__label">{{ $shift['label'] }}</div>
+                                        <div class="hr-schedule-cell__time">{{ $shift['time'] }}</div>
+                                        <div class="hr-schedule-cell__note">{{ $shift['note'] }}</div>
+                                    </div>
+                                @endforeach
                             @endforeach
                         </div>
-                    @else
-                        <div class="empty-state empty-state--dashed">
-                            <div class="empty-state__title">No staff matched the current filters.</div>
-                            <div class="empty-state__body">Clear the search or department filter to repopulate the monthly schedule outlook.</div>
-                        </div>
-                    @endif
-                @else
-                    @if ($scheduleRows->count())
-                        <div class="hr-schedule-board-wrap">
-                            <div class="hr-schedule-board">
-                                <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
-                                @foreach ($weekDays as $day)
-                                    <div class="hr-schedule-board__header">
-                                        <div>{{ $day->format('D') }}</div>
-                                        <div class="small-note">{{ $day->format('d M') }}</div>
-                                    </div>
-                                @endforeach
-
-                                @foreach ($scheduleRows as $row)
-                                    <div class="hr-schedule-board__staff">
-                                        <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
-                                        <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
-                                        <div class="small-note">{{ $row['staff']->department ?: 'No department' }}</div>
-                                        <div class="hr-schedule-board__meta">
-                                            <span class="chip">{{ $row['staff']->operational_role_label }}</span>
-                                            @if (! $row['staff']->is_active)
-                                                <span class="chip">Inactive</span>
-                                            @endif
-                                        </div>
-                                    </div>
-
-                                    @foreach ($row['days'] as $shift)
-                                        <div class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}">
-                                            <div class="hr-schedule-cell__label">{{ $shift['label'] }}</div>
-                                            <div class="hr-schedule-cell__time">{{ $shift['time'] }}</div>
-                                            <div class="hr-schedule-cell__note">{{ $shift['note'] }}</div>
-                                        </div>
-                                    @endforeach
-                                @endforeach
-                            </div>
-                        </div>
-                    @else
-                        <div class="empty-state empty-state--dashed">
-                            <div class="empty-state__title">No staff matched the current filters.</div>
-                            <div class="empty-state__body">Clear the search or department filter to repopulate the weekly roster board.</div>
-                        </div>
-                    @endif
+                    </div>
                 @endif
             </div>
         </section>

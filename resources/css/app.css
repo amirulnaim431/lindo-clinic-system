@@ -1926,12 +1926,15 @@
 
 .hr-schedule-board {
     display: grid;
-    grid-template-columns: minmax(240px, 1.2fr) repeat(5, minmax(170px, 1fr));
     border: 1px solid rgba(212, 185, 194, 0.4);
     border-radius: 1.5rem;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(255, 251, 252, 0.98) 0%, rgba(255, 247, 250, 0.92) 100%);
     min-width: 100%;
+}
+
+.hr-schedule-board--month {
+    min-width: max-content;
 }
 
 .hr-schedule-board__header,
@@ -2059,37 +2062,6 @@
 .hr-mini-pill--leave {
     background: rgba(252, 230, 236, 1);
     color: #9f546c;
-}
-
-.hr-month-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.2rem;
-}
-
-.hr-month-card {
-    height: 100%;
-}
-
-.hr-month-card__head,
-.hr-month-card__section {
-    display: grid;
-    gap: 0.55rem;
-}
-
-.hr-month-card__head {
-    margin-bottom: 1rem;
-}
-
-.hr-month-card__stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.55rem;
-    margin-bottom: 1rem;
-}
-
-.hr-month-card__section + .hr-month-card__section {
-    margin-top: 0.9rem;
 }
 
 .hr-summary-card__hint {
@@ -2611,7 +2583,6 @@
     .calendar-switcher,
     .hr-schedule-summary-row,
     .hr-schedule-stats--three,
-    .hr-month-grid,
     .calendar-editor__grid,
     .calendar-editor__item-grid,
     .calendar-editor__fields--compact {
