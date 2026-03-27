@@ -1090,6 +1090,21 @@
         padding: 1.1rem 1.15rem 1.2rem;
     }
 
+    .stat-card--interactive {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        transition: 180ms ease;
+    }
+
+    .stat-card--interactive:hover {
+        border-color: var(--app-border-strong);
+        transform: translateY(-1px);
+        box-shadow: var(--app-shadow-md);
+    }
+
     .stat-value,
     .metric-value {
         margin-top: 0.8rem;
@@ -1993,6 +2008,14 @@
         color: var(--app-text-strong);
         font-size: 1rem;
         font-weight: 800;
+    }
+
+    .metric-hint {
+        margin-top: auto;
+        color: var(--app-accent-strong);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
     }
 
     .panel--revenue-focus {

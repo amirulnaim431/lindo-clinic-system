@@ -14,10 +14,15 @@
          ]);
          $topFocus = $serviceFocus->first();
          $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
+         $customerDrilldowns = $customerDrilldowns ?? [];
+         $membershipInsight = $membershipInsight ?? ['payload' => ['key' => 'membership', 'label' => 'Membership', 'amount' => 0, 'details' => []]];
          $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
-        $revenueGroups = collect([
-            ['key' => 'wellness', 'label' => 'Wellness'],
-            ['key' => 'aesthetic', 'label' => 'Aesthetic'],
+         $newCustomersPayload = $customerDrilldowns['new_customers'] ?? ['key' => 'new_customers', 'label' => 'New Customers', 'amount' => 0, 'details' => []];
+         $existingCustomersPayload = $customerDrilldowns['existing_customers'] ?? ['key' => 'existing_customers', 'label' => 'Existing Customers', 'amount' => 0, 'details' => []];
+         $membershipPayload = $membershipInsight['payload'] ?? ['key' => 'membership', 'label' => 'Membership', 'amount' => 0, 'details' => []];
+         $revenueGroups = collect([
+             ['key' => 'wellness', 'label' => 'Wellness'],
+             ['key' => 'aesthetic', 'label' => 'Aesthetic'],
             ['key' => 'spa_beauty', 'label' => 'Spa & Beauty'],
         ])->map(function ($item) use ($revenueBreakdown) {
             $match = collect($revenueBreakdown['groups'] ?? [])->firstWhere('key', $item['key']);
@@ -89,9 +94,19 @@
         </section>
 
         <section class="summary-stat-grid">
-            <x-stat-card label="New Customers" :value="$kpi['new_customers'] ?? 0" meta="First visit in this period" />
-            <x-stat-card label="Existing Customers" :value="$kpi['existing_customers'] ?? 0" meta="Returning customers in this period" />
-            <div class="stat-card stat-card--membership">
+            <button type="button" class="stat-card stat-card--interactive metric-card-button" data-metric-card='@json($newCustomersPayload)'>
+                <div class="metric-label">New Customers</div>
+                <div class="stat-value">{{ $kpi['new_customers'] ?? 0 }}</div>
+                <div class="metric-meta">First visit in this period</div>
+                <div class="metric-hint">Open detail list</div>
+            </button>
+            <button type="button" class="stat-card stat-card--interactive metric-card-button" data-metric-card='@json($existingCustomersPayload)'>
+                <div class="metric-label">Existing Customers</div>
+                <div class="stat-value">{{ $kpi['existing_customers'] ?? 0 }}</div>
+                <div class="metric-meta">Returning customers in this period</div>
+                <div class="metric-hint">Open detail list</div>
+            </button>
+            <button type="button" class="stat-card stat-card--membership stat-card--interactive metric-card-button" data-metric-card='@json($membershipPayload)'>
                 <div class="metric-label">Membership</div>
                 <div class="membership-stat-list">
                     <div class="membership-stat-row">
@@ -108,7 +123,8 @@
                     </div>
                 </div>
                 <div class="metric-meta">{{ $periodLabel }}</div>
-            </div>
+                <div class="metric-hint">Open member list</div>
+            </button>
             <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />
         </section>
 
@@ -196,83 +212,7 @@
             </div>
         </section>
 
-        <section class="dashboard-grid">
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="filter-bar__head">
-                        <x-section-heading
-                            kicker="Recent activity"
-                            title="Appointments in scope"
-                            :subtitle="'Latest appointment groups inside '.$periodLabel.'.'" />
-
-                        <div class="page-actions">
-                            <a href="{{ route('app.appointments.index', ['date' => $selectedDateTo ?: $selectedDateFrom ?: $selectedDate]) }}" class="btn btn-secondary">Manage appointments</a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel-body">
-                    @if ($appointments->count())
-                        <div class="table-shell">
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 130px;">Time</th>
-                                            <th>Customer</th>
-                                            <th>Services</th>
-                                            <th>Staff</th>
-                                            <th style="width: 130px;">Sales</th>
-                                            <th style="width: 170px;">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($appointments as $g)
-                                            @php
-                                                $servicesSummary = $g->items?->map(fn($i) => $i->service?->name)->filter()->unique()->implode(', ') ?: '-';
-                                                $staffSummary = $g->items?->map(fn($i) => $i->staff?->full_name)->filter()->unique()->implode(', ') ?: '-';
-                                                $salesAmount = (int) $g->items?->sum(fn($i) => (int) ($i->service?->price ?? 0));
-                                                $currentStatus = is_object($g->status) ? $g->status->value : (string) $g->status;
-                                                $currentStatusLabel = is_object($g->status) && method_exists($g->status, 'label')
-                                                    ? $g->status->label()
-                                                    : ucfirst(str_replace('_', ' ', $currentStatus));
-                                                $tone = match ($currentStatus) {
-                                                    'confirmed', 'completed' => 'success',
-                                                    'checked_in' => 'info',
-                                                    'cancelled', 'no_show' => 'danger',
-                                                    default => 'warning',
-                                                };
-                                            @endphp
-                                            <tr>
-                                                <td>
-                                                    <div class="selection-card__title">{{ optional($g->starts_at)->format('H:i') ?: '-' }}</div>
-                                                    <div class="small-note">{{ optional($g->starts_at)->format('d M Y') ?: 'Date unavailable' }}</div>
-                                                </td>
-                                                <td>
-                                                    <div class="selection-card__title">{{ $g->customer?->full_name ?? '-' }}</div>
-                                                    @if ($g->customer?->phone)
-                                                        <div class="small-note">{{ $g->customer->phone }}</div>
-                                                    @endif
-                                                </td>
-                                                <td>{{ $servicesSummary }}</td>
-                                                <td>{{ $staffSummary }}</td>
-                                                <td>RM {{ number_format($salesAmount, 0) }}</td>
-                                                <td><x-status-pill :label="$currentStatusLabel" :tone="$tone" /></td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    @else
-                        <div class="empty-state empty-state--dashed">
-                            <div class="empty-state__title">No appointments found</div>
-                            <div class="empty-state__body">Adjust the filters to review another window of operational activity.</div>
-                        </div>
-                    @endif
-                </div>
-            </div>
-
+        <section>
             <div class="panel">
                 <div class="panel-header">
                     <h3 class="panel-title-display" style="font-size:24px;">Capacity Overview</h3>
@@ -303,6 +243,52 @@
 
         <div class="print-only small-note">
             Printed from Lindo Clinic dashboard for {{ $periodLabel }}.
+        </div>
+    </div>
+
+    <div id="metric-detail-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card revenue-detail-modal">
+                <div class="modal-header">
+                    <div class="modal-header__row">
+                        <div>
+                            <div class="modal-kicker">Customer detail</div>
+                            <h3 id="metric-detail-title" class="modal-title">-</h3>
+                            <p id="metric-detail-summary" class="modal-subtitle">-</p>
+                        </div>
+                        <button type="button" id="metric-detail-close-top" class="modal-close" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="btn-row btn-row--between revenue-detail-toolbar">
+                        <div class="small-note">Customer list for this selected dashboard metric.</div>
+                        <div class="btn-row">
+                            <a id="metric-detail-export" href="#" class="modal-btn modal-btn--secondary">Export CSV</a>
+                            <button type="button" id="metric-detail-print" class="modal-btn modal-btn--secondary">Print</button>
+                        </div>
+                    </div>
+                    <div class="table-shell">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Membership</th>
+                                        <th style="width: 120px;">Appointments</th>
+                                        <th style="width: 140px;">First Visit</th>
+                                        <th style="width: 140px;">Latest Visit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="metric-detail-rows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="metric-detail-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -394,11 +380,19 @@
     <script>
         (() => {
             const modal = document.getElementById('staff-review-modal');
+            const metricModal = document.getElementById('metric-detail-modal');
             const revenueModal = document.getElementById('revenue-detail-modal');
             const closeTop = document.getElementById('staff-review-close-top');
             const closeBottom = document.getElementById('staff-review-close-bottom');
+            const metricCloseTop = document.getElementById('metric-detail-close-top');
+            const metricCloseBottom = document.getElementById('metric-detail-close-bottom');
             const revenueCloseTop = document.getElementById('revenue-detail-close-top');
             const revenueCloseBottom = document.getElementById('revenue-detail-close-bottom');
+            const metricTitle = document.getElementById('metric-detail-title');
+            const metricSummary = document.getElementById('metric-detail-summary');
+            const metricRows = document.getElementById('metric-detail-rows');
+            const metricExport = document.getElementById('metric-detail-export');
+            const metricPrint = document.getElementById('metric-detail-print');
             const revenueTitle = document.getElementById('revenue-detail-title');
             const revenueSummary = document.getElementById('revenue-detail-summary');
             const revenueRows = document.getElementById('revenue-detail-rows');
@@ -407,12 +401,19 @@
             const nameTarget = document.getElementById('staff-review-name');
             const summaryTarget = document.getElementById('staff-review-summary');
             const detailTarget = document.getElementById('staff-review-details');
+            const metricCards = document.querySelectorAll('[data-metric-card]');
             const revenueCards = document.querySelectorAll('[data-revenue-card]');
             const dashboardQuery = @json($dashboardQuery);
 
             const closeModal = () => {
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            const closeMetricModal = () => {
+                metricModal.classList.add('hidden');
+                metricModal.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('overflow-hidden');
             };
 
@@ -428,6 +429,78 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+
+            const printTable = (title, subtitle, headers, rows) => {
+                const printWindow = window.open('', '_blank', 'width=980,height=720');
+
+                if (!printWindow) {
+                    return;
+                }
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${escapeHtml(title)}</title>
+                            <style>
+                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
+                                h1 { margin: 0 0 8px; font-size: 28px; }
+                                p { margin: 0 0 20px; color: #7c6670; }
+                                table { width: 100%; border-collapse: collapse; }
+                                th, td { border: 1px solid #d9c2cb; padding: 10px 12px; text-align: left; }
+                                th { background: #fdf4f7; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>${escapeHtml(title)}</h1>
+                            <p>${escapeHtml(subtitle)}</p>
+                            <table>
+                                <thead>
+                                    <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+                                </thead>
+                                <tbody>
+                                    ${rows.join('')}
+                                </tbody>
+                            </table>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            };
+
+            const openMetricModal = (payload) => {
+                const details = Array.isArray(payload.details) ? payload.details : [];
+                metricTitle.textContent = payload.label || 'Customer detail';
+                metricSummary.textContent = `${details.length} customer${details.length === 1 ? '' : 's'} | {{ $periodLabel }}`;
+                metricRows.innerHTML = details.length
+                    ? details.map((detail) => `
+                        <tr>
+                            <td>${escapeHtml(detail.customer_name || '-')}</td>
+                            <td>${escapeHtml(detail.membership_type || '-')}</td>
+                            <td>${escapeHtml(detail.appointments_label || detail.appointments_count || '-')}</td>
+                            <td>${escapeHtml(detail.first_visit_label || '-')}</td>
+                            <td>${escapeHtml(detail.latest_visit_label || '-')}</td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="5" class="small-note" style="text-align:center;padding:1rem;">No customer detail recorded for this selection.</td></tr>';
+
+                const exportUrl = new URL(@json(route('app.dashboard')), window.location.origin);
+                Object.entries(dashboardQuery).forEach(([key, value]) => {
+                    if (value) {
+                        exportUrl.searchParams.set(key, value);
+                    }
+                });
+                exportUrl.searchParams.set('export', 'metric_csv');
+                exportUrl.searchParams.set('metric', payload.key || 'new_customers');
+                metricExport.href = exportUrl.toString();
+                metricPrint.dataset.printTitle = payload.label || 'Customer detail';
+                metricPrint.dataset.printRows = JSON.stringify(details);
+
+                metricModal.classList.remove('hidden');
+                metricModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+            };
 
             const openRevenueModal = (payload) => {
                 const details = Array.isArray(payload.details) ? payload.details : [];
@@ -490,6 +563,20 @@
                 });
             });
 
+            metricCards.forEach((button) => {
+                button.addEventListener('click', () => {
+                    let payload = {};
+
+                    try {
+                        payload = JSON.parse(button.dataset.metricCard || '{}');
+                    } catch (error) {
+                        payload = {};
+                    }
+
+                    openMetricModal(payload);
+                });
+            });
+
             revenueCards.forEach((button) => {
                 button.addEventListener('click', () => {
                     let payload = {};
@@ -504,67 +591,59 @@
                 });
             });
 
+            metricPrint?.addEventListener('click', () => {
+                const details = JSON.parse(metricPrint.dataset.printRows || '[]');
+                const title = metricPrint.dataset.printTitle || 'Customer detail';
+
+                printTable(
+                    title,
+                    @json($periodLabel),
+                    ['Customer', 'Membership', 'Appointments', 'First Visit', 'Latest Visit'],
+                    details.map((detail) => `
+                        <tr>
+                            <td>${escapeHtml(detail.customer_name || '-')}</td>
+                            <td>${escapeHtml(detail.membership_type || '-')}</td>
+                            <td>${escapeHtml(detail.appointments_label || detail.appointments_count || '-')}</td>
+                            <td>${escapeHtml(detail.first_visit_label || '-')}</td>
+                            <td>${escapeHtml(detail.latest_visit_label || '-')}</td>
+                        </tr>
+                    `)
+                );
+            });
+
             revenuePrint?.addEventListener('click', () => {
                 const details = JSON.parse(revenuePrint.dataset.printRows || '[]');
                 const title = revenuePrint.dataset.printTitle || 'Revenue detail';
-                const printWindow = window.open('', '_blank', 'width=980,height=720');
 
-                if (!printWindow) {
-                    return;
-                }
-
-                printWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>${escapeHtml(title)}</title>
-                            <style>
-                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
-                                h1 { margin: 0 0 8px; font-size: 28px; }
-                                p { margin: 0 0 20px; color: #7c6670; }
-                                table { width: 100%; border-collapse: collapse; }
-                                th, td { border: 1px solid #d9c2cb; padding: 10px 12px; text-align: left; }
-                                th { background: #fdf4f7; }
-                            </style>
-                        </head>
-                        <body>
-                            <h1>${escapeHtml(title)}</h1>
-                            <p>{{ $periodLabel }}</p>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Customer</th>
-                                        <th>Service</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${details.map((detail) => `
-                                        <tr>
-                                            <td>${escapeHtml(detail.customer_name || '-')}</td>
-                                            <td>${escapeHtml(detail.service_name || '-')}</td>
-                                            <td>${escapeHtml(detail.date_label || '-')}</td>
-                                            <td>${escapeHtml(detail.time_label || '-')}</td>
-                                            <td>${escapeHtml(detail.amount_label || '-')}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </body>
-                    </html>
-                `);
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
+                printTable(
+                    title,
+                    @json($periodLabel),
+                    ['Customer', 'Service', 'Date', 'Time', 'Amount'],
+                    details.map((detail) => `
+                        <tr>
+                            <td>${escapeHtml(detail.customer_name || '-')}</td>
+                            <td>${escapeHtml(detail.service_name || '-')}</td>
+                            <td>${escapeHtml(detail.date_label || '-')}</td>
+                            <td>${escapeHtml(detail.time_label || '-')}</td>
+                            <td>${escapeHtml(detail.amount_label || '-')}</td>
+                        </tr>
+                    `)
+                );
             });
 
             [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
+            [metricCloseTop, metricCloseBottom].forEach((button) => button?.addEventListener('click', closeMetricModal));
             [revenueCloseTop, revenueCloseBottom].forEach((button) => button?.addEventListener('click', closeRevenueModal));
 
             modal?.addEventListener('click', (event) => {
                 if (event.target === modal || event.target === modal.firstElementChild) {
                     closeModal();
+                }
+            });
+
+            metricModal?.addEventListener('click', (event) => {
+                if (event.target === metricModal || event.target === metricModal.firstElementChild) {
+                    closeMetricModal();
                 }
             });
 
@@ -577,6 +656,10 @@
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
                     closeModal();
+                }
+
+                if (event.key === 'Escape' && metricModal && !metricModal.classList.contains('hidden')) {
+                    closeMetricModal();
                 }
 
                 if (event.key === 'Escape' && revenueModal && !revenueModal.classList.contains('hidden')) {

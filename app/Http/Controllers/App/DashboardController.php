@@ -68,11 +68,13 @@ class DashboardController extends Controller
         }
 
         $customerSegments = $this->buildCustomerSegments($reportGroups, $customerFirstVisits, $periodStart, $periodEnd);
+        $customerDrilldowns = $this->buildCustomerDrilldowns($reportGroups, $customerFirstVisits, $periodStart, $periodEnd);
         $serviceFocus = $this->buildServiceFocus($reportGroups);
         $sourceBreakdown = $this->buildSourceBreakdown($reportGroups);
         $staffReview = $this->buildStaffReview($reportGroups);
         $reportRows = $this->buildReportRows($reportGroups, $customerFirstVisits, $periodStart, $periodEnd);
-        $membershipSummary = $this->buildMembershipSummary($reportGroups);
+        $membershipInsight = $this->buildMembershipInsight($reportGroups);
+        $membershipSummary = $membershipInsight['summary'];
         $revenueBreakdown = $this->buildRevenueBreakdown($reportGroups);
 
         $kpi = [
@@ -92,6 +94,11 @@ class DashboardController extends Controller
             return $this->streamRevenueCsv($revenueBreakdown, $periodLabel, $category);
         }
 
+        if ($request->input('export') === 'metric_csv') {
+            $metric = (string) $request->input('metric', 'new_customers');
+            return $this->streamMetricCsv($customerDrilldowns, $membershipInsight, $periodLabel, $metric);
+        }
+
         return view('app.dashboard', [
             'date' => $date,
             'dateFrom' => $resolvedDateFrom,
@@ -109,7 +116,9 @@ class DashboardController extends Controller
             'sourceBreakdown' => $sourceBreakdown,
             'staffReview' => $staffReview,
             'reportRows' => $reportRows,
+            'customerDrilldowns' => $customerDrilldowns,
             'membershipSummary' => $membershipSummary,
+            'membershipInsight' => $membershipInsight,
             'revenueBreakdown' => $revenueBreakdown,
         ]);
     }
@@ -193,6 +202,53 @@ class DashboardController extends Controller
         return [
             'new' => $new,
             'existing' => $existing,
+        ];
+    }
+
+    private function buildCustomerDrilldowns(Collection $groups, Collection $customerFirstVisits, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $customers = $groups
+            ->filter(fn ($group) => ! empty($group->customer_id))
+            ->groupBy(fn ($group) => (string) $group->customer_id)
+            ->map(function (Collection $customerGroups, string $customerId) use ($customerFirstVisits, $periodStart, $periodEnd) {
+                $firstGroup = $customerGroups->sortBy('starts_at')->first();
+                $latestGroup = $customerGroups->sortByDesc('starts_at')->first();
+                $firstVisit = $customerFirstVisits->get($customerId);
+                $isNew = $firstVisit && $firstVisit->betweenIncluded($periodStart, $periodEnd);
+
+                return [
+                    'customer_name' => $firstGroup?->customer?->full_name ?: 'Unknown customer',
+                    'membership_type' => $this->formatMembershipLabel($firstGroup?->customer?->membership_type),
+                    'appointments_count' => $customerGroups->count(),
+                    'first_visit_label' => $firstVisit?->format('d M Y') ?: '-',
+                    'latest_visit_label' => optional($latestGroup?->starts_at)?->format('d M Y') ?: '-',
+                    'segment' => $isNew ? 'new_customers' : 'existing_customers',
+                ];
+            })
+            ->sortBy('customer_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return [
+            'new_customers' => [
+                'key' => 'new_customers',
+                'label' => 'New Customers',
+                'amount' => $customers->where('segment', 'new_customers')->count(),
+                'details' => $customers
+                    ->where('segment', 'new_customers')
+                    ->values()
+                    ->map(fn (array $row) => $this->customerMetricRow($row))
+                    ->all(),
+            ],
+            'existing_customers' => [
+                'key' => 'existing_customers',
+                'label' => 'Existing Customers',
+                'amount' => $customers->where('segment', 'existing_customers')->count(),
+                'details' => $customers
+                    ->where('segment', 'existing_customers')
+                    ->values()
+                    ->map(fn (array $row) => $this->customerMetricRow($row))
+                    ->all(),
+            ],
         ];
     }
 
@@ -311,7 +367,7 @@ class DashboardController extends Controller
         });
     }
 
-    private function buildMembershipSummary(Collection $groups): array
+    private function buildMembershipInsight(Collection $groups): array
     {
         $tiers = [
             'bronze' => 0,
@@ -319,17 +375,42 @@ class DashboardController extends Controller
             'black' => 0,
         ];
 
-        $groups
-            ->pluck('customer.membership_type')
-            ->filter()
-            ->map(fn ($membershipType) => mb_strtolower(trim((string) $membershipType)))
-            ->each(function (string $membershipType) use (&$tiers): void {
-                if (array_key_exists($membershipType, $tiers)) {
-                    $tiers[$membershipType]++;
-                }
-            });
+        $details = $groups
+            ->filter(fn ($group) => ! empty($group->customer_id))
+            ->groupBy(fn ($group) => (string) $group->customer_id)
+            ->map(function (Collection $customerGroups) {
+                $firstGroup = $customerGroups->sortBy('starts_at')->first();
+                $latestGroup = $customerGroups->sortByDesc('starts_at')->first();
+                $membershipType = mb_strtolower(trim((string) ($firstGroup?->customer?->membership_type ?: '')));
 
-        return $tiers;
+                return [
+                    'customer_name' => $firstGroup?->customer?->full_name ?: 'Unknown customer',
+                    'membership_key' => $membershipType,
+                    'membership_type' => $this->formatMembershipLabel($membershipType),
+                    'appointments_count' => $customerGroups->count(),
+                    'first_visit_label' => optional($firstGroup?->starts_at)?->format('d M Y') ?: '-',
+                    'latest_visit_label' => optional($latestGroup?->starts_at)?->format('d M Y') ?: '-',
+                ];
+            })
+            ->filter(fn (array $row) => array_key_exists($row['membership_key'], $tiers))
+            ->sortBy('customer_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $details->each(function (array $row) use (&$tiers): void {
+            $tiers[$row['membership_key']]++;
+        });
+
+        return [
+            'summary' => $tiers,
+            'payload' => [
+                'key' => 'membership',
+                'label' => 'Membership',
+                'amount' => $details->count(),
+                'details' => $details
+                    ->map(fn (array $row) => $this->customerMetricRow($row))
+                    ->all(),
+            ],
+        ];
     }
 
     private function buildRevenueBreakdown(Collection $groups): array
@@ -395,6 +476,49 @@ class DashboardController extends Controller
                 ->values()
                 ->all(),
         ];
+    }
+
+    private function customerMetricRow(array $row): array
+    {
+        return [
+            'customer_name' => $row['customer_name'],
+            'membership_type' => $row['membership_type'],
+            'appointments_count' => $row['appointments_count'],
+            'appointments_label' => (string) $row['appointments_count'],
+            'first_visit_label' => $row['first_visit_label'],
+            'latest_visit_label' => $row['latest_visit_label'],
+        ];
+    }
+
+    private function formatMembershipLabel(?string $membershipType): string
+    {
+        $normalized = mb_strtolower(trim((string) $membershipType));
+
+        return match ($normalized) {
+            'bronze' => 'Bronze',
+            'silver' => 'Silver',
+            'black' => 'Black',
+            default => 'None',
+        };
+    }
+
+    private function metricExportLabel(string $metric): string
+    {
+        return match ($metric) {
+            'new_customers' => 'New Customers',
+            'existing_customers' => 'Existing Customers',
+            'membership' => 'Membership',
+            default => 'Customer Metric',
+        };
+    }
+
+    private function metricExportRows(array $customerDrilldowns, array $membershipInsight, string $metric): array
+    {
+        return match ($metric) {
+            'existing_customers' => $customerDrilldowns['existing_customers']['details'] ?? [],
+            'membership' => $membershipInsight['payload']['details'] ?? [],
+            default => $customerDrilldowns['new_customers']['details'] ?? [],
+        };
     }
 
     private function buildPicList(Collection $staffList): Collection
@@ -530,6 +654,39 @@ class DashboardController extends Controller
                     $row['status_label'],
                     $row['source_label'],
                     $row['sales_label'],
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function streamMetricCsv(array $customerDrilldowns, array $membershipInsight, string $periodLabel, string $metric): StreamedResponse
+    {
+        $label = $this->metricExportLabel($metric);
+        $rows = $this->metricExportRows($customerDrilldowns, $membershipInsight, $metric);
+        $filename = 'lindo-dashboard-'.str($label.' '.$periodLabel)->slug()->toString().'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, [
+                'Customer',
+                'Membership',
+                'Appointments',
+                'First Visit',
+                'Latest Visit',
+            ]);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, [
+                    $row['customer_name'] ?? '',
+                    $row['membership_type'] ?? '',
+                    $row['appointments_count'] ?? '',
+                    $row['first_visit_label'] ?? '',
+                    $row['latest_visit_label'] ?? '',
                 ]);
             }
 
