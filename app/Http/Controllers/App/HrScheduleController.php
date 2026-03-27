@@ -213,7 +213,7 @@ class HrScheduleController extends Controller
             ];
         })->values();
 
-        $monthCalendarDays = $monthGridDays->map(function (Carbon $date) use ($staff, $monthStart) {
+        $monthCalendarDays = $monthGridDays->map(function (Carbon $date) use ($staff, $monthStart, $selectedDate) {
             $working = 0;
             $leave = 0;
             $pending = 0;
