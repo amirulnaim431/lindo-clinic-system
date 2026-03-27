@@ -415,6 +415,33 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
 
+            const extractResponseErrorMessage = (result, responseText, fallback) => {
+                const firstError = Object.values(result?.errors || {}).flat()[0];
+
+                if (result?.message || firstError) {
+                    return result.message || firstError;
+                }
+
+                if (typeof responseText === 'string' && responseText.trim() !== '') {
+                    const titleMatch = responseText.match(/<title[^>]*>(.*?)<\/title>/i);
+
+                    if (titleMatch?.[1]) {
+                        return titleMatch[1].trim();
+                    }
+
+                    const plainText = responseText
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    if (plainText !== '') {
+                        return plainText.slice(0, 220);
+                    }
+                }
+
+                return fallback;
+            };
+
             const setList = (id, values) => {
                 const element = document.getElementById(id);
                 if (!element) return;
@@ -872,12 +899,7 @@
                         }
 
                         if (!response.ok) {
-                            throw new Error(
-                                result.message
-                                || result.errors?.starts_at?.[0]
-                                || result.errors?.[0]
-                                || 'Unable to reschedule this appointment.'
-                            );
+                            throw new Error(extractResponseErrorMessage(result, responseText, 'Unable to reschedule this appointment.'));
                         }
 
                         window.location.reload();
@@ -949,23 +971,48 @@
                 editFeedback?.classList.add('hidden');
 
                 try {
+                    const body = new URLSearchParams();
+                    body.set('_method', 'PATCH');
+                    body.set('_token', csrfToken);
+                    body.set('customer_id', payload.customer_id || '');
+                    body.set('customer_full_name', payload.customer_full_name || '');
+                    body.set('customer_phone', payload.customer_phone || '');
+                    body.set('status', payload.status || '');
+                    body.set('source', payload.source || '');
+                    body.set('notes', payload.notes || '');
+
+                    (payload.items || []).forEach((item, index) => {
+                        body.set(`items[${index}][id]`, item.id || '');
+                        body.set(`items[${index}][service_id]`, item.service_id || '');
+                        body.set(`items[${index}][staff_id]`, item.staff_id || '');
+                        body.set(`items[${index}][date]`, item.date || '');
+                        body.set(`items[${index}][start_time]`, item.start_time || '');
+                        body.set(`items[${index}][end_time]`, item.end_time || '');
+                    });
+
                     const response = await fetch(currentEventData.update_url, {
-                        method: 'PATCH',
+                        method: 'POST',
                         headers: {
                             'Accept': 'application/json',
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                             'X-CSRF-TOKEN': csrfToken,
                             'X-Requested-With': 'XMLHttpRequest',
                         },
                         credentials: 'same-origin',
-                        body: JSON.stringify(payload),
+                        body: body.toString(),
                     });
 
-                    const result = await response.json().catch(() => ({}));
+                    const responseText = await response.text();
+                    let result = {};
+
+                    try {
+                        result = responseText ? JSON.parse(responseText) : {};
+                    } catch (parseError) {
+                        result = {};
+                    }
 
                     if (!response.ok) {
-                        const firstError = Object.values(result.errors || {}).flat()[0];
-                        throw new Error(result.message || firstError || 'Unable to save calendar changes.');
+                        throw new Error(extractResponseErrorMessage(result, responseText, 'Unable to save calendar changes.'));
                     }
 
                     window.location.reload();
