@@ -16,11 +16,19 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $date = $request->input('date') ?: now()->format('Y-m-d');
+        $dateFrom = trim((string) $request->input('date_from', ''));
+        $dateTo = trim((string) $request->input('date_to', ''));
         $period = $request->input('period', 'day');
         $staffId = $request->input('staff_id');
         $anchorDate = Carbon::parse($date);
 
-        [$periodStart, $periodEnd, $periodLabel] = $this->resolvePeriodWindow($anchorDate, $period);
+        if ($dateFrom !== '' || $dateTo !== '') {
+            [$periodStart, $periodEnd, $periodLabel, $resolvedDateFrom, $resolvedDateTo] = $this->resolveCustomDateWindow($dateFrom, $dateTo, $anchorDate);
+        } else {
+            [$periodStart, $periodEnd, $periodLabel] = $this->resolvePeriodWindow($anchorDate, $period);
+            $resolvedDateFrom = $periodStart->toDateString();
+            $resolvedDateTo = $periodEnd->toDateString();
+        }
 
         $staffList = $this->buildPicList(
             Staff::query()
@@ -81,6 +89,8 @@ class DashboardController extends Controller
 
         return view('app.dashboard', [
             'date' => $date,
+            'dateFrom' => $resolvedDateFrom,
+            'dateTo' => $resolvedDateTo,
             'period' => $period,
             'periodLabel' => $periodLabel,
             'periodStart' => $periodStart,
@@ -123,6 +133,24 @@ class DashboardController extends Controller
                 $anchorDate->format('d M Y'),
             ],
         };
+    }
+
+    protected function resolveCustomDateWindow(string $dateFrom, string $dateTo, Carbon $fallbackDate): array
+    {
+        $start = $dateFrom !== '' ? Carbon::parse($dateFrom)->startOfDay() : ($dateTo !== '' ? Carbon::parse($dateTo)->startOfDay() : $fallbackDate->copy()->startOfDay());
+        $end = $dateTo !== '' ? Carbon::parse($dateTo)->endOfDay() : $start->copy()->endOfDay();
+
+        if ($end->lt($start)) {
+            [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+        }
+
+        return [
+            $start,
+            $end,
+            $this->formatRangeLabel($start->copy(), $end->copy()),
+            $start->toDateString(),
+            $end->toDateString(),
+        ];
     }
 
     private function firstVisitLookup($groups)

@@ -4,17 +4,12 @@
 
     @php
         $selectedDate = request('date', $date ?? now()->toDateString());
+        $selectedDateFrom = request('date_from', $dateFrom ?? $selectedDate);
+        $selectedDateTo = request('date_to', $dateTo ?? $selectedDate);
         $selectedStaffId = request('staff_id');
-        $selectedPeriod = request('period', $period ?? 'day');
         $topFocus = $serviceFocus->first();
         $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
         $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
-        $periodOptions = [
-            'day' => 'Day',
-            'week' => 'Week',
-            'month' => 'Month',
-            'year' => 'Year',
-        ];
     @endphp
 
     <div class="stack">
@@ -30,25 +25,21 @@
             <div class="panel-body stack">
                 <div class="filter-bar__head">
                     <div class="page-actions">
-                        <a href="{{ route('app.dashboard', array_filter(['period' => $selectedPeriod, 'date' => $selectedDate, 'staff_id' => $selectedStaffId, 'export' => 'csv'])) }}" class="btn btn-secondary">Export CSV</a>
+                        <a href="{{ route('app.dashboard', array_filter(['date_from' => $selectedDateFrom, 'date_to' => $selectedDateTo, 'staff_id' => $selectedStaffId, 'export' => 'csv'])) }}" class="btn btn-secondary">Export CSV</a>
                         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
-                        <a href="{{ route('app.calendar', ['date' => $selectedDate]) }}" class="btn btn-secondary">Open calendar</a>
+                        <a href="{{ route('app.calendar', ['date' => $selectedDateTo ?: $selectedDateFrom ?: $selectedDate]) }}" class="btn btn-secondary">Open calendar</a>
                     </div>
                 </div>
 
                 <form method="GET" action="{{ route('app.dashboard') }}" class="form-grid">
                     <div class="col-3 field-block">
-                        <label class="field-label" for="period">Period</label>
-                        <select id="period" name="period" class="form-select">
-                            @foreach ($periodOptions as $value => $label)
-                                <option value="{{ $value }}" @selected($selectedPeriod === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
+                        <label class="field-label" for="date_from">From Date</label>
+                        <input id="date_from" name="date_from" type="date" class="form-input" value="{{ $selectedDateFrom }}">
                     </div>
 
                     <div class="col-3 field-block">
-                        <label class="field-label" for="date">Date</label>
-                        <input id="date" name="date" type="date" class="form-input" value="{{ $selectedDate }}">
+                        <label class="field-label" for="date_to">To Date</label>
+                        <input id="date_to" name="date_to" type="date" class="form-input" value="{{ $selectedDateTo }}">
                     </div>
 
                     <div class="col-3 field-block">
@@ -203,7 +194,7 @@
                             :subtitle="'Latest appointment groups inside '.$periodLabel.'.'" />
 
                         <div class="page-actions">
-                            <a href="{{ route('app.appointments.index', ['date' => $selectedDate]) }}" class="btn btn-secondary">Manage appointments</a>
+                            <a href="{{ route('app.appointments.index', ['date' => $selectedDateTo ?: $selectedDateFrom ?: $selectedDate]) }}" class="btn btn-secondary">Manage appointments</a>
                         </div>
                     </div>
                 </div>
