@@ -76,9 +76,59 @@
         <section class="summary-stat-grid">
             <x-stat-card label="New Customers" :value="$kpi['new_customers'] ?? 0" meta="First visit in this period" />
             <x-stat-card label="Existing Customers" :value="$kpi['existing_customers'] ?? 0" meta="Returning customers in this period" />
-            <x-stat-card label="Membership" :value="'Bronze '.$membershipSummary['bronze'].' | Silver '.$membershipSummary['silver'].' | Black '.$membershipSummary['black']" :meta="$periodLabel" />
-            <x-stat-card label="Total Revenue" :value="'RM '.number_format($revenueBreakdown['total'] ?? 0, 0)" :meta="$periodLabel" />
+            <div class="stat-card stat-card--membership">
+                <div class="metric-label">Membership</div>
+                <div class="membership-stat-list">
+                    <div class="membership-stat-row">
+                        <span class="membership-stat-row__label">Bronze</span>
+                        <span class="membership-stat-row__value">{{ $membershipSummary['bronze'] ?? 0 }}</span>
+                    </div>
+                    <div class="membership-stat-row">
+                        <span class="membership-stat-row__label">Silver</span>
+                        <span class="membership-stat-row__value">{{ $membershipSummary['silver'] ?? 0 }}</span>
+                    </div>
+                    <div class="membership-stat-row">
+                        <span class="membership-stat-row__label">Black</span>
+                        <span class="membership-stat-row__value">{{ $membershipSummary['black'] ?? 0 }}</span>
+                    </div>
+                </div>
+                <div class="metric-meta">{{ $periodLabel }}</div>
+            </div>
             <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />
+        </section>
+
+        <section class="revenue-focus-grid">
+            <div class="panel panel--revenue-focus">
+                <div class="panel-body">
+                    <div class="metric-label">Total Group Revenue</div>
+                    <div class="revenue-focus__date">Date Range</div>
+                    <div class="revenue-focus__range">{{ $periodLabel }}</div>
+                    <div class="revenue-focus__total">RM {{ number_format($revenueBreakdown['total'] ?? 0, 0) }}</div>
+                </div>
+            </div>
+
+            <div class="stack">
+                @php
+                    $revenueGroups = collect([
+                        ['key' => 'wellness', 'label' => 'Wellness'],
+                        ['key' => 'aesthetic', 'label' => 'Aesthetic'],
+                        ['key' => 'spa_beauty', 'label' => 'Spa & Beauty'],
+                    ])->map(function ($item) use ($revenueBreakdown) {
+                        $match = collect($revenueBreakdown['groups'] ?? [])->firstWhere('key', $item['key']);
+                        return [
+                            'label' => $item['label'],
+                            'amount' => $match['amount'] ?? 0,
+                        ];
+                    });
+                @endphp
+
+                @foreach ($revenueGroups as $group)
+                    <div class="revenue-group-card">
+                        <div class="revenue-group-card__label">{{ $group['label'] }}</div>
+                        <div class="revenue-group-card__value">RM {{ number_format($group['amount'], 0) }}</div>
+                    </div>
+                @endforeach
+            </div>
         </section>
 
         <section class="report-grid">
@@ -123,40 +173,22 @@
                 </div>
             </div>
 
-            <div class="stack">
-                <div class="report-card">
-                    <div class="metric-label">Total Group Revenue</div>
-                    <div class="report-card__value">RM {{ number_format($revenueBreakdown['total'] ?? 0, 0) }}</div>
-                    <div class="report-card__meta">{{ $periodLabel }}</div>
-                    <div class="stack" style="margin-top: 1rem;">
-                        @forelse (($revenueBreakdown['groups'] ?? collect())->take(4) as $group)
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">{{ $group['label'] }}</span>
-                                <span class="summary-pill__value">RM {{ number_format($group['amount'], 0) }}</span>
-                            </div>
-                        @empty
-                            <div class="small-note">No revenue data recorded for this period.</div>
-                        @endforelse
-                    </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <x-section-heading
+                        kicker="Channel mix"
+                        title="Booking sources"
+                        subtitle="Useful for reviewing where current demand is coming from." />
                 </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <x-section-heading
-                            kicker="Channel mix"
-                            title="Booking sources"
-                            subtitle="Useful for reviewing where current demand is coming from." />
-                    </div>
-                    <div class="panel-body stack">
-                        @forelse ($sourceBreakdown as $source)
-                            <div class="summary-pill">
-                                <span class="summary-pill__label">{{ $source['source'] }}</span>
-                                <span class="summary-pill__value">{{ $source['appointments'] }} appointment{{ $source['appointments'] === 1 ? '' : 's' }}</span>
-                            </div>
-                        @empty
-                            <div class="small-note">No source data recorded for this period.</div>
-                        @endforelse
-                    </div>
+                <div class="panel-body stack">
+                    @forelse ($sourceBreakdown as $source)
+                        <div class="summary-pill">
+                            <span class="summary-pill__label">{{ $source['source'] }}</span>
+                            <span class="summary-pill__value">{{ $source['appointments'] }} appointment{{ $source['appointments'] === 1 ? '' : 's' }}</span>
+                        </div>
+                    @empty
+                        <div class="small-note">No source data recorded for this period.</div>
+                    @endforelse
                 </div>
             </div>
         </section>

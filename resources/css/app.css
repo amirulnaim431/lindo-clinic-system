@@ -1840,7 +1840,8 @@
     .calendar-days-row,
     .month-grid,
     .staff-review-grid,
-    .summary-stat-grid {
+    .summary-stat-grid,
+    .revenue-focus-grid {
         display: grid;
         gap: 1rem;
     }
@@ -1851,7 +1852,11 @@
     }
 
     .summary-stat-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .revenue-focus-grid {
+        grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
     }
 
     .calendar-control-grid {
@@ -1902,7 +1907,8 @@
     .report-card,
     .month-day-card,
     .staff-review-card,
-    .day-control-card {
+    .day-control-card,
+    .revenue-group-card {
         border: 1px solid var(--app-border);
         border-radius: var(--radius-lg);
         background: rgba(255, 251, 252, 0.92);
@@ -1954,6 +1960,98 @@
         color: var(--app-muted);
         font-size: 0.84rem;
         line-height: 1.6;
+    }
+
+    .stat-card--membership {
+        display: grid;
+        gap: 0.8rem;
+    }
+
+    .membership-stat-list {
+        display: grid;
+        gap: 0.55rem;
+    }
+
+    .membership-stat-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border: 1px solid var(--app-border);
+        border-radius: 0.9rem;
+        background: rgba(255, 255, 255, 0.45);
+        padding: 0.55rem 0.75rem;
+    }
+
+    .membership-stat-row__label {
+        color: var(--app-text);
+        font-size: 0.84rem;
+        font-weight: 700;
+    }
+
+    .membership-stat-row__value {
+        color: var(--app-text-strong);
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .panel--revenue-focus {
+        min-height: 100%;
+    }
+
+    .revenue-focus__date {
+        margin-top: 1rem;
+        color: var(--app-muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .revenue-focus__range {
+        margin-top: 0.45rem;
+        display: inline-flex;
+        align-items: center;
+        min-height: 3rem;
+        border: 1px solid var(--app-border-strong);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.5);
+        padding: 0.8rem 1rem;
+        color: var(--app-text-strong);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .revenue-focus__total {
+        margin-top: 2rem;
+        color: var(--app-text-strong);
+        font-family: var(--font-display);
+        font-size: clamp(2.4rem, 4vw, 4rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+    }
+
+    .revenue-group-card {
+        display: grid;
+        gap: 0.55rem;
+        min-height: 110px;
+        align-content: center;
+    }
+
+    .revenue-group-card__label {
+        color: var(--app-muted-strong);
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .revenue-group-card__value {
+        color: var(--app-text-strong);
+        font-family: var(--font-display);
+        font-size: clamp(1.8rem, 2.6vw, 2.6rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
     }
 
     .staff-review-card {
@@ -2043,6 +2141,7 @@
     .staff-review-grid,
     .summary-stat-grid,
     .calendar-control-grid,
+    .revenue-focus-grid,
     .calendar-days-row,
     .month-grid,
     .calendar-switcher {
