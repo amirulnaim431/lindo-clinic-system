@@ -647,6 +647,19 @@
         text-transform: uppercase;
     }
 
+    .schedule-card__meta-stack {
+        display: grid;
+        gap: 0.2rem;
+        margin-top: 0.4rem;
+    }
+
+    .schedule-card__balance {
+        color: var(--app-text);
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.5;
+    }
+
     .metrics-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));

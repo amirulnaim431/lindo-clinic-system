@@ -98,6 +98,21 @@
                 ],
             ];
         })->all();
+        $formatMembershipBalance = function ($value) {
+            $raw = trim((string) $value);
+
+            if ($raw === '') {
+                return 'Pending update';
+            }
+
+            $normalized = preg_replace('/[^0-9.\-]/', '', $raw);
+
+            if ($normalized !== null && $normalized !== '' && is_numeric($normalized)) {
+                return 'RM '.number_format((float) $normalized, 0);
+            }
+
+            return $raw;
+        };
     @endphp
 
 
@@ -389,21 +404,25 @@
                     <div class="schedule-list">
                         @forelse ($appointmentGroups as $group)
                               @php
-                                  $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-                                  $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
-                                  $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
-                                      ? 'Reschedule'
-                                      : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
-                              @endphp
+                                   $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+                                   $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
+                                   $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
+                                       ? 'Reschedule'
+                                       : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
+                                   $membershipLabel = $group->customer?->membership_type ?: 'No membership';
+                                   $membershipCode = $group->customer?->membership_code ?: null;
+                                   $membershipBalance = $formatMembershipBalance($group->customer?->current_package);
+                               @endphp
                             <article class="schedule-card">
                                 <div class="schedule-card__head">
                                       <div>
                                           <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
                                           <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
                                           <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
-                                          @if ($group->customer?->membership_type)
-                                              <div class="schedule-card__membership">{{ $group->customer->membership_type }}</div>
-                                          @endif
+                                          <div class="schedule-card__meta-stack">
+                                              <div class="schedule-card__membership">{{ $membershipLabel }}@if ($membershipCode) • {{ $membershipCode }} @endif</div>
+                                              <div class="schedule-card__balance">Membership balance: {{ $membershipBalance }}</div>
+                                          </div>
                                       </div>
                                     <span class="status-chip" style="background: {{ $statusStyle['bg'] }}; border-color: {{ $statusStyle['border'] }}; color: {{ $statusStyle['text'] }};">
                                         <span class="status-dot"></span>
