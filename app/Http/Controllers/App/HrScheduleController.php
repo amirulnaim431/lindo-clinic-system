@@ -13,18 +13,32 @@ class HrScheduleController extends Controller
     {
         abort_unless($request->user()?->canAccessHrSchedule(), 403);
 
+        $viewMode = $request->input('view') === 'week' ? 'week' : 'month';
+        $selectedDate = $request->filled('date')
+            ? Carbon::parse((string) $request->input('date'))->startOfDay()
+            : now()->startOfDay();
+
         $filters = [
             'search' => trim((string) $request->input('search', '')),
             'department' => trim((string) $request->input('department', '')),
             'status' => trim((string) $request->input('status', 'active')),
         ];
 
-        $weekStart = $request->filled('week')
-            ? Carbon::parse((string) $request->input('week'))->startOfWeek(Carbon::TUESDAY)
-            : now()->startOfWeek(Carbon::TUESDAY);
+        $weekStart = $selectedDate->copy()->startOfWeek(Carbon::TUESDAY);
         $weekDays = collect(range(0, 4))
             ->map(fn (int $offset) => $weekStart->copy()->addDays($offset))
             ->values();
+        $monthStart = $selectedDate->copy()->startOfMonth();
+        $monthDays = collect();
+        $monthCursor = $monthStart->copy();
+
+        while ($monthCursor->month === $monthStart->month) {
+            if (in_array($monthCursor->dayOfWeek, [Carbon::TUESDAY, Carbon::WEDNESDAY, Carbon::THURSDAY, Carbon::FRIDAY, Carbon::SATURDAY], true)) {
+                $monthDays->push($monthCursor->copy());
+            }
+
+            $monthCursor->addDay();
+        }
 
         $staff = Staff::query()
             ->with(['services' => fn ($query) => $query->orderBy('name'), 'user:id,name,email'])
@@ -56,27 +70,81 @@ class HrScheduleController extends Controller
             ];
         })->values();
 
-        $today = now()->toDateString();
-        $todayCards = $scheduleRows->map(function (array $row) use ($today) {
-            $todayShift = collect($row['days'])->firstWhere('date', $today);
+        $monthRows = $staff->map(function (Staff $member) use ($monthDays) {
+            $days = $monthDays->map(fn (Carbon $date) => $this->buildMockShift($member, $date))->values();
 
             return [
-                'staff' => $row['staff'],
-                'shift' => $todayShift,
+                'staff' => $member,
+                'working_days' => $days->where('status', 'working')->count(),
+                'half_days' => $days->where('status', 'half_day')->count(),
+                'training_days' => $days->where('status', 'training')->count(),
+                'leave_days' => $days->where('status', 'leave')->count(),
+                'off_days' => $days->whereIn('status', ['off', 'unavailable'])->count(),
+                'leave_dates' => $days
+                    ->where('status', 'leave')
+                    ->map(fn (array $shift) => Carbon::parse($shift['date'])->format('d M'))
+                    ->take(3)
+                    ->values(),
+                'services' => $member->services->pluck('name')->take(3)->values(),
+            ];
+        })->values();
+
+        $selectedDayIso = $selectedDate->toDateString();
+        $selectedDateCards = $staff->map(function (Staff $member) use ($selectedDayIso) {
+            $selectedShift = $this->buildMockShift($member, Carbon::parse($selectedDayIso));
+
+            return [
+                'staff' => $member,
+                'shift' => $selectedShift,
             ];
         });
 
-        $coverageByDay = $weekDays->map(function (Carbon $date) use ($scheduleRows) {
+        $workingTodayDetails = $selectedDateCards
+            ->filter(fn (array $entry) => in_array($entry['shift']['status'] ?? null, ['working', 'half_day', 'training'], true))
+            ->map(fn (array $entry) => [
+                'staff_name' => $entry['staff']->full_name,
+                'job_title' => $entry['staff']->job_title ?: 'No title set',
+                'department' => $entry['staff']->department ?: 'No department',
+                'role' => $entry['staff']->operational_role_label,
+                'detail_primary' => $entry['shift']['time'] ?? '-',
+                'detail_secondary' => $entry['shift']['note'] ?? '-',
+            ])
+            ->values();
+
+        $leaveTodayDetails = $selectedDateCards
+            ->filter(fn (array $entry) => ($entry['shift']['status'] ?? null) === 'leave')
+            ->map(fn (array $entry) => [
+                'staff_name' => $entry['staff']->full_name,
+                'job_title' => $entry['staff']->job_title ?: 'No title set',
+                'department' => $entry['staff']->department ?: 'No department',
+                'role' => $entry['staff']->operational_role_label,
+                'detail_primary' => $entry['shift']['label'] ?? 'On Leave',
+                'detail_secondary' => $entry['shift']['note'] ?? '-',
+            ])
+            ->values();
+
+        $coverageSourceDays = $viewMode === 'week'
+            ? $weekDays
+            : $monthDays
+                ->filter(fn (Carbon $date) => $date->greaterThanOrEqualTo($selectedDate))
+                ->take(5)
+                ->values();
+
+        if ($viewMode === 'month' && $coverageSourceDays->count() < 5) {
+            $needed = 5 - $coverageSourceDays->count();
+            $coverageSourceDays = $coverageSourceDays
+                ->concat($monthDays->take($needed))
+                ->unique(fn (Carbon $date) => $date->toDateString())
+                ->values();
+        }
+
+        $coverageByDay = $coverageSourceDays->map(function (Carbon $date) use ($staff) {
             $dayKey = $date->toDateString();
             $working = 0;
             $leave = 0;
 
-            foreach ($scheduleRows as $row) {
-                $shift = collect($row['days'])->firstWhere('date', $dayKey);
-
-                if (! $shift) {
-                    continue;
-                }
+            foreach ($staff as $member) {
+                $shift = $this->buildMockShift($member, $date);
 
                 if ($shift['status'] === 'leave') {
                     $leave++;
@@ -97,12 +165,15 @@ class HrScheduleController extends Controller
             ];
         })->values();
 
-        $leaveHighlights = $scheduleRows
-            ->flatMap(function (array $row) {
-                return collect($row['days'])
+        $activeDays = $viewMode === 'week' ? $weekDays : $monthDays;
+
+        $leaveHighlights = $staff
+            ->flatMap(function (Staff $member) use ($activeDays) {
+                return $activeDays
+                    ->map(fn (Carbon $date) => $this->buildMockShift($member, $date))
                     ->where('status', 'leave')
                     ->map(fn (array $shift) => [
-                        'staff' => $row['staff'],
+                        'staff' => $member,
                         'shift' => $shift,
                     ]);
             })
@@ -115,6 +186,47 @@ class HrScheduleController extends Controller
                 || collect($member->access_permissions ?? [])->contains('hr.schedule');
         })->values();
 
+        $hrOwnerDetails = $hrOwners
+            ->map(fn (Staff $member) => [
+                'staff_name' => $member->full_name,
+                'job_title' => $member->job_title ?: 'No title set',
+                'department' => $member->department ?: 'No department',
+                'role' => $member->operational_role_label,
+                'detail_primary' => $member->user?->email ?: 'No linked login email',
+                'detail_secondary' => $member->department === 'Human Resources'
+                    ? 'Department-based HR access'
+                    : 'Explicit HR schedule permission',
+            ])
+            ->values();
+
+        $selectedDateLabel = $selectedDate->format('d M Y');
+        $hrSummaryCards = collect([
+            [
+                'key' => 'working_today',
+                'label' => 'Working Today',
+                'value' => $workingTodayDetails->count(),
+                'meta' => 'People scheduled for clinic or office coverage',
+                'summary' => $selectedDateLabel,
+                'details' => $workingTodayDetails,
+            ],
+            [
+                'key' => 'leave_today',
+                'label' => 'On Leave Today',
+                'value' => $leaveTodayDetails->count(),
+                'meta' => 'Easy visibility for leave and unavailable blocks',
+                'summary' => $selectedDateLabel,
+                'details' => $leaveTodayDetails,
+            ],
+            [
+                'key' => 'hr_owners',
+                'label' => 'HR Owners',
+                'value' => $hrOwnerDetails->count(),
+                'meta' => 'HR/admin users who can access this module now',
+                'summary' => 'Access controllers',
+                'details' => $hrOwnerDetails,
+            ],
+        ])->values();
+
         return view('app.hr.schedule', [
             'title' => 'Staff Schedule',
             'subtitle' => 'HR planning board for weekly staffing, leave visibility, and roster control.',
@@ -125,18 +237,30 @@ class HrScheduleController extends Controller
                 ->distinct()
                 ->orderBy('department')
                 ->pluck('department'),
+            'viewMode' => $viewMode,
+            'selectedDate' => $selectedDate,
+            'selectedDateIso' => $selectedDate->toDateString(),
+            'selectedDateLabel' => $selectedDateLabel,
             'scheduleRows' => $scheduleRows,
+            'monthRows' => $monthRows,
             'weekDays' => $weekDays,
+            'monthDays' => $monthDays,
             'weekStart' => $weekStart,
             'weekLabel' => $weekStart->format('d M').' - '.$weekStart->copy()->addDays(4)->format('d M Y'),
-            'previousWeek' => $weekStart->copy()->subWeek()->toDateString(),
-            'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
+            'monthLabel' => $monthStart->format('F Y'),
+            'previousDate' => $viewMode === 'week'
+                ? $weekStart->copy()->subWeek()->toDateString()
+                : $monthStart->copy()->subMonthNoOverflow()->toDateString(),
+            'nextDate' => $viewMode === 'week'
+                ? $weekStart->copy()->addWeek()->toDateString()
+                : $monthStart->copy()->addMonthNoOverflow()->toDateString(),
             'todaySummary' => [
                 'total_staff' => $staff->count(),
-                'working' => $todayCards->filter(fn (array $entry) => in_array($entry['shift']['status'] ?? null, ['working', 'half_day', 'training'], true))->count(),
-                'leave' => $todayCards->filter(fn (array $entry) => ($entry['shift']['status'] ?? null) === 'leave')->count(),
-                'off' => $todayCards->filter(fn (array $entry) => in_array($entry['shift']['status'] ?? null, ['off', 'unavailable'], true))->count(),
+                'working' => $selectedDateCards->filter(fn (array $entry) => in_array($entry['shift']['status'] ?? null, ['working', 'half_day', 'training'], true))->count(),
+                'leave' => $selectedDateCards->filter(fn (array $entry) => ($entry['shift']['status'] ?? null) === 'leave')->count(),
+                'off' => $selectedDateCards->filter(fn (array $entry) => in_array($entry['shift']['status'] ?? null, ['off', 'unavailable'], true))->count(),
             ],
+            'hrSummaryCards' => $hrSummaryCards,
             'coverageByDay' => $coverageByDay,
             'leaveHighlights' => $leaveHighlights,
             'hrOwners' => $hrOwners,
@@ -149,6 +273,7 @@ class HrScheduleController extends Controller
         $department = (string) ($staff->department ?? '');
         $seed = abs(crc32($staff->id.'|'.$date->toDateString()));
         $isWeekend = in_array($date->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true);
+        $isClinicClosed = in_array($date->dayOfWeek, [Carbon::SUNDAY, Carbon::MONDAY], true);
 
         $status = 'working';
         $time = '09:00 - 18:00';
@@ -158,12 +283,12 @@ class HrScheduleController extends Controller
             $status = 'unavailable';
             $time = 'Inactive';
             $note = 'Not currently rostered';
+        } elseif ($isClinicClosed) {
+            $status = 'off';
+            $time = 'Clinic closed';
+            $note = 'Sunday and Monday are closed clinic days';
         } elseif ($department === 'Human Resources') {
-            if ($date->isSunday()) {
-                $status = 'off';
-                $time = 'Off day';
-                $note = 'Weekend rest';
-            } elseif ($seed % 11 === 0) {
+            if ($seed % 11 === 0) {
                 $status = 'leave';
                 $time = 'On leave';
                 $note = 'Annual leave';
