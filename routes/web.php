@@ -5,6 +5,7 @@ use App\Http\Controllers\App\CalendarController;
 use App\Http\Controllers\App\CustomerController;
 use App\Http\Controllers\App\CustomerImportController;
 use App\Http\Controllers\App\DashboardController;
+use App\Http\Controllers\App\HrScheduleController;
 use App\Http\Controllers\App\StaffController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ProfileController;
@@ -65,6 +66,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::get('/calendar', [CalendarController::class, 'index'])
             ->middleware('app_permission:calendar.view')
             ->name('calendar');
+
+        Route::get('/hr/staff-schedule', [HrScheduleController::class, 'index'])
+            ->name('hr.schedule');
 
         Route::get('/staff', [StaffController::class, 'index'])
             ->middleware('app_permission:staff.view')

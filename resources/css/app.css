@@ -1873,13 +1873,173 @@
         padding-right: 3rem;
     }
 
-    .calendar-editor__input:focus {
-        box-shadow: none;
-    }
+.calendar-editor__input:focus {
+    box-shadow: none;
+}
 
-    .modal-close {
-        width: 2.5rem;
-        height: 2.5rem;
+.hr-schedule-page {
+    gap: 1.5rem;
+}
+
+.hr-schedule-hero__intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.hr-schedule-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.9fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.hr-schedule-side {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.hr-schedule-board {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.2fr) repeat(7, minmax(150px, 1fr));
+    border: 1px solid rgba(212, 185, 194, 0.4);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255, 251, 252, 0.98) 0%, rgba(255, 247, 250, 0.92) 100%);
+}
+
+.hr-schedule-board__header,
+.hr-schedule-board__staff,
+.hr-schedule-cell {
+    padding: 1rem;
+    border-right: 1px solid rgba(212, 185, 194, 0.24);
+    border-bottom: 1px solid rgba(212, 185, 194, 0.24);
+}
+
+.hr-schedule-board__header {
+    background: rgba(255, 244, 247, 0.88);
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-strong);
+}
+
+.hr-schedule-board__header--staff {
+    text-align: left;
+}
+
+.hr-schedule-board__staff {
+    display: grid;
+    gap: 0.45rem;
+    align-content: center;
+    background: rgba(255, 252, 253, 0.95);
+}
+
+.hr-schedule-board__meta {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.hr-schedule-cell {
+    min-height: 124px;
+    display: grid;
+    gap: 0.45rem;
+    align-content: start;
+    background: rgba(255, 255, 255, 0.82);
+}
+
+.hr-schedule-cell__label {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.hr-schedule-cell__time {
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.hr-schedule-cell__note {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.hr-schedule-cell--working {
+    background: linear-gradient(180deg, rgba(241, 251, 245, 0.96) 0%, rgba(231, 247, 237, 0.88) 100%);
+}
+
+.hr-schedule-cell--leave {
+    background: linear-gradient(180deg, rgba(255, 241, 244, 0.96) 0%, rgba(252, 227, 234, 0.9) 100%);
+}
+
+.hr-schedule-cell--off,
+.hr-schedule-cell--neutral {
+    background: linear-gradient(180deg, rgba(249, 246, 247, 0.96) 0%, rgba(240, 234, 236, 0.9) 100%);
+}
+
+.hr-schedule-cell--training {
+    background: linear-gradient(180deg, rgba(243, 247, 255, 0.96) 0%, rgba(228, 236, 248, 0.9) 100%);
+}
+
+.hr-schedule-cell--half {
+    background: linear-gradient(180deg, rgba(255, 248, 240, 0.96) 0%, rgba(252, 237, 220, 0.9) 100%);
+}
+
+.hr-coverage-list,
+.hr-leave-list {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.hr-coverage-card,
+.hr-leave-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(212, 185, 194, 0.28);
+    border-radius: 1.1rem;
+    background: rgba(255, 252, 253, 0.92);
+}
+
+.hr-coverage-card__stats {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.hr-mini-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.hr-mini-pill--working {
+    background: rgba(230, 244, 236, 1);
+    color: #4a7b5f;
+}
+
+.hr-mini-pill--leave {
+    background: rgba(252, 230, 236, 1);
+    color: #9f546c;
+}
+
+.modal-close {
+    width: 2.5rem;
+    height: 2.5rem;
         border-radius: 999px;
         border: 1px solid var(--app-border);
         background: rgba(255, 255, 255, 0.04);
@@ -2386,6 +2546,7 @@
     .calendar-days-row,
     .month-grid,
     .calendar-switcher,
+    .hr-schedule-layout,
     .calendar-editor__grid,
     .calendar-editor__item-grid,
     .calendar-editor__fields--compact {
@@ -2457,6 +2618,37 @@
 
     .btn-row--compact-mobile {
         flex-wrap: nowrap;
+    }
+
+    .hr-schedule-hero__intro,
+    .hr-coverage-card,
+    .hr-leave-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .hr-schedule-board {
+        display: flex;
+        flex-direction: column;
+        border-radius: 1.25rem;
+    }
+
+    .hr-schedule-board__header {
+        display: none;
+    }
+
+    .hr-schedule-board__staff,
+    .hr-schedule-cell {
+        border-right: none;
+    }
+
+    .hr-schedule-cell::before {
+        content: attr(data-day-label);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
     }
 
     .panel-header,

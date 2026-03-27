@@ -62,6 +62,10 @@ class Staff extends Model
             'label' => 'Manage staff',
             'description' => 'Create staff, update records, assign services, and manage access.',
         ],
+        'hr.schedule' => [
+            'label' => 'HR schedule',
+            'description' => 'Open the HR staff schedule workspace and manage roster visibility.',
+        ],
     ];
 
     protected $table = 'staff';

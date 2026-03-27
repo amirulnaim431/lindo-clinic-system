@@ -34,7 +34,9 @@
         $canCustomers = $can('customers.view');
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
+        $canHrSchedule = $user && method_exists($user, 'canAccessHrSchedule') ? $user->canAccessHrSchedule() : false;
         $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
+        $hrNavActive = request()->routeIs('app.hr.*');
         $sidebarLogoPath = public_path('assets/branding/sidebar-logo.png');
         $sidebarLogoUrl = file_exists($sidebarLogoPath) ? asset('assets/branding/sidebar-logo.png') : null;
     @endphp
@@ -121,6 +123,30 @@
                                         <span>Import Customers</span>
                                     </a>
                                 @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if ($canHrSchedule)
+                    <div class="app-nav-section">
+                        <div class="app-nav-group {{ $hrNavActive ? 'is-open' : '' }}">
+                            <button
+                                type="button"
+                                class="app-nav-group-head {{ $hrNavActive ? 'is-active' : '' }}"
+                                data-nav-toggle="hr-subnav"
+                                aria-expanded="{{ $hrNavActive ? 'true' : 'false' }}"
+                            >
+                                <span class="app-nav-icon" aria-hidden="true">⌘</span>
+                                <span>HR</span>
+                                <span class="app-nav-toggle"></span>
+                            </button>
+
+                            <div id="hr-subnav" class="app-nav-subnav" @if (! $hrNavActive) hidden @endif>
+                                <a href="{{ $r('app.hr.schedule') }}" class="app-nav-sublink {{ $is('app.hr.schedule') ? 'is-active' : '' }}">
+                                    <span class="app-nav-subicon" aria-hidden="true">◔</span>
+                                    <span>Staff Schedule</span>
+                                </a>
                             </div>
                         </div>
                     </div>

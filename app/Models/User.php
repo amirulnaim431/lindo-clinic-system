@@ -96,4 +96,27 @@ class User extends Authenticatable
 
         return $staffProfile->hasAccessPermission($permission);
     }
+
+    public function canAccessHrSchedule(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (! $this->isStaff()) {
+            return false;
+        }
+
+        $staffProfile = $this->staffProfile;
+
+        if (! $staffProfile || ! $staffProfile->is_active || ! $staffProfile->can_login) {
+            return false;
+        }
+
+        if ($staffProfile->hasAccessPermission('hr.schedule')) {
+            return true;
+        }
+
+        return $staffProfile->department === 'Human Resources';
+    }
 }
