@@ -2,14 +2,19 @@
     :title="'Dashboard'"
     :subtitle="null">
 
-    @php
-        $selectedDate = request('date', $date ?? now()->toDateString());
-        $selectedDateFrom = request('date_from', $dateFrom ?? $selectedDate);
-        $selectedDateTo = request('date_to', $dateTo ?? $selectedDate);
-        $selectedStaffId = request('staff_id');
-        $topFocus = $serviceFocus->first();
-        $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
-        $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
+     @php
+         $selectedDate = request('date', $date ?? now()->toDateString());
+         $selectedDateFrom = request('date_from', $dateFrom ?? $selectedDate);
+         $selectedDateTo = request('date_to', $dateTo ?? $selectedDate);
+         $selectedStaffId = request('staff_id');
+         $dashboardQuery = array_filter([
+             'date_from' => $selectedDateFrom,
+             'date_to' => $selectedDateTo,
+             'staff_id' => $selectedStaffId,
+         ]);
+         $topFocus = $serviceFocus->first();
+         $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
+         $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
         $revenueGroups = collect([
             ['key' => 'wellness', 'label' => 'Wellness'],
             ['key' => 'aesthetic', 'label' => 'Aesthetic'],
@@ -403,11 +408,7 @@
             const summaryTarget = document.getElementById('staff-review-summary');
             const detailTarget = document.getElementById('staff-review-details');
             const revenueCards = document.querySelectorAll('[data-revenue-card]');
-            const dashboardQuery = @json(array_filter([
-                'date_from' => $selectedDateFrom,
-                'date_to' => $selectedDateTo,
-                'staff_id' => $selectedStaffId,
-            ]));
+            const dashboardQuery = @json($dashboardQuery);
 
             const closeModal = () => {
                 modal.classList.add('hidden');
