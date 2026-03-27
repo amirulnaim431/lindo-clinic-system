@@ -42,6 +42,9 @@
     <div class="app-shell" data-shell>
         <aside class="app-sidebar">
             <div class="app-sidebar__brand">
+                <button type="button" class="sidebar-toggle-btn sidebar-toggle-btn--corner" data-sidebar-toggle aria-pressed="false" aria-label="Minimize side panel">
+                    <span class="sidebar-toggle-btn__icon" aria-hidden="true">&lt;</span>
+                </button>
                 <a href="{{ $r('app.dashboard') }}" class="app-brand">
                     @if ($sidebarLogoUrl)
                         <img src="{{ $sidebarLogoUrl }}" alt="Lindo Clinic" class="app-brand__image">
@@ -62,28 +65,28 @@
                     <div class="app-nav-list">
                         @if ($canDashboard)
                             <a href="{{ $r('app.dashboard') }}" class="app-nav-link {{ $is('app.dashboard') ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">⌂</span>
                                 <span>Dashboard</span>
                             </a>
                         @endif
 
                         @if ($canAppointments)
                             <a href="{{ $r('app.appointments.index', ['mode' => 'checkin']) }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'checkin' ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">✓</span>
                                 <span>Customer Check-In</span>
                             </a>
                         @endif
 
                         @if ($canCalendar)
                             <a href="{{ $r('app.calendar') }}" class="app-nav-link {{ $is('app.calendar') ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">▦</span>
                                 <span>Calendar Board</span>
                             </a>
                         @endif
 
                         @if ($canAppointments)
                             <a href="{{ $r('app.appointments.index') }}" class="app-nav-link {{ $is('app.appointments.*') && $appointmentsMode === 'booking' ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">✦</span>
                                 <span>Appointments</span>
                             </a>
                         @endif
@@ -99,7 +102,7 @@
                                 data-nav-toggle="customers-subnav"
                                 aria-expanded="{{ $customersNavActive ? 'true' : 'false' }}"
                             >
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">◫</span>
                                 <span>Customers</span>
                                 <span class="app-nav-toggle"></span>
                             </button>
@@ -107,14 +110,14 @@
                             <div id="customers-subnav" class="app-nav-subnav" @if (! $customersNavActive) hidden @endif>
                                 @if ($canCustomers)
                                     <a href="{{ $r('app.customers.index') }}" class="app-nav-sublink {{ $is('app.customers.index') || $is('app.customers.show') || $is('app.customers.edit') ? 'is-active' : '' }}">
-                                        <span class="app-nav-subdot"></span>
+                                        <span class="app-nav-subicon" aria-hidden="true">⌕</span>
                                         <span>Customer Directory</span>
                                     </a>
                                 @endif
 
                                 @if ($canCustomerImport)
                                     <a href="{{ $r('app.customers.import.index') }}" class="app-nav-sublink {{ $is('app.customers.import.*') ? 'is-active' : '' }}">
-                                        <span class="app-nav-subdot"></span>
+                                        <span class="app-nav-subicon" aria-hidden="true">⇪</span>
                                         <span>Import Customers</span>
                                     </a>
                                 @endif
@@ -128,20 +131,13 @@
                         <div class="app-nav-section__label">Clinic Team</div>
                         <div class="app-nav-list">
                             <a href="{{ $r('app.staff.index') }}" class="app-nav-link {{ $is('app.staff.*') ? 'is-active' : '' }}">
-                                <span class="app-nav-dot"></span>
+                                <span class="app-nav-icon" aria-hidden="true">♟</span>
                                 <span>Staff Directory</span>
                             </a>
                         </div>
                     </div>
                 @endif
             </nav>
-
-            <div class="app-sidebar__tools">
-                <button type="button" class="sidebar-toggle-btn" data-sidebar-toggle aria-pressed="false" aria-label="Minimize side panel">
-                    <span class="sidebar-toggle-btn__icon" aria-hidden="true"></span>
-                    <span class="sidebar-toggle-btn__label">Minimize Panel</span>
-                </button>
-            </div>
 
             <div class="app-sidebar__footer">
                 <div class="user-card">
@@ -204,7 +200,7 @@
 
                 shell.classList.toggle('app-shell--sidebar-minimized', isMinimized);
                 sidebarToggle.setAttribute('aria-pressed', isMinimized ? 'true' : 'false');
-                sidebarToggle.querySelector('.sidebar-toggle-btn__label').textContent = isMinimized ? 'Expand Panel' : 'Minimize Panel';
+                sidebarToggle.querySelector('.sidebar-toggle-btn__icon').textContent = isMinimized ? '>' : '<';
             };
 
             if (shell && sidebarToggle) {
