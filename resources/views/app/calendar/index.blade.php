@@ -16,13 +16,32 @@
                     </div>
 
                     <div class="page-actions">
-                        <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'week', 'date' => $selectedDateIso, 'anchor' => $weekAnchor, 'staff_id' => $staffId ?: null])) }}" class="btn {{ $viewMode === 'week' ? 'btn-primary' : 'btn-secondary' }}">Week view</a>
-                        <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => $selectedDateIso, 'anchor' => $monthAnchor, 'staff_id' => $staffId ?: null])) }}" class="btn {{ $viewMode === 'month' ? 'btn-primary' : 'btn-secondary' }}">Month view</a>
-                        <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-secondary">Booking queue</a>
+                        <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'week', 'date' => $selectedDateIso, 'anchor' => $weekAnchor, 'staff_id' => $staffId ?: null])) }}" class="btn {{ $viewMode === 'week' ? 'btn-primary' : 'btn-secondary' }}">Weekly view</a>
+                        <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => $selectedDateIso, 'anchor' => $monthAnchor, 'staff_id' => $staffId ?: null])) }}" class="btn {{ $viewMode === 'month' ? 'btn-primary' : 'btn-secondary' }}">Monthly view</a>
+                        <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-secondary">Schedule</a>
                     </div>
                 </div>
 
-                <div class="calendar-control-grid">
+                <div class="calendar-control-grid calendar-control-grid--single calendar-control-grid--with-popover">
+                    <form method="GET" action="{{ route('app.calendar') }}" class="calendar-filter-popover hidden" data-calendar-pic-panel>
+                        <input type="hidden" name="view" value="{{ $viewMode }}">
+                        <input type="hidden" name="date" value="{{ $selectedDateIso }}">
+                        <input type="hidden" name="anchor" value="{{ $viewMode === 'month' ? $monthAnchor : $weekAnchor }}">
+                        <div class="field-block">
+                            <label for="staff_id" class="field-label">PIC</label>
+                            <select id="staff_id" name="staff_id" class="form-select">
+                                <option value="">All PIC</option>
+                                @foreach ($staffList as $staff)
+                                    <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="small-note">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'PIC') : 'Showing the full operational board' }}</div>
+                        <div class="btn-row btn-row--compact-mobile">
+                            <button type="submit" class="btn btn-primary">Apply</button>
+                            <a href="{{ route('app.calendar', ['view' => $viewMode, 'date' => $selectedDateIso, 'anchor' => $viewMode === 'month' ? $monthAnchor : $weekAnchor]) }}" class="btn btn-secondary">Reset</a>
+                        </div>
+                    </form>
                     <div class="stack">
                         <div class="btn-row btn-row--between">
                             @if ($viewMode === 'month')
@@ -30,6 +49,7 @@
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => \Carbon\Carbon::parse($previousMonth)->startOfMonth()->toDateString(), 'anchor' => $previousMonth, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">&larr; Previous month</a>
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => now()->toDateString(), 'anchor' => $currentMonth, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Today</a>
                                     <a href="{{ route('app.calendar', array_merge($queryBase, ['view' => 'month', 'date' => \Carbon\Carbon::parse($nextMonth)->startOfMonth()->toDateString(), 'anchor' => $nextMonth, 'staff_id' => $staffId ?: null])) }}" class="btn btn-secondary">Next month &rarr;</a>
+                                    <button type="button" class="btn btn-secondary" data-calendar-pic-toggle>PIC</button>
                                 </div>
                             @else
                                 <div class="btn-row" style="align-items: flex-end;">
@@ -48,6 +68,7 @@
                                         </div>
                                         <button type="submit" class="btn btn-secondary">Go</button>
                                     </form>
+                                    <button type="button" class="btn btn-secondary" data-calendar-pic-toggle>PIC</button>
                                 </div>
                             @endif
                         </div>
@@ -59,18 +80,30 @@
                                 @endforeach
 
                                 @foreach ($monthDays as $day)
-                                    <a href="{{ $day['url'] }}" class="month-day-card {{ $day['is_selected'] ? 'is-selected' : '' }} {{ $day['is_outside_month'] ? 'is-outside-month' : '' }}">
-                                        <div class="filter-bar__head">
-                                            <div>
-                                                <div class="selection-card__title">{{ $day['day_number'] }}</div>
-                                                <div class="small-note">{{ $day['label'] }}</div>
+                                    @if ($day['is_clickable'])
+                                        <a href="{{ $day['url'] }}" class="month-day-card {{ $day['is_selected'] ? 'is-selected' : '' }} {{ $day['is_outside_month'] ? 'is-outside-month' : '' }}">
+                                            <div class="filter-bar__head">
+                                                <div>
+                                                    <div class="selection-card__title">{{ $day['day_number'] }}</div>
+                                                    <div class="small-note">{{ $day['label'] }}</div>
+                                                </div>
+                                                @if ($day['is_today'])
+                                                    <span class="soft-pill">Today</span>
+                                                @endif
                                             </div>
-                                            @if ($day['is_today'])
-                                                <span class="soft-pill">Today</span>
-                                            @endif
+                                            <div class="small-note" style="margin-top: 0.85rem;">{{ $day['appointment_count'] }} appointment{{ $day['appointment_count'] === 1 ? '' : 's' }}</div>
+                                        </a>
+                                    @else
+                                        <div class="month-day-card month-day-card--disabled {{ $day['is_outside_month'] ? 'is-outside-month' : '' }}">
+                                            <div class="filter-bar__head">
+                                                <div>
+                                                    <div class="selection-card__title">{{ $day['day_number'] }}</div>
+                                                    <div class="small-note">{{ $day['label'] }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="small-note" style="margin-top: 0.85rem;">Unavailable</div>
                                         </div>
-                                        <div class="small-note" style="margin-top: 0.85rem;">{{ $day['appointment_count'] }} appointment{{ $day['appointment_count'] === 1 ? '' : 's' }}</div>
-                                    </a>
+                                    @endif
                                 @endforeach
                             </div>
                         @else
@@ -85,25 +118,6 @@
                             </div>
                         @endif
                     </div>
-
-                    <form method="GET" action="{{ route('app.calendar') }}" class="report-card">
-                        <input type="hidden" name="view" value="{{ $viewMode }}">
-                        <input type="hidden" name="date" value="{{ $selectedDateIso }}">
-                        <input type="hidden" name="anchor" value="{{ $viewMode === 'month' ? $monthAnchor : $weekAnchor }}">
-
-                        <div class="metric-label">Staff filter</div>
-                        <select id="staff_id" name="staff_id" class="form-select" style="margin-top: 0.9rem;">
-                            <option value="">All staff</option>
-                            @foreach ($staffList as $staff)
-                                <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}</option>
-                            @endforeach
-                        </select>
-                        <div class="report-card__meta">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'Staff') : 'Showing full clinic workload' }}</div>
-                        <div class="btn-row" style="margin-top: 1rem;">
-                            <button type="submit" class="btn btn-primary">Apply</button>
-                            <a href="{{ route('app.calendar', ['view' => $viewMode, 'date' => $selectedDateIso, 'anchor' => $viewMode === 'month' ? $monthAnchor : $weekAnchor]) }}" class="btn btn-secondary">Reset</a>
-                        </div>
-                    </form>
                 </div>
             </div>
         </section>
@@ -203,6 +217,15 @@
                         <div class="modal-panel"><div class="modal-panel__label">Package / Membership</div><div id="modal-membership" class="modal-panel__value">-</div></div>
                         <div class="modal-panel"><div class="modal-panel__label">Source</div><div id="modal-source" class="modal-panel__value">-</div></div>
                     </div>
+                    @if ($canViewMembershipBalance)
+                        <div class="modal-meta-grid">
+                            <div class="modal-panel modal-panel--wide">
+                                <div class="modal-panel__label">Total Balance Membership</div>
+                                <div id="modal-membership-balance" class="modal-panel__value">Coming soon</div>
+                                <div class="small-note" style="margin-top: 0.55rem;">Pending input</div>
+                            </div>
+                        </div>
+                    @endif
                     <div class="modal-meta-grid">
                         <div class="modal-panel"><div class="modal-panel__label">Visit Services</div><div id="modal-services" class="modal-pill-list">-</div></div>
                         <div class="modal-panel"><div class="modal-panel__label">Assigned Staff</div><div id="modal-staff" class="modal-pill-list">-</div></div>
@@ -212,6 +235,7 @@
                 </div>
                 <div class="modal-actions">
                     <a id="modal-create-link" href="#" class="modal-btn modal-btn--secondary">Book this time</a>
+                    <a id="modal-edit-link" href="#" class="modal-btn modal-btn--secondary">Edit</a>
                     <a id="modal-manage-link" href="#" class="modal-btn modal-btn--primary">Open appointments</a>
                     <button type="button" id="calendar-detail-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
                 </div>
@@ -269,9 +293,12 @@
             const overflowCloseBottom = document.getElementById('calendar-overflow-close-bottom');
             const manageLink = document.getElementById('modal-manage-link');
             const createLink = document.getElementById('modal-create-link');
+            const editLink = document.getElementById('modal-edit-link');
             const timelineGrid = document.querySelector('.timeline-grid');
             const timelineButtons = Array.from(document.querySelectorAll('.calendar-event-btn'));
             const overflowButtons = Array.from(document.querySelectorAll('.calendar-overflow-btn'));
+            const picPanels = Array.from(document.querySelectorAll('[data-calendar-pic-panel]'));
+            const picToggles = Array.from(document.querySelectorAll('[data-calendar-pic-toggle]'));
             const canManageAppointments = @json($canManageAppointments);
             const rowHeightPx = @json($rowHeightPx);
             const selectedDateIso = @json($selectedDateIso);
@@ -315,6 +342,7 @@
                 setText('modal-source', eventData.source, 'Not recorded');
                 setText('modal-notes', eventData.notes, 'No notes recorded.');
                 manageLink.href = eventData.manage_url || '#';
+                editLink.href = eventData.edit_url || eventData.manage_url || '#';
                 createLink.href = eventData.create_url || '#';
                 modalHeader.style.background = `radial-gradient(circle at top left, ${eventData.service_styles.surface_strong || eventData.service_styles.surface} 0%, rgba(255, 247, 250, 0.88) 38%, transparent 62%)`;
                 modal.classList.remove('hidden');
@@ -332,6 +360,10 @@
                 overflowModal.classList.add('hidden');
                 overflowModal.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('overflow-hidden');
+            };
+
+            const closePicPanels = () => {
+                picPanels.forEach((panel) => panel.classList.add('hidden'));
             };
 
             const parseEventPayload = (button) => {
@@ -529,6 +561,17 @@
             };
 
             timelineButtons.forEach((button) => attachDragBehavior(button));
+            picToggles.forEach((toggle) => {
+                toggle.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    const targetPanel = picPanels[0];
+                    const isHidden = targetPanel?.classList.contains('hidden');
+                    closePicPanels();
+                    if (targetPanel && isHidden) {
+                        targetPanel.classList.remove('hidden');
+                    }
+                });
+            });
             overflowButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     let payload = {};
@@ -577,6 +620,16 @@
 
                 if (event.key === 'Escape' && overflowModal && !overflowModal.classList.contains('hidden')) {
                     closeOverflowModal();
+                }
+
+                if (event.key === 'Escape') {
+                    closePicPanels();
+                }
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('[data-calendar-pic-toggle]') && !event.target.closest('[data-calendar-pic-panel]')) {
+                    closePicPanels();
                 }
             });
         })();

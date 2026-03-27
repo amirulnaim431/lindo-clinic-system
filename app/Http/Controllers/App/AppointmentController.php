@@ -29,7 +29,7 @@ class AppointmentController extends Controller
             'service_order' => $request->input('service_order', []),
             'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
             'staff_id' => $request->input('staff_id'),
-            'status' => $request->input('status'),
+            'status' => $this->normalizeStatusFilter($request->input('status')),
             'slot' => $this->sanitizeSlot($request->input('slot')),
         ];
 
@@ -75,7 +75,11 @@ class AppointmentController extends Controller
         }
 
         if (! empty($filters['status'])) {
-            $appointmentGroupsQuery->where('status', $filters['status']);
+            if ($filters['status'] === 'reschedule') {
+                $appointmentGroupsQuery->whereIn('status', ['cancelled', 'no_show']);
+            } else {
+                $appointmentGroupsQuery->where('status', $filters['status']);
+            }
         }
 
         $appointmentGroups = $appointmentGroupsQuery
@@ -811,6 +815,17 @@ class AppointmentController extends Controller
     private function normalizeArrangementMode(mixed $arrangementMode): string
     {
         return $arrangementMode === 'back_to_back' ? 'back_to_back' : 'same_slot';
+    }
+
+    private function normalizeStatusFilter(mixed $status): ?string
+    {
+        $normalized = trim((string) $status);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return $normalized === 'reschedule' ? 'reschedule' : $normalized;
     }
 
     private function syncAppointmentGroupWindow(?AppointmentGroup $group): void

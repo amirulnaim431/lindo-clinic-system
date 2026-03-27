@@ -1,12 +1,14 @@
 <x-internal-layout
     :title="'Dashboard'"
-    :subtitle="'Live-ready reporting for appointments, customer mix, and staff utilisation.'">
+    :subtitle="null">
 
     @php
         $selectedDate = request('date', $date ?? now()->toDateString());
         $selectedStaffId = request('staff_id');
         $selectedPeriod = request('period', $period ?? 'day');
         $topFocus = $serviceFocus->first();
+        $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
+        $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
         $periodOptions = [
             'day' => 'Day',
             'week' => 'Week',
@@ -27,11 +29,6 @@
         <section class="hero-panel">
             <div class="panel-body stack">
                 <div class="filter-bar__head">
-                    <x-section-heading
-                        kicker="Executive view"
-                        title="Operations reporting"
-                        :subtitle="'Track customer mix, sales, service demand, and staff workload for '.$periodLabel.'.'" />
-
                     <div class="page-actions">
                         <a href="{{ route('app.dashboard', array_filter(['period' => $selectedPeriod, 'date' => $selectedDate, 'staff_id' => $selectedStaffId, 'export' => 'csv'])) }}" class="btn btn-secondary">Export CSV</a>
                         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
@@ -50,14 +47,14 @@
                     </div>
 
                     <div class="col-3 field-block">
-                        <label class="field-label" for="date">Anchor date</label>
+                        <label class="field-label" for="date">Date</label>
                         <input id="date" name="date" type="date" class="form-input" value="{{ $selectedDate }}">
                     </div>
 
                     <div class="col-3 field-block">
-                        <label class="field-label" for="staff_id">Staff review filter</label>
+                        <label class="field-label" for="staff_id">Person In Charge</label>
                         <select id="staff_id" name="staff_id" class="form-select">
-                            <option value="">All staff</option>
+                            <option value="">All PIC</option>
                             @foreach ($staffList as $s)
                                 <option value="{{ $s->id }}" @selected((string) $selectedStaffId === (string) $s->id)>
                                     {{ $s->full_name }} ({{ $s->job_title ?: $s->role_key }})
@@ -67,8 +64,8 @@
                     </div>
 
                     <div class="col-3 field-block" style="align-self:end;">
-                        <div class="btn-row btn-row--end">
-                            <button type="submit" class="btn btn-primary">Apply filters</button>
+                        <div class="btn-row btn-row--end btn-row--compact-mobile">
+                            <button type="submit" class="btn btn-primary">Apply</button>
                             <a href="{{ route('app.dashboard') }}" class="btn btn-secondary">Reset</a>
                         </div>
                     </div>
@@ -77,10 +74,10 @@
         </section>
 
         <section class="summary-stat-grid">
-            <x-stat-card label="Appointments" :value="$kpi['total'] ?? 0" :meta="$periodLabel" />
             <x-stat-card label="New Customers" :value="$kpi['new_customers'] ?? 0" meta="First visit in this period" />
             <x-stat-card label="Existing Customers" :value="$kpi['existing_customers'] ?? 0" meta="Returning customers in this period" />
-            <x-stat-card label="Total Sales" :value="'RM '.number_format($kpi['total_sales'] ?? 0, 0)" meta="Based on scheduled service prices" />
+            <x-stat-card label="Membership" :value="'Bronze '.$membershipSummary['bronze'].' | Silver '.$membershipSummary['silver'].' | Black '.$membershipSummary['black']" :meta="$periodLabel" />
+            <x-stat-card label="Total Revenue" :value="'RM '.number_format($revenueBreakdown['total'] ?? 0, 0)" :meta="$periodLabel" />
             <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />
         </section>
 
@@ -128,9 +125,19 @@
 
             <div class="stack">
                 <div class="report-card">
-                    <div class="metric-label">Sales snapshot</div>
-                    <div class="report-card__value">RM {{ number_format($kpi['total_sales'] ?? 0, 0) }}</div>
-                    <div class="report-card__meta">Scheduled service value across all matching appointments.</div>
+                    <div class="metric-label">Total Group Revenue</div>
+                    <div class="report-card__value">RM {{ number_format($revenueBreakdown['total'] ?? 0, 0) }}</div>
+                    <div class="report-card__meta">{{ $periodLabel }}</div>
+                    <div class="stack" style="margin-top: 1rem;">
+                        @forelse (($revenueBreakdown['groups'] ?? collect())->take(4) as $group)
+                            <div class="summary-pill">
+                                <span class="summary-pill__label">{{ $group['label'] }}</span>
+                                <span class="summary-pill__value">RM {{ number_format($group['amount'], 0) }}</span>
+                            </div>
+                        @empty
+                            <div class="small-note">No revenue data recorded for this period.</div>
+                        @endforelse
+                    </div>
                 </div>
 
                 <div class="panel">
@@ -233,10 +240,7 @@
 
             <div class="panel">
                 <div class="panel-header">
-                    <x-section-heading
-                        kicker="Boss review"
-                        title="Staff workload"
-                        subtitle="Tap any staff card to open their appointment details for this reporting window." />
+                    <h3 class="panel-title-display" style="font-size:24px;">Capacity Overview</h3>
                 </div>
 
                 <div class="panel-body">

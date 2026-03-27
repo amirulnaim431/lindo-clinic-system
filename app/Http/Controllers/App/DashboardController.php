@@ -8,6 +8,7 @@ use App\Models\AppointmentGroup;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DashboardController extends Controller
@@ -21,10 +22,12 @@ class DashboardController extends Controller
 
         [$periodStart, $periodEnd, $periodLabel] = $this->resolvePeriodWindow($anchorDate, $period);
 
-        $staffList = Staff::query()
+        $staffList = $this->buildPicList(
+            Staff::query()
             ->where('is_active', true)
             ->orderBy('full_name')
-            ->get(['id', 'full_name', 'role_key', 'job_title']);
+            ->get(['id', 'full_name', 'role_key', 'job_title', 'operational_role'])
+        );
 
         $baseQuery = AppointmentGroup::query()
             ->with([
@@ -61,6 +64,8 @@ class DashboardController extends Controller
         $sourceBreakdown = $this->buildSourceBreakdown($reportGroups);
         $staffReview = $this->buildStaffReview($reportGroups);
         $reportRows = $this->buildReportRows($reportGroups, $customerFirstVisits, $periodStart, $periodEnd);
+        $membershipSummary = $this->buildMembershipSummary($reportGroups);
+        $revenueBreakdown = $this->buildRevenueBreakdown($reportGroups);
 
         $kpi = [
             'total' => $reportGroups->count(),
@@ -89,6 +94,8 @@ class DashboardController extends Controller
             'sourceBreakdown' => $sourceBreakdown,
             'staffReview' => $staffReview,
             'reportRows' => $reportRows,
+            'membershipSummary' => $membershipSummary,
+            'revenueBreakdown' => $revenueBreakdown,
         ]);
     }
 
@@ -98,17 +105,17 @@ class DashboardController extends Controller
             'week' => [
                 $anchorDate->copy()->startOfWeek(),
                 $anchorDate->copy()->endOfWeek(),
-                'Week of '.$anchorDate->copy()->startOfWeek()->format('d M Y'),
+                $this->formatRangeLabel($anchorDate->copy()->startOfWeek(), $anchorDate->copy()->endOfWeek()),
             ],
             'month' => [
                 $anchorDate->copy()->startOfMonth(),
                 $anchorDate->copy()->endOfMonth(),
-                $anchorDate->format('F Y'),
+                $this->formatRangeLabel($anchorDate->copy()->startOfMonth(), $anchorDate->copy()->endOfMonth()),
             ],
             'year' => [
                 $anchorDate->copy()->startOfYear(),
                 $anchorDate->copy()->endOfYear(),
-                $anchorDate->format('Y'),
+                $this->formatRangeLabel($anchorDate->copy()->startOfYear(), $anchorDate->copy()->endOfYear()),
             ],
             default => [
                 $anchorDate->copy()->startOfDay(),
@@ -185,7 +192,7 @@ class DashboardController extends Controller
             ->groupBy(fn ($group) => $group->source ?: 'not_recorded')
             ->map(function ($rows, $source) {
                 return [
-                    'source' => str($source)->replace('_', ' ')->title()->toString(),
+                    'source' => $this->formatSourceLabel($source),
                     'appointments' => $rows->count(),
                 ];
             })
@@ -264,11 +271,166 @@ class DashboardController extends Controller
                 'services' => $group->items->map(fn ($item) => $item->service?->name)->filter()->unique()->implode(', '),
                 'staff' => $group->items->map(fn ($item) => $item->staff?->full_name)->filter()->unique()->implode(', '),
                 'status_label' => $statusLabel,
-                'source_label' => str($group->source ?: 'not_recorded')->replace('_', ' ')->title()->toString(),
+                'source_label' => $this->formatSourceLabel($group->source ?: 'not_recorded'),
                 'sales_amount' => $salesAmount,
                 'sales_label' => $this->money($salesAmount),
             ]);
         });
+    }
+
+    private function buildMembershipSummary(Collection $groups): array
+    {
+        $tiers = [
+            'bronze' => 0,
+            'silver' => 0,
+            'black' => 0,
+        ];
+
+        $groups
+            ->pluck('customer.membership_type')
+            ->filter()
+            ->map(fn ($membershipType) => mb_strtolower(trim((string) $membershipType)))
+            ->each(function (string $membershipType) use (&$tiers): void {
+                if (array_key_exists($membershipType, $tiers)) {
+                    $tiers[$membershipType]++;
+                }
+            });
+
+        return $tiers;
+    }
+
+    private function buildRevenueBreakdown(Collection $groups): array
+    {
+        $rows = $groups->flatMap(function ($group) {
+            return $group->items->map(function ($item) {
+                $serviceName = $item->service?->name ?: 'Service';
+                $categoryKey = $this->resolveRevenueCategory($serviceName);
+
+                return [
+                    'category_key' => $categoryKey,
+                    'category_label' => $this->revenueCategoryLabel($categoryKey),
+                    'amount' => (int) ($item->service?->price ?? 0),
+                ];
+            });
+        });
+
+        return [
+            'total' => (int) $rows->sum('amount'),
+            'groups' => $rows
+                ->groupBy('category_key')
+                ->map(function (Collection $categoryRows, string $categoryKey) {
+                    return [
+                        'key' => $categoryKey,
+                        'label' => $this->revenueCategoryLabel($categoryKey),
+                        'amount' => (int) $categoryRows->sum('amount'),
+                    ];
+                })
+                ->sortByDesc('amount')
+                ->values(),
+        ];
+    }
+
+    private function buildPicList(Collection $staffList): Collection
+    {
+        return $staffList
+            ->sort(function ($left, $right) {
+                $leftRole = $this->normalizePicRole($left->operational_role ?: $left->role_key);
+                $rightRole = $this->normalizePicRole($right->operational_role ?: $right->role_key);
+                $leftRank = $this->picRoleRank($leftRole);
+                $rightRank = $this->picRoleRank($rightRole);
+
+                if ($leftRank === $rightRank) {
+                    return strcasecmp($left->full_name, $right->full_name);
+                }
+
+                return $leftRank <=> $rightRank;
+            })
+            ->values();
+    }
+
+    private function normalizePicRole(?string $role): string
+    {
+        $normalized = mb_strtolower(trim((string) $role));
+
+        return match ($normalized) {
+            'doctor' => 'doctor',
+            'aesthetic', 'aestatic', 'nurse' => 'aesthetic',
+            'beautician' => 'beautician',
+            'management' => 'management',
+            default => 'others',
+        };
+    }
+
+    private function picRoleRank(string $role): int
+    {
+        return match ($role) {
+            'doctor' => 1,
+            'aesthetic' => 2,
+            'beautician' => 3,
+            'management' => 4,
+            default => 5,
+        };
+    }
+
+    private function formatRangeLabel(Carbon $start, Carbon $end): string
+    {
+        if ($start->isSameDay($end)) {
+            return $start->format('d M Y');
+        }
+
+        if ($start->isSameMonth($end)) {
+            return $start->format('j').' - '.$end->format('j F Y');
+        }
+
+        if ($start->isSameYear($end)) {
+            return $start->format('j M').' - '.$end->format('j M Y');
+        }
+
+        return $start->format('j M Y').' - '.$end->format('j M Y');
+    }
+
+    private function resolveRevenueCategory(string $serviceName): string
+    {
+        $normalized = mb_strtolower(trim($serviceName));
+
+        return match (true) {
+            str_contains($normalized, 'wellness'),
+            str_contains($normalized, 'weight'),
+            str_contains($normalized, 'slim'),
+            str_contains($normalized, 'nutrition') => 'wellness',
+            str_contains($normalized, 'aesthetic'),
+            str_contains($normalized, 'laser'),
+            str_contains($normalized, 'inject'),
+            str_contains($normalized, 'filler'),
+            str_contains($normalized, 'botox') => 'aesthetic',
+            str_contains($normalized, 'spa'),
+            str_contains($normalized, 'beauty'),
+            str_contains($normalized, 'facial') => 'spa_beauty',
+            default => 'others',
+        };
+    }
+
+    private function revenueCategoryLabel(string $categoryKey): string
+    {
+        return match ($categoryKey) {
+            'wellness' => 'Wellness',
+            'aesthetic' => 'Aesthetic',
+            'spa_beauty' => 'Spa & Beauty',
+            default => 'Others',
+        };
+    }
+
+    private function formatSourceLabel(?string $source): string
+    {
+        return match ((string) $source) {
+            '', 'not_recorded' => 'Not recorded',
+            'walk_in' => 'Walk-in',
+            'whatsapp' => 'WhatsApp',
+            'instagram' => 'Instagram',
+            'facebook' => 'Facebook',
+            'referral' => 'Referral',
+            default => str((string) $source)->replace('_', ' ')->title()->toString(),
+        };
     }
 
     private function streamCsv($reportRows, string $periodLabel): StreamedResponse

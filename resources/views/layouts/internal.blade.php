@@ -39,7 +39,7 @@
         $sidebarLogoUrl = file_exists($sidebarLogoPath) ? asset('assets/branding/sidebar-logo.png') : null;
     @endphp
 
-    <div class="app-shell">
+    <div class="app-shell" data-shell>
         <aside class="app-sidebar">
             <div class="app-sidebar__brand">
                 <a href="{{ $r('app.dashboard') }}" class="app-brand">
@@ -92,7 +92,6 @@
 
                 @if ($canCustomers || $canCustomerImport)
                     <div class="app-nav-section">
-                        <div class="app-nav-section__label">Patient CRM</div>
                         <div class="app-nav-group {{ $customersNavActive ? 'is-open' : '' }}">
                             <button
                                 type="button"
@@ -136,6 +135,13 @@
                     </div>
                 @endif
             </nav>
+
+            <div class="app-sidebar__tools">
+                <button type="button" class="sidebar-toggle-btn" data-sidebar-toggle aria-pressed="false" aria-label="Minimize side panel">
+                    <span class="sidebar-toggle-btn__icon" aria-hidden="true"></span>
+                    <span class="sidebar-toggle-btn__label">Minimize Panel</span>
+                </button>
+            </div>
 
             <div class="app-sidebar__footer">
                 <div class="user-card">
@@ -185,6 +191,33 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const shell = document.querySelector('[data-shell]');
+            const sidebarToggle = document.querySelector('[data-sidebar-toggle]');
+            const sidebarStorageKey = 'lindo-sidebar-minimized';
+            const liveRefreshIntervalMs = 30000;
+            let pendingInteraction = false;
+
+            const applySidebarState = function (isMinimized) {
+                if (!shell || !sidebarToggle) {
+                    return;
+                }
+
+                shell.classList.toggle('app-shell--sidebar-minimized', isMinimized);
+                sidebarToggle.setAttribute('aria-pressed', isMinimized ? 'true' : 'false');
+                sidebarToggle.querySelector('.sidebar-toggle-btn__label').textContent = isMinimized ? 'Expand Panel' : 'Minimize Panel';
+            };
+
+            if (shell && sidebarToggle) {
+                const savedPreference = window.localStorage.getItem(sidebarStorageKey) === '1';
+                applySidebarState(savedPreference);
+
+                sidebarToggle.addEventListener('click', function () {
+                    const isMinimized = !shell.classList.contains('app-shell--sidebar-minimized');
+                    applySidebarState(isMinimized);
+                    window.localStorage.setItem(sidebarStorageKey, isMinimized ? '1' : '0');
+                });
+            }
+
             document.querySelectorAll('[data-nav-toggle]').forEach(function (toggle) {
                 toggle.addEventListener('click', function () {
                     const targetId = toggle.getAttribute('data-nav-toggle');
@@ -208,6 +241,55 @@
                     }
                 });
             });
+
+            const hasActiveInteraction = function () {
+                const activeElement = document.activeElement;
+                const isEditing = activeElement && (
+                    activeElement.matches('input, textarea, select')
+                    || activeElement.isContentEditable
+                );
+                const hasOpenModal = document.querySelector('.modal-shell:not(.hidden)');
+                const hasDraggingItem = document.querySelector('.is-dragging');
+
+                return isEditing || !!hasOpenModal || !!hasDraggingItem || pendingInteraction;
+            };
+
+            document.addEventListener('submit', function () {
+                pendingInteraction = true;
+                window.setTimeout(function () {
+                    pendingInteraction = false;
+                }, 5000);
+            });
+
+            document.addEventListener('click', function (event) {
+                if (event.target.closest('button, a, [role="button"]')) {
+                    pendingInteraction = true;
+                    window.setTimeout(function () {
+                        pendingInteraction = false;
+                    }, 2500);
+                }
+            });
+
+            window.setInterval(function () {
+                fetch(window.location.href, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                }).catch(function () {
+                    return null;
+                });
+            }, 300000);
+
+            window.setInterval(function () {
+                if (document.hidden || hasActiveInteraction()) {
+                    return;
+                }
+
+                window.location.reload();
+            }, liveRefreshIntervalMs);
         });
     </script>
 </body>

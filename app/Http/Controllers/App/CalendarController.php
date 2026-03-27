@@ -31,8 +31,8 @@ class CalendarController extends Controller
         'confirmed' => ['label' => 'Confirmed', 'dot' => '#7d9abb', 'badge_bg' => '#f2f7fc', 'badge_border' => '#cbd9e8', 'badge_text' => '#48617e'],
         'checked_in' => ['label' => 'Checked In', 'dot' => '#9a79bf', 'badge_bg' => '#f6f1fc', 'badge_border' => '#ddcfef', 'badge_text' => '#795a9a'],
         'completed' => ['label' => 'Completed', 'dot' => '#79ab91', 'badge_bg' => '#f0f8f3', 'badge_border' => '#c6dece', 'badge_text' => '#4c7a60'],
-        'cancelled' => ['label' => 'Cancelled', 'dot' => '#cf7d95', 'badge_bg' => '#fff3f6', 'badge_border' => '#ebc0cf', 'badge_text' => '#9a4f67'],
-        'no_show' => ['label' => 'No-show', 'dot' => '#9f8a91', 'badge_bg' => '#fbf8f9', 'badge_border' => '#dfd2d7', 'badge_text' => '#7d666e'],
+        'cancelled' => ['label' => 'Reschedule', 'dot' => '#cf7d95', 'badge_bg' => '#fff3f6', 'badge_border' => '#ebc0cf', 'badge_text' => '#9a4f67'],
+        'no_show' => ['label' => 'Reschedule', 'dot' => '#9f8a91', 'badge_bg' => '#fbf8f9', 'badge_border' => '#dfd2d7', 'badge_text' => '#7d666e'],
     ];
 
     public function index(Request $request)
@@ -45,11 +45,13 @@ class CalendarController extends Controller
         $monthEnd = $selectedDate->copy()->endOfMonth()->endOfDay();
         $staffId = trim((string) $request->input('staff_id', ''));
 
-        $staffList = Staff::query()
-            ->select('id', 'full_name', 'role_key', 'job_title')
+        $staffList = $this->buildPicList(
+            Staff::query()
+            ->select('id', 'full_name', 'role_key', 'job_title', 'operational_role')
             ->where('is_active', true)
             ->orderBy('full_name')
-            ->get();
+            ->get()
+        );
 
         $rangeStart = $viewMode === 'month' ? $monthStart : $weekStart;
         $rangeEnd = $viewMode === 'month' ? $monthEnd : $weekEnd;
@@ -119,6 +121,7 @@ class CalendarController extends Controller
             'currentMonth' => now()->startOfMonth()->toDateString(),
             'daySummary' => $daySummary,
             'canManageAppointments' => auth()->user()?->hasAppPermission('appointments.manage') ?? false,
+            'canViewMembershipBalance' => auth()->user()?->hasAppPermission('customers.view') ?? false,
         ]);
     }
 
@@ -176,6 +179,7 @@ class CalendarController extends Controller
                 'is_selected' => $date->isSameDay($selectedDate),
                 'is_today' => $date->isToday(),
                 'is_outside_month' => ! $date->isSameMonth($monthStart),
+                'is_clickable' => ! in_array($date->dayOfWeek, [Carbon::SUNDAY, Carbon::MONDAY], true),
                 'url' => route('app.calendar', array_filter([
                     'view' => $viewMode,
                     'date' => $date->toDateString(),
@@ -292,8 +296,9 @@ class CalendarController extends Controller
             'status_value' => $statusValue,
             'status_label' => $statusStyles['label'],
             'notes' => $group->notes ?: null,
-            'source' => $group->source ? str($group->source)->replace('_', ' ')->title()->toString() : null,
+            'source' => $this->formatSourceLabel($group->source),
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
+            'edit_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
             'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
             'reschedule_url' => route('app.appointments.items.reschedule', $item),
             'service_styles' => $serviceStyles,
@@ -452,6 +457,64 @@ class CalendarController extends Controller
         ]);
 
         return $parts === [] ? null : implode(' | ', $parts);
+    }
+
+    private function buildPicList(Collection $staffList): Collection
+    {
+        return $staffList
+            ->sort(function ($left, $right) {
+                $leftRole = $this->normalizePicRole($left->operational_role ?: $left->role_key);
+                $rightRole = $this->normalizePicRole($right->operational_role ?: $right->role_key);
+                $leftRank = $this->picRoleRank($leftRole);
+                $rightRank = $this->picRoleRank($rightRole);
+
+                if ($leftRank === $rightRank) {
+                    return strcasecmp($left->full_name, $right->full_name);
+                }
+
+                return $leftRank <=> $rightRank;
+            })
+            ->values();
+    }
+
+    private function normalizePicRole(?string $role): string
+    {
+        $normalized = mb_strtolower(trim((string) $role));
+
+        return match ($normalized) {
+            'doctor' => 'doctor',
+            'aesthetic', 'aestatic', 'nurse' => 'aesthetic',
+            'beautician' => 'beautician',
+            'management' => 'management',
+            default => 'others',
+        };
+    }
+
+    private function picRoleRank(string $role): int
+    {
+        return match ($role) {
+            'doctor' => 1,
+            'aesthetic' => 2,
+            'beautician' => 3,
+            'management' => 4,
+            default => 5,
+        };
+    }
+
+    private function formatSourceLabel(?string $source): ?string
+    {
+        if ($source === null || trim((string) $source) === '') {
+            return null;
+        }
+
+        return match ((string) $source) {
+            'walk_in' => 'Walk-in',
+            'whatsapp' => 'WhatsApp',
+            'instagram' => 'Instagram',
+            'facebook' => 'Facebook',
+            'referral' => 'Referral',
+            default => str((string) $source)->replace('_', ' ')->title()->toString(),
+        };
     }
 
     private function summarizeNames(array $names, string $fallback): string

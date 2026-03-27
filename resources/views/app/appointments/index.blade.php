@@ -3,11 +3,12 @@
     $isCheckInMode = $mode === 'checkin';
 @endphp
 
-<x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="$isCheckInMode ? 'Front desk status control for check-in, completion, no-show, and same-day follow-up.' : 'Cleaner front desk flow for booking, availability, and same-day follow-up.'">
+<x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="null">
     @php
         $filters = $filters ?? ['date' => now()->format('Y-m-d'), 'service_ids' => [], 'slot' => null];
         $selectedServiceIds = collect($filters['service_ids'] ?? [])->map(fn ($id) => (string) $id)->values()->all();
         $selectedDate = $filters['date'] ?? now()->format('Y-m-d');
+        $selectedStatus = $filters['status'] ?? null;
         $prefilledSlot = $filters['slot'] ?? null;
         $selectedArrangementMode = $filters['arrangement_mode'] ?? 'same_slot';
         $services = $services ?? collect();
@@ -20,8 +21,8 @@
             'confirmed' => ['bg' => '#f0f9ff', 'border' => '#bae6fd', 'text' => '#0369a1', 'label' => 'Confirmed'],
             'checked_in' => ['bg' => '#f5f3ff', 'border' => '#ddd6fe', 'text' => '#6d28d9', 'label' => 'Checked In'],
             'completed' => ['bg' => '#ecfdf5', 'border' => '#a7f3d0', 'text' => '#047857', 'label' => 'Completed'],
-            'cancelled' => ['bg' => '#fff1f2', 'border' => '#fecdd3', 'text' => '#be123c', 'label' => 'Cancelled'],
-            'no_show' => ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => 'No-show'],
+            'cancelled' => ['bg' => '#fff1f2', 'border' => '#fecdd3', 'text' => '#be123c', 'label' => 'Reschedule'],
+            'no_show' => ['bg' => '#fff1f2', 'border' => '#fecdd3', 'text' => '#be123c', 'label' => 'Reschedule'],
         ];
         $slotOptions = [];
         if (! empty($availability['viable_slots'])) {
@@ -38,22 +39,42 @@
         $selectedSlotRow = $prefilledSlot ? ($availability['slots'][$prefilledSlot] ?? null) : null;
         $dailyStatusCounts = [
             'total' => $appointmentGroups->count(),
-            'booked' => 0,
-            'confirmed' => 0,
             'checked_in' => 0,
             'completed' => 0,
-            'cancelled' => 0,
+            'reschedule' => 0,
         ];
         foreach ($appointmentGroups as $group) {
             $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-            if (array_key_exists($statusValue, $dailyStatusCounts)) {
-                $dailyStatusCounts[$statusValue]++;
-            } elseif ($statusValue === 'no_show') {
-                $dailyStatusCounts['cancelled']++;
-            } else {
-                $dailyStatusCounts['booked']++;
+            if ($statusValue === 'checked_in') {
+                $dailyStatusCounts['checked_in']++;
+            } elseif ($statusValue === 'completed') {
+                $dailyStatusCounts['completed']++;
+            } elseif (in_array($statusValue, ['cancelled', 'no_show'], true)) {
+                $dailyStatusCounts['reschedule']++;
             }
         }
+        $summaryCards = [
+            [
+                'label' => 'Total',
+                'value' => $dailyStatusCounts['total'],
+                'status' => null,
+            ],
+            [
+                'label' => 'Checked In',
+                'value' => $dailyStatusCounts['checked_in'],
+                'status' => 'checked_in',
+            ],
+            [
+                'label' => 'Completed',
+                'value' => $dailyStatusCounts['completed'],
+                'status' => 'completed',
+            ],
+            [
+                'label' => 'Reschedule',
+                'value' => $dailyStatusCounts['reschedule'],
+                'status' => 'reschedule',
+            ],
+        ];
         $selectedServiceLabels = $services->whereIn('id', $selectedServiceIds)->pluck('name')->values()->all();
         $selectedServiceOrderIds = collect($filters['service_order'] ?? [])
             ->map(fn ($id) => (string) $id)
@@ -102,9 +123,11 @@
 
         <section class="ops-card ops-card--hero">
             <div class="ops-card__body">
-                <div class="ops-kicker">{{ $isCheckInMode ? 'Status control' : 'Front desk' }}</div>
-                <h2 class="ops-title">{{ $isCheckInMode ? "Manage today's appointment statuses" : "Book and manage today's appointments" }}</h2>
-                <div class="ops-subtitle">{{ $isCheckInMode ? 'Review today\'s queue and update pending, confirmed, checked-in, completed, cancelled, or no-show statuses from one place.' : 'Choose services, find an available team member, and confirm the booking without jumping between screens.' }}</div>
+                <div class="ops-kicker">{{ $isCheckInMode ? 'Status' : 'Appointments' }}</div>
+                <h2 class="ops-title">{{ $isCheckInMode ? 'Status' : "Book and manage today's appointments" }}</h2>
+                @if (! $isCheckInMode)
+                    <div class="ops-subtitle">Choose services, find an available team member, and confirm the booking without jumping between screens.</div>
+                @endif
 
                 <div class="metrics-grid" style="margin-top:22px;">
                     <div class="metric-card">
@@ -112,31 +135,20 @@
                         <div class="metric-card__value" style="font-size:22px;">{{ \Carbon\Carbon::parse($selectedDate)->format('d M') }}</div>
                         <div class="metric-card__meta">{{ \Carbon\Carbon::parse($selectedDate)->format('l') }}</div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-card__label">Total</div>
-                        <div class="metric-card__value">{{ $dailyStatusCounts['total'] }}</div>
-                        <div class="metric-card__meta">Booked groups</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-card__label">Pending</div>
-                        <div class="metric-card__value">{{ $dailyStatusCounts['booked'] }}</div>
-                        <div class="metric-card__meta">Needs action</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-card__label">Confirmed</div>
-                        <div class="metric-card__value">{{ $dailyStatusCounts['confirmed'] }}</div>
-                        <div class="metric-card__meta">Reserved</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-card__label">Checked In</div>
-                        <div class="metric-card__value">{{ $dailyStatusCounts['checked_in'] }}</div>
-                        <div class="metric-card__meta">On site</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-card__label">Completed</div>
-                        <div class="metric-card__value">{{ $dailyStatusCounts['completed'] }}</div>
-                        <div class="metric-card__meta">Finished</div>
-                    </div>
+                    @foreach ($summaryCards as $card)
+                        @php
+                            $cardUrl = route('app.appointments.index', array_filter([
+                                'mode' => $mode,
+                                'date' => $selectedDate,
+                                'status' => $card['status'],
+                            ]));
+                            $isActiveCard = ($card['status'] === null && $selectedStatus === null) || ($card['status'] !== null && $selectedStatus === $card['status']);
+                        @endphp
+                        <a href="{{ $cardUrl }}" class="metric-card metric-card--action {{ $isActiveCard ? 'is-active' : '' }}">
+                            <div class="metric-card__label">{{ $card['label'] }}</div>
+                            <div class="metric-card__value">{{ $card['value'] }}</div>
+                        </a>
+                    @endforeach
                 </div>
             </div>
         </section>
@@ -358,27 +370,41 @@
         <section class="ops-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
-                    <div class="ops-kicker">{{ $isCheckInMode ? 'Customer status queue' : 'Live Booking Queue' }}</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">{{ $isCheckInMode ? 'Check-in and status control for '.\Carbon\Carbon::parse($selectedDate)->format('d M Y') : 'Schedule for '.\Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
-                    <div class="ops-subtitle" style="max-width:none;">{{ $isCheckInMode ? 'Use this queue only for status changes and same-day customer handling.' : 'Current appointment groups for the selected day. Front desk can review service allocations and update status without leaving the booking desk.' }}</div>
+                    <div class="filter-bar__head">
+                        <div>
+                            <div class="ops-kicker">{{ $isCheckInMode ? 'Status update' : 'Schedule' }}</div>
+                            <h3 class="panel-title-display" style="font-size:24px;">{{ ($isCheckInMode ? 'Status update' : 'Schedule').' for '.\Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
+                        </div>
+                        <div class="page-actions">
+                            @if ($selectedStatus)
+                                <a href="{{ route('app.appointments.index', array_filter(['mode' => $mode, 'date' => $selectedDate])) }}" class="btn btn-secondary">Reset list</a>
+                            @endif
+                            <button type="button" class="btn btn-secondary" onclick="window.print()">Print list</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="ops-card__body">
 
                     <div class="schedule-list">
                         @forelse ($appointmentGroups as $group)
-                            @php
-                                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-                                $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
-                                $statusLabel = $group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label'];
-                            @endphp
+                              @php
+                                  $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+                                  $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
+                                  $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
+                                      ? 'Reschedule'
+                                      : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
+                              @endphp
                             <article class="schedule-card">
                                 <div class="schedule-card__head">
-                                    <div>
-                                        <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
-                                        <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
-                                        <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
-                                    </div>
+                                      <div>
+                                          <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
+                                          <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
+                                          <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
+                                          @if ($group->customer?->membership_type)
+                                              <div class="schedule-card__membership">{{ $group->customer->membership_type }}</div>
+                                          @endif
+                                      </div>
                                     <span class="status-chip" style="background: {{ $statusStyle['bg'] }}; border-color: {{ $statusStyle['border'] }}; color: {{ $statusStyle['text'] }};">
                                         <span class="status-dot"></span>
                                         {{ $statusLabel }}
@@ -402,12 +428,14 @@
                                 <form method="POST" action="{{ route('app.appointments.status', $group) }}" style="margin-top:16px;display:grid;gap:8px;">
                                     @csrf
                                     @method('PATCH')
-                                    <label for="status-{{ $group->id }}" class="field-label" style="color: var(--app-accent-strong);">Update status</label>
+                                    <label for="status-{{ $group->id }}" class="field-label" style="color: var(--app-accent-strong);">Status update</label>
                                     <select id="status-{{ $group->id }}" name="status" onchange="this.form.submit()" class="field-input select-input">
                                         @foreach ($statusOptions as $option)
                                             @php
                                                 $optionValue = $option instanceof \BackedEnum ? $option->value : (is_string($option) ? $option : '');
-                                                $optionLabel = $option instanceof \App\Enums\AppointmentStatus ? $option->label() : \Illuminate\Support\Str::headline(str_replace('_', ' ', $optionValue));
+                                                $optionLabel = in_array($optionValue, ['cancelled', 'no_show'], true)
+                                                    ? 'Reschedule'
+                                                    : ($option instanceof \App\Enums\AppointmentStatus ? $option->label() : \Illuminate\Support\Str::headline(str_replace('_', ' ', $optionValue)));
                                             @endphp
                                             <option value="{{ $optionValue }}" @selected($statusValue === $optionValue)>{{ $optionLabel }}</option>
                                         @endforeach
