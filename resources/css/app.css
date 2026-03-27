@@ -1574,6 +1574,14 @@
         grid-template-columns: 1fr;
     }
 
+    .staff-access-panel .field-block {
+        gap: 0.4rem;
+    }
+
+    .staff-access-panel .btn-row.btn-row--start {
+        margin-top: 0.1rem;
+    }
+
     .timeline-grid {
         position: relative;
         margin-left: 92px;
