@@ -58,6 +58,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.status');
+        Route::patch('/appointments/{appointmentGroup}', [AppointmentController::class, 'updateFromCalendar'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.update');
 
         Route::get('/calendar', [CalendarController::class, 'index'])
             ->middleware('app_permission:calendar.view')

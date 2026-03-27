@@ -410,6 +410,193 @@ class AppointmentController extends Controller
         return back()->with('success', 'Status updated.');
     }
 
+    public function updateFromCalendar(Request $request, AppointmentGroup $appointmentGroup): JsonResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => ['nullable', 'string', Rule::exists('customers', 'id')],
+            'customer_full_name' => ['required', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:50'],
+            'status' => ['required', Rule::in(AppointmentStatus::values())],
+            'source' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'string'],
+            'items.*.service_id' => ['required', 'string', Rule::exists('services', 'id')],
+            'items.*.staff_id' => ['nullable', 'string', Rule::exists('staff', 'id')],
+            'items.*.date' => ['required', 'date_format:Y-m-d'],
+            'items.*.start_time' => ['required', 'date_format:H:i'],
+            'items.*.end_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $appointmentGroup->loadMissing([
+            'customer',
+            'items:id,appointment_group_id,service_id,staff_id,starts_at,ends_at',
+        ]);
+
+        $existingItems = $appointmentGroup->items->keyBy(fn ($item) => (string) $item->id);
+
+        foreach ($validated['items'] as $row) {
+            if (! $existingItems->has((string) $row['id'])) {
+                throw ValidationException::withMessages([
+                    'items' => 'One or more linked service items could not be found for this appointment.',
+                ]);
+            }
+        }
+
+        $serviceIds = collect($validated['items'])->pluck('service_id')->map(fn ($id) => (string) $id)->unique()->values();
+        $services = Service::query()
+            ->whereIn('id', $serviceIds)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy(fn ($service) => (string) $service->id);
+
+        if ($services->count() !== $serviceIds->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'One or more selected services are inactive or unavailable.',
+            ]);
+        }
+
+        $staffIds = collect($validated['items'])
+            ->pluck('staff_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+
+        $staffMembers = Staff::query()
+            ->whereIn('id', $staffIds)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy(fn ($staff) => (string) $staff->id);
+
+        if ($staffIds->count() !== $staffMembers->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'One or more assigned staff members are inactive or unavailable.',
+            ]);
+        }
+
+        $preparedItems = collect($validated['items'])->map(function (array $row) use ($existingItems, $services, $staffMembers) {
+            $item = $existingItems->get((string) $row['id']);
+            $serviceId = (string) $row['service_id'];
+            $staffId = filled($row['staff_id']) ? (string) $row['staff_id'] : null;
+            $service = $services->get($serviceId);
+            $staff = $staffId ? $staffMembers->get($staffId) : null;
+            $start = Carbon::createFromFormat('Y-m-d H:i', $row['date'].' '.$row['start_time']);
+            $end = Carbon::createFromFormat('Y-m-d H:i', $row['date'].' '.$row['end_time']);
+
+            if ($end->lte($start)) {
+                throw ValidationException::withMessages([
+                    'items' => 'Each linked service must end after its start time.',
+                ]);
+            }
+
+            $clinicStart = $start->copy()->setTime(9, 0);
+            $clinicEnd = $start->copy()->setTime(18, 0);
+
+            if ($start->lt($clinicStart) || $end->gt($clinicEnd)) {
+                throw ValidationException::withMessages([
+                    'items' => 'Appointments can only be scheduled within clinic hours from 09:00 to 18:00.',
+                ]);
+            }
+
+            if ($staff && ! $service->staff()->where('staff.id', $staff->id)->where('staff.is_active', true)->exists()) {
+                throw ValidationException::withMessages([
+                    'items' => "{$staff->full_name} is not assigned to {$service->name}.",
+                ]);
+            }
+
+            return [
+                'item' => $item,
+                'service' => $service,
+                'staff' => $staff,
+                'staff_id' => $staffId,
+                'start' => $start,
+                'end' => $end,
+            ];
+        })->values();
+
+        foreach ($preparedItems as $index => $current) {
+            if ($current['staff_id']) {
+                $hasConflict = AppointmentItem::query()
+                    ->where('staff_id', $current['staff_id'])
+                    ->where('id', '!=', $current['item']->id)
+                    ->where('starts_at', '<', $current['end'])
+                    ->where('ends_at', '>', $current['start'])
+                    ->exists();
+
+                if ($hasConflict) {
+                    $staffName = $current['staff']?->full_name ?? 'Assigned staff';
+
+                    throw ValidationException::withMessages([
+                        'items' => "{$staffName} is already occupied in one of the selected time blocks.",
+                    ]);
+                }
+            }
+
+            foreach ($preparedItems->slice($index + 1) as $other) {
+                if (! $current['staff_id'] || $current['staff_id'] !== $other['staff_id']) {
+                    continue;
+                }
+
+                if ($current['start']->lt($other['end']) && $current['end']->gt($other['start'])) {
+                    $staffName = $current['staff']?->full_name ?? 'Assigned staff';
+
+                    throw ValidationException::withMessages([
+                        'items' => "{$staffName} is assigned to overlapping linked service times in this visit.",
+                    ]);
+                }
+            }
+        }
+
+        DB::transaction(function () use ($validated, $appointmentGroup, $preparedItems) {
+            $phone = trim((string) ($validated['customer_phone'] ?? ''));
+            $customer = null;
+
+            if (! empty($validated['customer_id'])) {
+                $customer = Customer::query()->find($validated['customer_id']);
+            }
+
+            if (! $customer && $phone !== '') {
+                $customer = Customer::query()->firstOrCreate(
+                    ['phone' => $phone],
+                    ['full_name' => $validated['customer_full_name']]
+                );
+            }
+
+            if (! $customer) {
+                $customer = $appointmentGroup->customer ?: new Customer();
+            }
+
+            $customer->full_name = $validated['customer_full_name'];
+            $customer->phone = $phone !== '' ? $phone : $customer->phone;
+            $customer->save();
+
+            foreach ($preparedItems as $preparedItem) {
+                $preparedItem['item']->update([
+                    'service_id' => $preparedItem['service']->id,
+                    'staff_id' => $preparedItem['staff_id'],
+                    'required_role' => $preparedItem['staff']?->role_key,
+                    'starts_at' => $preparedItem['start'],
+                    'ends_at' => $preparedItem['end'],
+                ]);
+            }
+
+            $appointmentGroup->update([
+                'customer_id' => $customer->id,
+                'status' => $validated['status'],
+                'source' => filled($validated['source'] ?? null) ? trim((string) $validated['source']) : null,
+                'notes' => $validated['notes'] ?? null,
+                'services_summary' => $preparedItems->map(fn ($preparedItem) => $preparedItem['service']->name)->implode(', '),
+            ]);
+
+            $this->syncAppointmentGroupWindow($appointmentGroup);
+        });
+
+        return response()->json([
+            'message' => 'Appointment updated successfully.',
+        ]);
+    }
+
     public function reschedule(Request $request, AppointmentGroup $appointmentGroup)
     {
         $validated = $request->validate([

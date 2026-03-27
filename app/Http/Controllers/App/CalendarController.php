@@ -6,6 +6,7 @@ use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
+use App\Models\Service;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -93,6 +94,40 @@ class CalendarController extends Controller
         $monthDays = $this->buildMonthDays($monthStart, $groups, $selectedDate, $staffId, $viewMode);
         $daySummary = $this->buildDaySummary($groupsForSelectedDay);
         $selectedStaff = $staffList->firstWhere('id', $staffId);
+        $serviceOptions = Service::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($service) => [
+                'id' => (string) $service->id,
+                'name' => $service->name,
+            ])
+            ->values();
+        $staffOptions = Staff::query()
+            ->where('is_active', true)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'job_title', 'role_key'])
+            ->map(fn ($staff) => [
+                'id' => (string) $staff->id,
+                'full_name' => $staff->full_name,
+                'label' => $staff->job_title
+                    ? $staff->full_name.' - '.$staff->job_title
+                    : $staff->full_name.($staff->role_key ? ' - '.str($staff->role_key)->replace('_', ' ')->title()->toString() : ''),
+            ])
+            ->values();
+        $statusOptions = collect(AppointmentStatus::cases())
+            ->map(fn (AppointmentStatus $status) => [
+                'value' => $status->value,
+                'label' => in_array($status->value, ['cancelled', 'no_show'], true) ? 'Reschedule' : $status->label(),
+            ])
+            ->unique('value')
+            ->values();
+        $sourceOptions = collect(['admin', 'walk_in', 'whatsapp', 'instagram', 'facebook', 'referral'])
+            ->map(fn (string $source) => [
+                'value' => $source,
+                'label' => $this->formatSourceLabel($source) ?? str($source)->replace('_', ' ')->title()->toString(),
+            ])
+            ->values();
 
         return view('app.calendar.index', [
             'title' => 'Calendar',
@@ -120,6 +155,10 @@ class CalendarController extends Controller
             'currentWeek' => now()->startOfWeek(Carbon::TUESDAY)->toDateString(),
             'currentMonth' => now()->startOfMonth()->toDateString(),
             'daySummary' => $daySummary,
+            'serviceOptions' => $serviceOptions,
+            'staffOptions' => $staffOptions,
+            'statusOptions' => $statusOptions,
+            'sourceOptions' => $sourceOptions,
             'canManageAppointments' => auth()->user()?->hasAppPermission('appointments.manage') ?? false,
             'canViewMembershipBalance' => auth()->user()?->hasAppPermission('customers.view') ?? false,
         ]);
@@ -272,10 +311,14 @@ class CalendarController extends Controller
         return [
             'id' => (string) $item->id,
             'group_id' => (string) $group->id,
+            'customer_id' => $group->customer?->id ? (string) $group->customer->id : null,
             'group_service_count' => $group->items->count(),
             'customer_name' => optional($group->customer)->full_name ?: 'Unknown Customer',
             'customer_phone' => optional($group->customer)->phone ?: 'No phone recorded',
             'membership_label' => $this->membershipLabel($group),
+            'membership_type' => optional($group->customer)->membership_type,
+            'membership_code' => optional($group->customer)->membership_code,
+            'membership_balance' => optional($group->customer)->current_package,
             'service_names' => $services->all(),
             'service_summary' => $itemServiceName,
             'staff_ids' => $item->staff_id ? [(string) $item->staff_id] : [],
@@ -296,11 +339,13 @@ class CalendarController extends Controller
             'status_value' => $statusValue,
             'status_label' => $statusStyles['label'],
             'notes' => $group->notes ?: null,
+            'source_value' => (string) ($group->source ?: 'admin'),
             'source' => $this->formatSourceLabel($group->source),
             'manage_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
-            'edit_url' => route('app.appointments.index', ['date' => $startsAt->toDateString()]),
+            'edit_url' => route('app.appointments.update', $group),
             'create_url' => route('app.appointments.index', ['date' => $startsAt->toDateString(), 'slot' => $startsAt->format('H:i')]),
             'reschedule_url' => route('app.appointments.items.reschedule', $item),
+            'update_url' => route('app.appointments.update', $group),
             'service_styles' => $serviceStyles,
             'status_styles' => $statusStyles,
             'top_px' => (int) round($topMinutes * $pixelsPerMinute),
@@ -311,6 +356,22 @@ class CalendarController extends Controller
             'date_iso' => $startsAt->toDateString(),
             'start_24' => $startsAt->format('H:i'),
             'item_role' => $itemStaffRole,
+            'editable_items' => $group->items->map(function ($linkedItem) {
+                return [
+                    'id' => (string) $linkedItem->id,
+                    'service_id' => $linkedItem->service_id ? (string) $linkedItem->service_id : null,
+                    'staff_id' => $linkedItem->staff_id ? (string) $linkedItem->staff_id : null,
+                    'service_name' => $linkedItem->service?->name ?: 'Service',
+                    'staff_label' => $linkedItem->staff
+                        ? ($linkedItem->staff->job_title
+                            ? $linkedItem->staff->full_name.' - '.$linkedItem->staff->job_title
+                            : $linkedItem->staff->full_name)
+                        : 'Unassigned',
+                    'date' => $linkedItem->starts_at?->format('Y-m-d') ?: $group->starts_at?->format('Y-m-d'),
+                    'start_time' => $linkedItem->starts_at?->format('H:i') ?: '09:00',
+                    'end_time' => $linkedItem->ends_at?->format('H:i') ?: '09:30',
+                ];
+            })->values()->all(),
         ];
     }
 

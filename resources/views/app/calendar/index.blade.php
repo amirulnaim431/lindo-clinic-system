@@ -196,7 +196,7 @@
     <div id="calendar-detail-modal" class="modal-shell hidden" aria-hidden="true">
         <div class="modal-backdrop"></div>
         <div class="modal-stage">
-            <div class="modal-card">
+            <div class="modal-card calendar-editor-modal">
                 <div id="modal-header" class="modal-header">
                     <div class="modal-header__row">
                         <div>
@@ -208,34 +208,107 @@
                     </div>
                 </div>
                 <div class="modal-body">
-                    <div class="modal-meta-grid">
-                        <div class="modal-panel modal-panel--wide"><div class="modal-panel__label">Date & Time</div><div id="modal-time" class="modal-panel__value">-</div></div>
-                        <div class="modal-panel"><div class="modal-panel__label">Status</div><div id="modal-status" class="modal-panel__value" style="margin-top:10px;"></div></div>
-                    </div>
-                    <div class="modal-meta-grid">
-                        <div class="modal-panel"><div class="modal-panel__label">Customer Phone</div><div id="modal-phone" class="modal-panel__value">-</div></div>
-                        <div class="modal-panel"><div class="modal-panel__label">Package / Membership</div><div id="modal-membership" class="modal-panel__value">-</div></div>
-                        <div class="modal-panel"><div class="modal-panel__label">Source</div><div id="modal-source" class="modal-panel__value">-</div></div>
-                    </div>
-                    @if ($canViewMembershipBalance)
+                    <div data-calendar-detail-view>
                         <div class="modal-meta-grid">
-                            <div class="modal-panel modal-panel--wide">
-                                <div class="modal-panel__label">Total Balance Membership</div>
-                                <div id="modal-membership-balance" class="modal-panel__value">Coming soon</div>
-                                <div class="small-note" style="margin-top: 0.55rem;">Pending input</div>
-                            </div>
+                            <div class="modal-panel modal-panel--wide"><div class="modal-panel__label">Date & Time</div><div id="modal-time" class="modal-panel__value">-</div></div>
+                            <div class="modal-panel"><div class="modal-panel__label">Status</div><div id="modal-status" class="modal-panel__value" style="margin-top:10px;"></div></div>
                         </div>
-                    @endif
-                    <div class="modal-meta-grid">
-                        <div class="modal-panel"><div class="modal-panel__label">Visit Services</div><div id="modal-services" class="modal-pill-list">-</div></div>
-                        <div class="modal-panel"><div class="modal-panel__label">Assigned Staff</div><div id="modal-staff" class="modal-pill-list">-</div></div>
+                        <div class="modal-meta-grid">
+                            <div class="modal-panel"><div class="modal-panel__label">Customer Phone</div><div id="modal-phone" class="modal-panel__value">-</div></div>
+                            <div class="modal-panel"><div class="modal-panel__label">Package / Membership</div><div id="modal-membership" class="modal-panel__value">-</div></div>
+                            <div class="modal-panel"><div class="modal-panel__label">Source</div><div id="modal-source" class="modal-panel__value">-</div></div>
+                        </div>
+                        @if ($canViewMembershipBalance)
+                            <div class="modal-meta-grid">
+                                <div class="modal-panel modal-panel--wide">
+                                    <div class="modal-panel__label">Total Balance Membership</div>
+                                    <div id="modal-membership-balance" class="modal-panel__value">Coming soon</div>
+                                    <div id="modal-membership-balance-note" class="small-note" style="margin-top: 0.55rem;">Pending input</div>
+                                </div>
+                            </div>
+                        @endif
+                        <div class="modal-meta-grid">
+                            <div class="modal-panel"><div class="modal-panel__label">Visit Services</div><div id="modal-services" class="modal-pill-list">-</div></div>
+                            <div class="modal-panel"><div class="modal-panel__label">Assigned Staff</div><div id="modal-staff" class="modal-pill-list">-</div></div>
+                        </div>
+                        <div class="modal-panel"><div class="modal-panel__label">Linked Visit Flow</div><div id="modal-linked-services" class="modal-pill-list">-</div></div>
+                        <div class="modal-panel"><div class="modal-panel__label">Notes</div><div id="modal-notes" class="modal-panel__value" style="white-space:pre-line;">-</div></div>
                     </div>
-                    <div class="modal-panel"><div class="modal-panel__label">Linked Visit Flow</div><div id="modal-linked-services" class="modal-pill-list">-</div></div>
-                    <div class="modal-panel"><div class="modal-panel__label">Notes</div><div id="modal-notes" class="modal-panel__value" style="white-space:pre-line;">-</div></div>
+
+                    @if ($canManageAppointments)
+                    <div class="calendar-editor hidden" data-calendar-edit-view>
+                        <div id="calendar-edit-feedback" class="flash flash--error hidden"></div>
+
+                        <div class="calendar-editor__grid">
+                            <section class="calendar-editor__panel calendar-editor__panel--customer">
+                                <div class="modal-panel__label">Customer</div>
+                                <div class="calendar-editor__fields">
+                                    <div class="field-block customer-picker">
+                                        <label for="calendar-edit-customer-name" class="field-label">Customer name</label>
+                                        <input id="calendar-edit-customer-id" type="hidden">
+                                        <input id="calendar-edit-customer-name" type="text" class="field-input" autocomplete="off" placeholder="Search customer or type a new name">
+                                        <div id="calendar-edit-customer-suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
+                                        <div id="calendar-edit-customer-selected" class="customer-picked hidden"></div>
+                                    </div>
+                                    <div class="field-block">
+                                        <label for="calendar-edit-customer-phone" class="field-label">Customer phone</label>
+                                        <input id="calendar-edit-customer-phone" type="text" class="field-input" placeholder="Phone number">
+                                    </div>
+                                    <div class="field-block">
+                                        <label class="field-label">Membership</label>
+                                        <div id="calendar-edit-membership-summary" class="calendar-editor__summary-card">No package or membership linked</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="calendar-editor__panel">
+                                <div class="modal-panel__label">Visit Settings</div>
+                                <div class="calendar-editor__fields calendar-editor__fields--compact">
+                                    <div class="field-block calendar-editor__control">
+                                        <label for="calendar-edit-date" class="field-label">Date</label>
+                                        <div class="calendar-editor__control-shell calendar-editor__control-shell--date">
+                                            <input id="calendar-edit-date" type="date" class="field-input calendar-editor__input">
+                                        </div>
+                                    </div>
+                                    <div class="field-block calendar-editor__control">
+                                        <label for="calendar-edit-status" class="field-label">Status</label>
+                                        <div class="calendar-editor__control-shell calendar-editor__control-shell--select">
+                                            <select id="calendar-edit-status" class="field-input select-input calendar-editor__input"></select>
+                                        </div>
+                                    </div>
+                                    <div class="field-block calendar-editor__control">
+                                        <label for="calendar-edit-source" class="field-label">Source</label>
+                                        <div class="calendar-editor__control-shell calendar-editor__control-shell--select">
+                                            <select id="calendar-edit-source" class="field-input select-input calendar-editor__input"></select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field-block" style="margin-top: 1rem;">
+                                    <label for="calendar-edit-notes" class="field-label">Notes</label>
+                                    <textarea id="calendar-edit-notes" class="field-input booking-textarea" style="min-height: 120px;"></textarea>
+                                </div>
+                            </section>
+                        </div>
+
+                        <section class="calendar-editor__panel">
+                            <div class="filter-bar__head">
+                                <div>
+                                    <div class="modal-panel__label">Linked Visit Flow</div>
+                                    <div class="small-note" style="margin-top: 0.35rem;">Adjust service, assigned PIC, and exact timing directly here.</div>
+                                </div>
+                            </div>
+                            <div id="calendar-edit-items" class="calendar-editor__items"></div>
+                        </section>
+                    </div>
+                    @endif
                 </div>
                 <div class="modal-actions">
                     <a id="modal-create-link" href="#" class="modal-btn modal-btn--secondary">Book this time</a>
-                    <a id="modal-edit-link" href="#" class="modal-btn modal-btn--secondary">Edit</a>
+                    @if ($canManageAppointments)
+                    <button type="button" id="modal-edit-link" class="modal-btn modal-btn--secondary">Edit</button>
+                    <button type="button" id="modal-edit-cancel" class="modal-btn modal-btn--secondary hidden">Cancel</button>
+                    <button type="button" id="modal-edit-save" class="modal-btn modal-btn--primary hidden">Save changes</button>
+                    @endif
                     <a id="modal-manage-link" href="#" class="modal-btn modal-btn--primary">Open appointments</a>
                     <button type="button" id="calendar-detail-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
                 </div>
@@ -287,6 +360,8 @@
             const modal = document.getElementById('calendar-detail-modal');
             const overflowModal = document.getElementById('calendar-overflow-modal');
             const modalHeader = document.getElementById('modal-header');
+            const detailView = document.querySelector('[data-calendar-detail-view]');
+            const editView = document.querySelector('[data-calendar-edit-view]');
             const closeTop = document.getElementById('calendar-detail-close-top');
             const closeBottom = document.getElementById('calendar-detail-close-bottom');
             const overflowCloseTop = document.getElementById('calendar-overflow-close-top');
@@ -294,6 +369,20 @@
             const manageLink = document.getElementById('modal-manage-link');
             const createLink = document.getElementById('modal-create-link');
             const editLink = document.getElementById('modal-edit-link');
+            const editCancel = document.getElementById('modal-edit-cancel');
+            const editSave = document.getElementById('modal-edit-save');
+            const editFeedback = document.getElementById('calendar-edit-feedback');
+            const editCustomerId = document.getElementById('calendar-edit-customer-id');
+            const editCustomerName = document.getElementById('calendar-edit-customer-name');
+            const editCustomerPhone = document.getElementById('calendar-edit-customer-phone');
+            const editCustomerSuggestions = document.getElementById('calendar-edit-customer-suggestions');
+            const editCustomerSelected = document.getElementById('calendar-edit-customer-selected');
+            const editMembershipSummary = document.getElementById('calendar-edit-membership-summary');
+            const editDate = document.getElementById('calendar-edit-date');
+            const editStatus = document.getElementById('calendar-edit-status');
+            const editSource = document.getElementById('calendar-edit-source');
+            const editNotes = document.getElementById('calendar-edit-notes');
+            const editItems = document.getElementById('calendar-edit-items');
             const timelineGrid = document.querySelector('.timeline-grid');
             const timelineButtons = Array.from(document.querySelectorAll('.calendar-event-btn'));
             const overflowButtons = Array.from(document.querySelectorAll('.calendar-overflow-btn'));
@@ -304,6 +393,13 @@
             const selectedDateIso = @json($selectedDateIso);
             const slots = @json($slots);
             const csrfToken = @json(csrf_token());
+            const customerSearchUrl = @json(route('app.appointments.customer-search'));
+            const serviceOptions = @json($serviceOptions);
+            const staffOptions = @json($staffOptions);
+            const statusOptions = @json($statusOptions);
+            const sourceOptions = @json($sourceOptions);
+            let activeCustomerRequest = null;
+            let currentEventData = null;
 
             const setText = (id, value, fallback = '-') => {
                 const element = document.getElementById(id);
@@ -311,6 +407,13 @@
                     element.textContent = value && String(value).trim() !== '' ? value : fallback;
                 }
             };
+
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
 
             const setList = (id, values) => {
                 const element = document.getElementById(id);
@@ -329,7 +432,238 @@
                 container.innerHTML = `<span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold" style="background:${eventData.status_styles.badge_bg}; border-color:${eventData.status_styles.badge_border}; color:${eventData.status_styles.badge_text};"><span style="width:8px; height:8px; border-radius:999px; background:${eventData.status_styles.dot}; display:inline-block;"></span>${eventData.status_label || 'Status'}</span>`;
             };
 
+            const populateSelect = (select, options, selectedValue, placeholder = null) => {
+                if (!select) {
+                    return;
+                }
+
+                const optionMarkup = [];
+
+                if (placeholder !== null) {
+                    optionMarkup.push(`<option value="">${escapeHtml(placeholder)}</option>`);
+                }
+
+                optionMarkup.push(...(options || []).map((option) => {
+                    const value = String(option.value ?? option.id ?? '');
+                    const label = option.label ?? option.name ?? option.full_name ?? value;
+                    const selected = value === String(selectedValue ?? '') ? ' selected' : '';
+                    return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
+                }));
+
+                select.innerHTML = optionMarkup.join('');
+            };
+
+            const formatMembershipBalance = (value) => {
+                const raw = String(value ?? '').trim();
+
+                if (!raw) {
+                    return 'Pending input';
+                }
+
+                const normalized = raw.replace(/[^0-9.\-]/g, '');
+
+                if (normalized && !Number.isNaN(Number(normalized))) {
+                    return `RM ${Number(normalized).toLocaleString()}`;
+                }
+
+                return raw;
+            };
+
+            const setMembershipSummary = (customer) => {
+                if (!editMembershipSummary) {
+                    return;
+                }
+
+                const membership = [customer?.membership_type, customer?.membership_code].filter(Boolean).join(' | ') || 'No package or membership linked';
+                const balance = formatMembershipBalance(customer?.current_package);
+                editMembershipSummary.innerHTML = `
+                    <div class="calendar-editor__summary-title">${escapeHtml(membership)}</div>
+                    <div class="calendar-editor__summary-meta">Membership balance: ${escapeHtml(balance)}</div>
+                `;
+            };
+
+            const renderSelectedCustomer = (customer) => {
+                if (!editCustomerSelected) {
+                    return;
+                }
+
+                const parts = [customer?.full_name || 'Customer'];
+
+                if (customer?.phone) {
+                    parts.push(customer.phone);
+                }
+
+                if (customer?.membership_code) {
+                    parts.push(`Member ${customer.membership_code}`);
+                }
+
+                editCustomerSelected.textContent = `Linked customer: ${parts.join(' | ')}`;
+                editCustomerSelected.classList.remove('hidden');
+                setMembershipSummary(customer);
+            };
+
+            const clearSelectedCustomer = () => {
+                if (editCustomerId) {
+                    editCustomerId.value = '';
+                }
+
+                editCustomerSelected?.classList.add('hidden');
+                if (editCustomerSelected) {
+                    editCustomerSelected.textContent = '';
+                }
+                setMembershipSummary({ membership_type: '', membership_code: '', current_package: '' });
+            };
+
+            const hideCustomerSuggestions = () => {
+                editCustomerSuggestions?.classList.add('hidden');
+                if (editCustomerSuggestions) {
+                    editCustomerSuggestions.innerHTML = '';
+                }
+            };
+
+            const selectCustomer = (customer) => {
+                if (editCustomerId) {
+                    editCustomerId.value = customer.id || '';
+                }
+
+                if (editCustomerName) {
+                    editCustomerName.value = customer.full_name || '';
+                }
+
+                if (editCustomerPhone && customer.phone) {
+                    editCustomerPhone.value = customer.phone;
+                }
+
+                renderSelectedCustomer(customer);
+                hideCustomerSuggestions();
+            };
+
+            const renderCustomerSuggestions = (customers) => {
+                if (!editCustomerSuggestions) {
+                    return;
+                }
+
+                editCustomerSuggestions.innerHTML = '';
+
+                if (!customers.length) {
+                    hideCustomerSuggestions();
+                    return;
+                }
+
+                customers.forEach((customer) => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.className = 'customer-suggestion';
+                    option.innerHTML = `
+                        <div class="customer-suggestion__name">${escapeHtml(customer.full_name || 'Customer')}</div>
+                        <div class="customer-suggestion__meta">
+                            ${escapeHtml(customer.phone || 'No phone')}
+                            ${customer.membership_code ? ` | Member ${escapeHtml(customer.membership_code)}` : ''}
+                            ${customer.current_package ? ` | ${escapeHtml(customer.current_package)}` : ''}
+                        </div>
+                    `;
+                    option.addEventListener('click', () => selectCustomer(customer));
+                    editCustomerSuggestions.appendChild(option);
+                });
+
+                editCustomerSuggestions.classList.remove('hidden');
+            };
+
+            const renderEditItems = (items = []) => {
+                if (!editItems) {
+                    return;
+                }
+
+                editItems.innerHTML = (items || []).map((item, index) => `
+                    <div class="calendar-editor__item" data-edit-item-id="${escapeHtml(item.id)}">
+                        <div class="calendar-editor__item-head">
+                            <div>
+                                <div class="calendar-editor__item-title">Service ${index + 1}</div>
+                                <div class="calendar-editor__item-meta">Linked visit item</div>
+                            </div>
+                        </div>
+                        <div class="calendar-editor__item-grid">
+                            <div class="field-block calendar-editor__control">
+                                <label class="field-label">Service</label>
+                                <div class="calendar-editor__control-shell calendar-editor__control-shell--select">
+                                    <select class="field-input select-input calendar-editor__input" data-edit-field="service_id"></select>
+                                </div>
+                            </div>
+                            <div class="field-block calendar-editor__control">
+                                <label class="field-label">PIC</label>
+                                <div class="calendar-editor__control-shell calendar-editor__control-shell--select">
+                                    <select class="field-input select-input calendar-editor__input" data-edit-field="staff_id"></select>
+                                </div>
+                            </div>
+                            <div class="field-block calendar-editor__control">
+                                <label class="field-label">Start</label>
+                                <div class="calendar-editor__control-shell calendar-editor__control-shell--time">
+                                    <input type="time" class="field-input calendar-editor__input" data-edit-field="start_time" value="${escapeHtml(item.start_time || '09:00')}">
+                                </div>
+                            </div>
+                            <div class="field-block calendar-editor__control">
+                                <label class="field-label">End</label>
+                                <div class="calendar-editor__control-shell calendar-editor__control-shell--time">
+                                    <input type="time" class="field-input calendar-editor__input" data-edit-field="end_time" value="${escapeHtml(item.end_time || '09:30')}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                Array.from(editItems.querySelectorAll('[data-edit-item-id]')).forEach((row, index) => {
+                    const item = items[index];
+                    populateSelect(row.querySelector('[data-edit-field="service_id"]'), serviceOptions, item?.service_id);
+                    populateSelect(row.querySelector('[data-edit-field="staff_id"]'), staffOptions.map((staff) => ({ value: staff.id, label: staff.label })), item?.staff_id, 'Unassigned');
+                });
+            };
+
+            const setEditMode = (enabled) => {
+                detailView?.classList.toggle('hidden', enabled);
+                editView?.classList.toggle('hidden', !enabled);
+                createLink?.classList.toggle('hidden', enabled);
+                editLink?.classList.toggle('hidden', enabled || !canManageAppointments);
+                manageLink?.classList.toggle('hidden', enabled);
+                editCancel?.classList.toggle('hidden', !enabled);
+                editSave?.classList.toggle('hidden', !enabled);
+                if (!enabled && editFeedback) {
+                    editFeedback.classList.add('hidden');
+                    editFeedback.textContent = '';
+                }
+            };
+
+            const prepareEditForm = (eventData) => {
+                if (editCustomerId) {
+                    editCustomerId.value = eventData.customer_id || '';
+                }
+                if (editCustomerName) {
+                    editCustomerName.value = eventData.customer_name || '';
+                }
+                if (editCustomerPhone) {
+                    editCustomerPhone.value = eventData.customer_phone && eventData.customer_phone !== 'No phone recorded' ? eventData.customer_phone : '';
+                }
+                if (editDate) {
+                    editDate.value = eventData.date_iso || selectedDateIso;
+                }
+                if (editNotes) {
+                    editNotes.value = eventData.notes || '';
+                }
+
+                populateSelect(editStatus, statusOptions, eventData.status_value);
+                populateSelect(editSource, sourceOptions, eventData.source_value || 'admin');
+                renderSelectedCustomer({
+                    id: eventData.customer_id || '',
+                    full_name: eventData.customer_name || '',
+                    phone: eventData.customer_phone && eventData.customer_phone !== 'No phone recorded' ? eventData.customer_phone : '',
+                    membership_type: eventData.membership_type || '',
+                    membership_code: eventData.membership_code || '',
+                    current_package: eventData.membership_balance || '',
+                });
+                renderEditItems(eventData.editable_items || []);
+            };
+
             const openModal = (eventData) => {
+                currentEventData = eventData;
                 setText('modal-customer-name', eventData.customer_name);
                 setText('modal-service-summary', eventData.service_summary);
                 setText('modal-time', `${eventData.date_label || '-'} | ${eventData.start_time || '-'} - ${eventData.end_time || '-'}`);
@@ -341,16 +675,23 @@
                 setText('modal-membership', eventData.membership_label, 'No package or membership linked');
                 setText('modal-source', eventData.source, 'Not recorded');
                 setText('modal-notes', eventData.notes, 'No notes recorded.');
+                @if ($canViewMembershipBalance)
+                    setText('modal-membership-balance', 'Coming soon');
+                    setText('modal-membership-balance-note', 'Pending input', 'Pending input');
+                @endif
                 manageLink.href = eventData.manage_url || '#';
-                editLink.href = eventData.edit_url || eventData.manage_url || '#';
                 createLink.href = eventData.create_url || '#';
                 modalHeader.style.background = `radial-gradient(circle at top left, ${eventData.service_styles.surface_strong || eventData.service_styles.surface} 0%, rgba(255, 247, 250, 0.88) 38%, transparent 62%)`;
+                prepareEditForm(eventData);
+                setEditMode(false);
                 modal.classList.remove('hidden');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('overflow-hidden');
             };
 
             const closeModal = () => {
+                currentEventData = null;
+                hideCustomerSuggestions();
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('overflow-hidden');
@@ -560,6 +901,127 @@
                 });
             };
 
+            const collectEditPayload = () => {
+                const activeDate = editDate?.value || selectedDateIso;
+
+                return {
+                    customer_id: editCustomerId?.value || null,
+                    customer_full_name: editCustomerName?.value || '',
+                    customer_phone: editCustomerPhone?.value || '',
+                    status: editStatus?.value || '',
+                    source: editSource?.value || '',
+                    notes: editNotes?.value || '',
+                    items: Array.from(editItems?.querySelectorAll('[data-edit-item-id]') || []).map((row) => ({
+                        id: row.dataset.editItemId,
+                        service_id: row.querySelector('[data-edit-field="service_id"]')?.value || '',
+                        staff_id: row.querySelector('[data-edit-field="staff_id"]')?.value || '',
+                        date: activeDate,
+                        start_time: row.querySelector('[data-edit-field="start_time"]')?.value || '',
+                        end_time: row.querySelector('[data-edit-field="end_time"]')?.value || '',
+                    })),
+                };
+            };
+
+            editLink?.addEventListener('click', () => {
+                if (!currentEventData || !canManageAppointments) {
+                    return;
+                }
+
+                setEditMode(true);
+            });
+
+            editCancel?.addEventListener('click', () => {
+                if (!currentEventData) {
+                    return;
+                }
+
+                prepareEditForm(currentEventData);
+                setEditMode(false);
+            });
+
+            editSave?.addEventListener('click', async () => {
+                if (!currentEventData?.update_url) {
+                    return;
+                }
+
+                const payload = collectEditPayload();
+                editSave.disabled = true;
+                editFeedback?.classList.add('hidden');
+
+                try {
+                    const response = await fetch(currentEventData.update_url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify(payload),
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const firstError = Object.values(result.errors || {}).flat()[0];
+                        throw new Error(result.message || firstError || 'Unable to save calendar changes.');
+                    }
+
+                    window.location.reload();
+                } catch (error) {
+                    if (editFeedback) {
+                        editFeedback.textContent = error.message || 'Unable to save calendar changes.';
+                        editFeedback.classList.remove('hidden');
+                    }
+                } finally {
+                    editSave.disabled = false;
+                }
+            });
+
+            editCustomerName?.addEventListener('input', async () => {
+                const query = editCustomerName.value.trim();
+
+                if (editCustomerId?.value) {
+                    clearSelectedCustomer();
+                }
+
+                if (query.length < 2) {
+                    hideCustomerSuggestions();
+                    return;
+                }
+
+                activeCustomerRequest?.abort?.();
+                activeCustomerRequest = new AbortController();
+
+                try {
+                    const url = new URL(customerSearchUrl, window.location.origin);
+                    url.searchParams.set('q', query);
+
+                    const response = await fetch(url.toString(), {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        signal: activeCustomerRequest.signal,
+                    });
+
+                    const result = await response.json().catch(() => ({ customers: [] }));
+                    renderCustomerSuggestions(Array.isArray(result.customers) ? result.customers : []);
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        hideCustomerSuggestions();
+                    }
+                }
+            });
+
+            editCustomerPhone?.addEventListener('input', () => {
+                if (editCustomerId?.value) {
+                    clearSelectedCustomer();
+                }
+            });
+
             timelineButtons.forEach((button) => attachDragBehavior(button));
             picToggles.forEach((toggle) => {
                 toggle.addEventListener('click', (event) => {
@@ -628,6 +1090,10 @@
             });
 
             document.addEventListener('click', (event) => {
+                if (!event.target.closest('.customer-picker')) {
+                    hideCustomerSuggestions();
+                }
+
                 if (!event.target.closest('[data-calendar-pic-toggle]') && !event.target.closest('[data-calendar-pic-panel]')) {
                     closePicPanels();
                 }

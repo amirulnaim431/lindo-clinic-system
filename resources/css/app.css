@@ -1701,6 +1701,182 @@
         font-weight: 600;
     }
 
+    .calendar-editor-modal {
+        width: min(1120px, 100%);
+    }
+
+    .calendar-editor {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .calendar-editor__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 1rem;
+    }
+
+    .calendar-editor__panel {
+        border: 1px solid var(--app-border);
+        border-radius: 1.4rem;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 250, 252, 0.96));
+        padding: 1rem 1.05rem;
+    }
+
+    .calendar-editor__fields {
+        display: grid;
+        gap: 0.95rem;
+        margin-top: 0.9rem;
+    }
+
+    .calendar-editor__fields--compact {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: end;
+    }
+
+    .calendar-editor__summary-card {
+        min-height: 3.6rem;
+        border: 1px solid var(--app-border);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 0.85rem 0.95rem;
+    }
+
+    .calendar-editor__summary-title {
+        color: var(--app-text-strong);
+        font-weight: 700;
+    }
+
+    .calendar-editor__summary-meta {
+        margin-top: 0.3rem;
+        color: var(--app-muted);
+        font-size: 0.82rem;
+    }
+
+    .calendar-editor__items {
+        display: grid;
+        gap: 0.9rem;
+        margin-top: 0.95rem;
+    }
+
+    .calendar-editor__item {
+        border: 1px solid var(--app-border);
+        border-radius: 1.2rem;
+        background: rgba(255, 255, 255, 0.78);
+        padding: 0.95rem;
+    }
+
+    .calendar-editor__item-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .calendar-editor__item-title {
+        color: var(--app-text-strong);
+        font-weight: 800;
+        font-size: 0.95rem;
+    }
+
+    .calendar-editor__item-meta {
+        margin-top: 0.25rem;
+        color: var(--app-muted);
+        font-size: 0.78rem;
+    }
+
+    .calendar-editor__item-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(140px, 0.6fr) minmax(140px, 0.6fr);
+        gap: 0.85rem;
+    }
+
+    .calendar-editor__control {
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .calendar-editor__control-shell {
+        position: relative;
+        border: 1px solid rgba(219, 194, 203, 0.9);
+        border-radius: 1rem;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 248, 250, 0.94));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+        transition: 180ms ease;
+    }
+
+    .calendar-editor__control-shell:focus-within {
+        border-color: rgba(191, 140, 159, 0.9);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.92),
+            0 0 0 4px rgba(193, 144, 162, 0.12);
+    }
+
+    .calendar-editor__control-shell--select::after,
+    .calendar-editor__control-shell--date::after,
+    .calendar-editor__control-shell--time::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: 1rem;
+        width: 0.6rem;
+        height: 0.6rem;
+        border-right: 2px solid rgba(125, 102, 110, 0.82);
+        border-bottom: 2px solid rgba(125, 102, 110, 0.82);
+        transform: translateY(-60%) rotate(45deg);
+        pointer-events: none;
+    }
+
+    .calendar-editor__control-shell--date::after {
+        width: 1rem;
+        height: 1rem;
+        border: none;
+        transform: translateY(-50%);
+        background:
+            linear-gradient(rgba(125, 102, 110, 0.82), rgba(125, 102, 110, 0.82)) center 0.2rem / 0.7rem 0.12rem no-repeat,
+            linear-gradient(rgba(125, 102, 110, 0.82), rgba(125, 102, 110, 0.82)) center 0.5rem / 0.75rem 0.12rem no-repeat,
+            linear-gradient(rgba(125, 102, 110, 0.82), rgba(125, 102, 110, 0.82)) center 0.82rem / 0.75rem 0.12rem no-repeat,
+            linear-gradient(rgba(125, 102, 110, 0.82), rgba(125, 102, 110, 0.82)) center / 0.95rem 0.95rem no-repeat;
+            opacity: 0.65;
+    }
+
+    .calendar-editor__control-shell--time::after {
+        width: 1rem;
+        height: 1rem;
+        border: none;
+        border-radius: 999px;
+        transform: translateY(-50%);
+        box-shadow: inset 0 0 0 2px rgba(125, 102, 110, 0.78);
+        opacity: 0.7;
+    }
+
+    .calendar-editor__control-shell--time::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: 1.5rem;
+        width: 0.35rem;
+        height: 0.35rem;
+        border-top: 2px solid rgba(125, 102, 110, 0.82);
+        border-right: 2px solid rgba(125, 102, 110, 0.82);
+        transform: translate(-0.15rem, -0.4rem) rotate(45deg);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .calendar-editor__input {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        padding-right: 3rem;
+    }
+
+    .calendar-editor__input:focus {
+        box-shadow: none;
+    }
+
     .modal-close {
         width: 2.5rem;
         height: 2.5rem;
@@ -2209,7 +2385,10 @@
     .revenue-focus-grid,
     .calendar-days-row,
     .month-grid,
-    .calendar-switcher {
+    .calendar-switcher,
+    .calendar-editor__grid,
+    .calendar-editor__item-grid,
+    .calendar-editor__fields--compact {
         grid-template-columns: 1fr;
     }
 
