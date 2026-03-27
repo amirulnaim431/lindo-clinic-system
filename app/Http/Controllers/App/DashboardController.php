@@ -87,6 +87,11 @@ class DashboardController extends Controller
             return $this->streamCsv($reportRows, $periodLabel);
         }
 
+        if ($request->input('export') === 'revenue_csv') {
+            $category = (string) $request->input('category', 'total');
+            return $this->streamRevenueCsv($revenueBreakdown, $periodLabel, $category);
+        }
+
         return view('app.dashboard', [
             'date' => $date,
             'dateFrom' => $resolvedDateFrom,
@@ -333,28 +338,62 @@ class DashboardController extends Controller
             return $group->items->map(function ($item) {
                 $serviceName = $item->service?->name ?: 'Service';
                 $categoryKey = $this->resolveRevenueCategory($serviceName);
+                $startsAt = $item->starts_at ?: $group->starts_at;
 
                 return [
                     'category_key' => $categoryKey,
                     'category_label' => $this->revenueCategoryLabel($categoryKey),
                     'amount' => (int) ($item->service?->price ?? 0),
+                    'customer_name' => $group->customer?->full_name ?: 'Unknown customer',
+                    'service_name' => $serviceName,
+                    'date_label' => optional($startsAt)?->format('d M Y') ?: '-',
+                    'time_label' => optional($startsAt)?->format('h:i A') ?: '-',
+                    'amount_label' => $this->money((int) ($item->service?->price ?? 0)),
                 ];
             });
         });
 
+        $groupedRows = $rows
+            ->groupBy('category_key')
+            ->map(function (Collection $categoryRows, string $categoryKey) {
+                return [
+                    'key' => $categoryKey,
+                    'label' => $this->revenueCategoryLabel($categoryKey),
+                    'amount' => (int) $categoryRows->sum('amount'),
+                    'details' => $categoryRows
+                        ->sortBy([['date_label', 'asc'], ['time_label', 'asc'], ['customer_name', 'asc']])
+                        ->map(fn (array $row) => [
+                            'customer_name' => $row['customer_name'],
+                            'service_name' => $row['service_name'],
+                            'date_label' => $row['date_label'],
+                            'time_label' => $row['time_label'],
+                            'amount' => $row['amount'],
+                            'amount_label' => $row['amount_label'],
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->sortByDesc('amount')
+            ->values();
+
         return [
             'total' => (int) $rows->sum('amount'),
-            'groups' => $rows
-                ->groupBy('category_key')
-                ->map(function (Collection $categoryRows, string $categoryKey) {
-                    return [
-                        'key' => $categoryKey,
-                        'label' => $this->revenueCategoryLabel($categoryKey),
-                        'amount' => (int) $categoryRows->sum('amount'),
-                    ];
-                })
-                ->sortByDesc('amount')
-                ->values(),
+            'groups' => $groupedRows,
+            'details' => $rows
+                ->sortBy([['date_label', 'asc'], ['time_label', 'asc'], ['customer_name', 'asc']])
+                ->map(fn (array $row) => [
+                    'customer_name' => $row['customer_name'],
+                    'service_name' => $row['service_name'],
+                    'date_label' => $row['date_label'],
+                    'time_label' => $row['time_label'],
+                    'amount' => $row['amount'],
+                    'amount_label' => $row['amount_label'],
+                    'category_key' => $row['category_key'],
+                    'category_label' => $row['category_label'],
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
@@ -491,6 +530,47 @@ class DashboardController extends Controller
                     $row['status_label'],
                     $row['source_label'],
                     $row['sales_label'],
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function streamRevenueCsv(array $revenueBreakdown, string $periodLabel, string $category): StreamedResponse
+    {
+        $category = $category !== '' ? $category : 'total';
+        $rows = $category === 'total'
+            ? collect($revenueBreakdown['details'] ?? [])
+            : collect($revenueBreakdown['groups'] ?? [])->firstWhere('key', $category)['details'] ?? [];
+        $rows = collect($rows);
+        $label = $category === 'total'
+            ? 'total-group-revenue'
+            : str($this->revenueCategoryLabel($category))->slug()->toString();
+        $filename = 'lindo-'.$label.'-'.str($periodLabel)->slug()->toString().'.csv';
+
+        return response()->streamDownload(function () use ($rows, $category) {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, [
+                'Customer',
+                'Service',
+                'Date',
+                'Time',
+                'Amount',
+                'Group',
+            ]);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, [
+                    $row['customer_name'] ?? '',
+                    $row['service_name'] ?? '',
+                    $row['date_label'] ?? '',
+                    $row['time_label'] ?? '',
+                    $row['amount_label'] ?? $this->money((int) ($row['amount'] ?? 0)),
+                    $row['category_label'] ?? ($category === 'total' ? 'Total Group Revenue' : $this->revenueCategoryLabel($category)),
                 ]);
             }
 

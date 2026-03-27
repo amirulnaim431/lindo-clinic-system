@@ -1999,6 +1999,19 @@
         min-height: 100%;
     }
 
+    .revenue-card-button {
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        transition: 180ms ease;
+    }
+
+    .revenue-card-button:hover {
+        border-color: var(--app-border-strong);
+        transform: translateY(-1px);
+        box-shadow: var(--app-shadow-md);
+    }
+
     .revenue-focus__date {
         margin-top: 1rem;
         color: var(--app-muted);
@@ -2031,6 +2044,14 @@
         letter-spacing: -0.04em;
     }
 
+    .revenue-focus__hint,
+    .revenue-group-card__hint {
+        margin-top: 0.7rem;
+        color: var(--app-muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
     .revenue-group-card {
         display: grid;
         gap: 0.55rem;
@@ -2052,6 +2073,14 @@
         font-size: clamp(1.8rem, 2.6vw, 2.6rem);
         line-height: 1;
         letter-spacing: -0.04em;
+    }
+
+    .revenue-detail-modal {
+        width: min(1080px, 100%);
+    }
+
+    .revenue-detail-toolbar {
+        margin-bottom: 1rem;
     }
 
     .staff-review-card {

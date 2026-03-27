@@ -10,6 +10,25 @@
         $topFocus = $serviceFocus->first();
         $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
         $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
+        $revenueGroups = collect([
+            ['key' => 'wellness', 'label' => 'Wellness'],
+            ['key' => 'aesthetic', 'label' => 'Aesthetic'],
+            ['key' => 'spa_beauty', 'label' => 'Spa & Beauty'],
+        ])->map(function ($item) use ($revenueBreakdown) {
+            $match = collect($revenueBreakdown['groups'] ?? [])->firstWhere('key', $item['key']);
+            return [
+                'key' => $item['key'],
+                'label' => $item['label'],
+                'amount' => $match['amount'] ?? 0,
+                'details' => $match['details'] ?? [],
+            ];
+        });
+        $totalRevenuePayload = [
+            'key' => 'total',
+            'label' => 'Total Group Revenue',
+            'amount' => $revenueBreakdown['total'] ?? 0,
+            'details' => $revenueBreakdown['details'] ?? [],
+        ];
     @endphp
 
     <div class="stack">
@@ -89,35 +108,23 @@
         </section>
 
         <section class="revenue-focus-grid">
-            <div class="panel panel--revenue-focus">
+            <button type="button" class="panel panel--revenue-focus revenue-card-button" data-revenue-card='@json($totalRevenuePayload)'>
                 <div class="panel-body">
                     <div class="metric-label">Total Group Revenue</div>
                     <div class="revenue-focus__date">Date Range</div>
                     <div class="revenue-focus__range">{{ $periodLabel }}</div>
                     <div class="revenue-focus__total">RM {{ number_format($revenueBreakdown['total'] ?? 0, 0) }}</div>
+                    <div class="revenue-focus__hint">Tap to view customer and service details</div>
                 </div>
-            </div>
+            </button>
 
             <div class="stack">
-                @php
-                    $revenueGroups = collect([
-                        ['key' => 'wellness', 'label' => 'Wellness'],
-                        ['key' => 'aesthetic', 'label' => 'Aesthetic'],
-                        ['key' => 'spa_beauty', 'label' => 'Spa & Beauty'],
-                    ])->map(function ($item) use ($revenueBreakdown) {
-                        $match = collect($revenueBreakdown['groups'] ?? [])->firstWhere('key', $item['key']);
-                        return [
-                            'label' => $item['label'],
-                            'amount' => $match['amount'] ?? 0,
-                        ];
-                    });
-                @endphp
-
                 @foreach ($revenueGroups as $group)
-                    <div class="revenue-group-card">
+                    <button type="button" class="revenue-group-card revenue-card-button" data-revenue-card='@json($group)'>
                         <div class="revenue-group-card__label">{{ $group['label'] }}</div>
                         <div class="revenue-group-card__value">RM {{ number_format($group['amount'], 0) }}</div>
-                    </div>
+                        <div class="revenue-group-card__hint">Open detail list</div>
+                    </button>
                 @endforeach
             </div>
         </section>
@@ -294,6 +301,52 @@
         </div>
     </div>
 
+    <div id="revenue-detail-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card revenue-detail-modal">
+                <div class="modal-header">
+                    <div class="modal-header__row">
+                        <div>
+                            <div class="modal-kicker">Revenue detail</div>
+                            <h3 id="revenue-detail-title" class="modal-title">-</h3>
+                            <p id="revenue-detail-summary" class="modal-subtitle">-</p>
+                        </div>
+                        <button type="button" id="revenue-detail-close-top" class="modal-close" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="btn-row btn-row--between revenue-detail-toolbar">
+                        <div class="small-note">Customer and service lines contributing to this revenue total.</div>
+                        <div class="btn-row">
+                            <a id="revenue-detail-export" href="#" class="modal-btn modal-btn--secondary">Export CSV</a>
+                            <button type="button" id="revenue-detail-print" class="modal-btn modal-btn--secondary">Print</button>
+                        </div>
+                    </div>
+                    <div class="table-shell">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th style="width: 140px;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="revenue-detail-rows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="revenue-detail-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="staff-review-modal" class="modal-shell hidden" aria-hidden="true">
         <div class="modal-backdrop"></div>
         <div class="modal-stage">
@@ -336,16 +389,76 @@
     <script>
         (() => {
             const modal = document.getElementById('staff-review-modal');
+            const revenueModal = document.getElementById('revenue-detail-modal');
             const closeTop = document.getElementById('staff-review-close-top');
             const closeBottom = document.getElementById('staff-review-close-bottom');
+            const revenueCloseTop = document.getElementById('revenue-detail-close-top');
+            const revenueCloseBottom = document.getElementById('revenue-detail-close-bottom');
+            const revenueTitle = document.getElementById('revenue-detail-title');
+            const revenueSummary = document.getElementById('revenue-detail-summary');
+            const revenueRows = document.getElementById('revenue-detail-rows');
+            const revenueExport = document.getElementById('revenue-detail-export');
+            const revenuePrint = document.getElementById('revenue-detail-print');
             const nameTarget = document.getElementById('staff-review-name');
             const summaryTarget = document.getElementById('staff-review-summary');
             const detailTarget = document.getElementById('staff-review-details');
+            const revenueCards = document.querySelectorAll('[data-revenue-card]');
+            const dashboardQuery = @json(array_filter([
+                'date_from' => $selectedDateFrom,
+                'date_to' => $selectedDateTo,
+                'staff_id' => $selectedStaffId,
+            ]));
 
             const closeModal = () => {
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('overflow-hidden');
+            };
+
+            const closeRevenueModal = () => {
+                revenueModal.classList.add('hidden');
+                revenueModal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const openRevenueModal = (payload) => {
+                const details = Array.isArray(payload.details) ? payload.details : [];
+                revenueTitle.textContent = payload.label || 'Revenue detail';
+                revenueSummary.textContent = `RM ${(Number(payload.amount || 0)).toLocaleString()} | ${details.length} line item${details.length === 1 ? '' : 's'} | {{ $periodLabel }}`;
+                revenueRows.innerHTML = details.length
+                    ? details.map((detail) => `
+                        <tr>
+                            <td>${escapeHtml(detail.customer_name || '-')}</td>
+                            <td>${escapeHtml(detail.service_name || '-')}</td>
+                            <td>${escapeHtml(detail.date_label || '-')}</td>
+                            <td>${escapeHtml(detail.time_label || '-')}</td>
+                            <td>${escapeHtml(detail.amount_label || '-')}</td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="5" class="small-note" style="text-align:center;padding:1rem;">No revenue detail recorded for this selection.</td></tr>';
+
+                const exportUrl = new URL(@json(route('app.dashboard')), window.location.origin);
+                Object.entries(dashboardQuery).forEach(([key, value]) => {
+                    if (value) {
+                        exportUrl.searchParams.set(key, value);
+                    }
+                });
+                exportUrl.searchParams.set('export', 'revenue_csv');
+                exportUrl.searchParams.set('category', payload.key || 'total');
+                revenueExport.href = exportUrl.toString();
+                revenuePrint.dataset.printTitle = payload.label || 'Revenue detail';
+                revenuePrint.dataset.printRows = JSON.stringify(details);
+
+                revenueModal.classList.remove('hidden');
+                revenueModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
             };
 
             document.querySelectorAll('[data-staff-review]').forEach((button) => {
@@ -376,7 +489,77 @@
                 });
             });
 
+            revenueCards.forEach((button) => {
+                button.addEventListener('click', () => {
+                    let payload = {};
+
+                    try {
+                        payload = JSON.parse(button.dataset.revenueCard || '{}');
+                    } catch (error) {
+                        payload = {};
+                    }
+
+                    openRevenueModal(payload);
+                });
+            });
+
+            revenuePrint?.addEventListener('click', () => {
+                const details = JSON.parse(revenuePrint.dataset.printRows || '[]');
+                const title = revenuePrint.dataset.printTitle || 'Revenue detail';
+                const printWindow = window.open('', '_blank', 'width=980,height=720');
+
+                if (!printWindow) {
+                    return;
+                }
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${escapeHtml(title)}</title>
+                            <style>
+                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
+                                h1 { margin: 0 0 8px; font-size: 28px; }
+                                p { margin: 0 0 20px; color: #7c6670; }
+                                table { width: 100%; border-collapse: collapse; }
+                                th, td { border: 1px solid #d9c2cb; padding: 10px 12px; text-align: left; }
+                                th { background: #fdf4f7; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>${escapeHtml(title)}</h1>
+                            <p>{{ $periodLabel }}</p>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${details.map((detail) => `
+                                        <tr>
+                                            <td>${escapeHtml(detail.customer_name || '-')}</td>
+                                            <td>${escapeHtml(detail.service_name || '-')}</td>
+                                            <td>${escapeHtml(detail.date_label || '-')}</td>
+                                            <td>${escapeHtml(detail.time_label || '-')}</td>
+                                            <td>${escapeHtml(detail.amount_label || '-')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            });
+
             [closeTop, closeBottom].forEach((button) => button?.addEventListener('click', closeModal));
+            [revenueCloseTop, revenueCloseBottom].forEach((button) => button?.addEventListener('click', closeRevenueModal));
 
             modal?.addEventListener('click', (event) => {
                 if (event.target === modal || event.target === modal.firstElementChild) {
@@ -384,9 +567,19 @@
                 }
             });
 
+            revenueModal?.addEventListener('click', (event) => {
+                if (event.target === revenueModal || event.target === revenueModal.firstElementChild) {
+                    closeRevenueModal();
+                }
+            });
+
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
                     closeModal();
+                }
+
+                if (event.key === 'Escape' && revenueModal && !revenueModal.classList.contains('hidden')) {
+                    closeRevenueModal();
                 }
             });
         })();
