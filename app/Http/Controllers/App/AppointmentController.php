@@ -586,7 +586,6 @@ class AppointmentController extends Controller
                 'status' => $validated['status'],
                 'source' => filled($validated['source'] ?? null) ? trim((string) $validated['source']) : null,
                 'notes' => $validated['notes'] ?? null,
-                'services_summary' => $preparedItems->map(fn ($preparedItem) => $preparedItem['service']->name)->implode(', '),
             ]);
 
             $this->syncAppointmentGroupWindow($appointmentGroup);
