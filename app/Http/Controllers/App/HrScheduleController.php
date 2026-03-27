@@ -39,7 +39,7 @@ class HrScheduleController extends Controller
             ->when($filters['department'] !== '', fn ($query) => $query->where('department', $filters['department']))
             ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
             ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->orderByDesc('department = "Human Resources"')
+            ->orderByRaw("CASE WHEN department = 'Human Resources' THEN 1 ELSE 0 END DESC")
             ->orderByDesc('is_active')
             ->orderBy('department')
             ->orderBy('full_name')
