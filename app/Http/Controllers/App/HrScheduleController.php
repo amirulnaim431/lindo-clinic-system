@@ -20,9 +20,9 @@ class HrScheduleController extends Controller
         ];
 
         $weekStart = $request->filled('week')
-            ? Carbon::parse((string) $request->input('week'))->startOfWeek()
-            : now()->startOfWeek();
-        $weekDays = collect(range(0, 6))
+            ? Carbon::parse((string) $request->input('week'))->startOfWeek(Carbon::TUESDAY)
+            : now()->startOfWeek(Carbon::TUESDAY);
+        $weekDays = collect(range(0, 4))
             ->map(fn (int $offset) => $weekStart->copy()->addDays($offset))
             ->values();
 
@@ -128,7 +128,7 @@ class HrScheduleController extends Controller
             'scheduleRows' => $scheduleRows,
             'weekDays' => $weekDays,
             'weekStart' => $weekStart,
-            'weekLabel' => $weekStart->format('d M').' - '.$weekStart->copy()->addDays(6)->format('d M Y'),
+            'weekLabel' => $weekStart->format('d M').' - '.$weekStart->copy()->addDays(4)->format('d M Y'),
             'previousWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
             'todaySummary' => [

@@ -77,36 +77,38 @@
                 </div>
                 <div class="panel-body">
                     @if ($scheduleRows->count())
-                        <div class="hr-schedule-board">
-                            <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
-                            @foreach ($weekDays as $day)
-                                <div class="hr-schedule-board__header">
-                                    <div>{{ $day->format('D') }}</div>
-                                    <div class="small-note">{{ $day->format('d M') }}</div>
-                                </div>
-                            @endforeach
-
-                            @foreach ($scheduleRows as $row)
-                                <div class="hr-schedule-board__staff">
-                                    <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
-                                    <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
-                                    <div class="small-note">{{ $row['staff']->department ?: 'No department' }}</div>
-                                    <div class="hr-schedule-board__meta">
-                                        <span class="chip">{{ $row['staff']->operational_role_label }}</span>
-                                        @if (! $row['staff']->is_active)
-                                            <span class="chip">Inactive</span>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                @foreach ($row['days'] as $shift)
-                                    <div class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}">
-                                        <div class="hr-schedule-cell__label">{{ $shift['label'] }}</div>
-                                        <div class="hr-schedule-cell__time">{{ $shift['time'] }}</div>
-                                        <div class="hr-schedule-cell__note">{{ $shift['note'] }}</div>
+                        <div class="hr-schedule-board-wrap">
+                            <div class="hr-schedule-board">
+                                <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
+                                @foreach ($weekDays as $day)
+                                    <div class="hr-schedule-board__header">
+                                        <div>{{ $day->format('D') }}</div>
+                                        <div class="small-note">{{ $day->format('d M') }}</div>
                                     </div>
                                 @endforeach
-                            @endforeach
+
+                                @foreach ($scheduleRows as $row)
+                                    <div class="hr-schedule-board__staff">
+                                        <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
+                                        <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
+                                        <div class="small-note">{{ $row['staff']->department ?: 'No department' }}</div>
+                                        <div class="hr-schedule-board__meta">
+                                            <span class="chip">{{ $row['staff']->operational_role_label }}</span>
+                                            @if (! $row['staff']->is_active)
+                                                <span class="chip">Inactive</span>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    @foreach ($row['days'] as $shift)
+                                        <div class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}">
+                                            <div class="hr-schedule-cell__label">{{ $shift['label'] }}</div>
+                                            <div class="hr-schedule-cell__time">{{ $shift['time'] }}</div>
+                                            <div class="hr-schedule-cell__note">{{ $shift['note'] }}</div>
+                                        </div>
+                                    @endforeach
+                                @endforeach
+                            </div>
                         </div>
                     @else
                         <div class="empty-state empty-state--dashed">
