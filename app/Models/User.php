@@ -14,6 +14,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'password_setup_required',
+        'last_password_reset_sent_at',
         'role',
     ];
 
@@ -27,6 +29,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_setup_required' => 'boolean',
+            'last_password_reset_sent_at' => 'datetime',
         ];
     }
 

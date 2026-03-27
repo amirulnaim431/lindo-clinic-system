@@ -7,7 +7,10 @@ use App\Models\Service;
 use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -37,6 +40,20 @@ class StaffController extends Controller
         return Staff::accessPermissionOptions();
     }
 
+    protected function accessLevelOptions(): array
+    {
+        return [
+            'staff' => [
+                'label' => 'Operational staff access',
+                'description' => 'Role-based access for daily operations such as appointments, calendar, CRM, and HR tools.',
+            ],
+            'admin' => [
+                'label' => 'Super admin access',
+                'description' => 'Full internal access for HOD, board members, and executive leaders who need unrestricted oversight.',
+            ],
+        ];
+    }
+
     protected function serviceOptions()
     {
         return Service::query()
@@ -47,18 +64,16 @@ class StaffController extends Controller
             ->get();
     }
 
-    protected function userOptions()
-    {
-        return User::query()
-            ->whereIn('role', ['admin', 'staff'])
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role']);
-    }
-
     protected function validatedData(Request $request, ?Staff $staff = null): array
     {
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:160'],
+            'employee_code' => [
+                'nullable',
+                'string',
+                'max:40',
+                Rule::unique('staff', 'employee_code')->ignore($staff?->id),
+            ],
             'job_title' => ['required', 'string', 'max:160'],
             'department' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -66,12 +81,7 @@ class StaffController extends Controller
             'operational_role' => ['required', 'string', Rule::in(array_keys($this->operationalRoleOptions()))],
             'is_active' => ['nullable'],
             'can_login' => ['nullable'],
-            'user_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('users', 'id'),
-                Rule::unique('staff', 'user_id')->ignore($staff?->id),
-            ],
+            'access_level' => ['nullable', 'string', Rule::in(array_keys($this->accessLevelOptions()))],
             'notes' => ['nullable', 'string', 'max:4000'],
             'access_permissions' => ['nullable', 'array'],
             'access_permissions.*' => ['string', Rule::in(array_keys($this->permissionOptions()))],
@@ -79,26 +89,16 @@ class StaffController extends Controller
             'service_ids.*' => ['string', 'exists:services,id'],
         ]);
 
-        if (! empty($data['user_id'])) {
-            $linkedUser = User::query()->find($data['user_id']);
-
-            if (! $linkedUser || ! in_array($linkedUser->role, ['admin', 'staff'], true)) {
-                throw ValidationException::withMessages([
-                    'user_id' => 'Selected user must be a staff or admin login.',
-                ]);
-            }
-        }
-
-        if ($request->boolean('can_login') && empty($data['user_id'])) {
+        if ($request->boolean('can_login') && blank($data['email'] ?? null)) {
             throw ValidationException::withMessages([
-                'user_id' => 'Link a login user before enabling staff login.',
+                'email' => 'Enter a work email before enabling internal login access.',
             ]);
         }
 
         if (
             $request->boolean('can_login')
-            && ! empty($data['user_id'])
-            && User::query()->whereKey($data['user_id'])->value('role') === 'staff'
+            && ($request->input('access_level', $staff?->user?->role ?? 'staff') !== 'admin')
+            && ($staff?->user?->role === 'staff' || ! $staff?->user_id || $request->input('access_level', 'staff') === 'staff')
             && empty($data['access_permissions'])
         ) {
             throw ValidationException::withMessages([
@@ -106,6 +106,12 @@ class StaffController extends Controller
             ]);
         }
 
+        $data['employee_code'] = filled($data['employee_code'] ?? null)
+            ? Str::upper(trim((string) $data['employee_code']))
+            : null;
+        $data['access_level'] = $request->boolean('can_login')
+            ? (string) ($data['access_level'] ?? ($staff?->user?->role === 'admin' ? 'admin' : 'staff'))
+            : null;
         $data['is_active'] = $request->boolean('is_active');
         $data['can_login'] = $request->boolean('can_login');
         $data['access_permissions'] = collect($data['access_permissions'] ?? [])->values()->all();
@@ -124,10 +130,16 @@ class StaffController extends Controller
             'roleOptions' => $this->operationalRoleOptions(),
             'departmentOptions' => $this->departmentOptions(),
             'permissionOptions' => $this->permissionOptions(),
+            'accessLevelOptions' => $this->accessLevelOptions(),
             'services' => $this->serviceOptions(),
-            'availableUsers' => $this->userOptions(),
             'selectedServiceIds' => $staff->services->pluck('id')->map(fn ($id) => (string) $id)->all(),
             'selectedPermissions' => collect($staff->access_permissions ?? [])->values()->all(),
+            'selectedAccessLevel' => old('access_level', $staff->user?->role === 'admin' ? 'admin' : 'staff'),
+            'accessStatus' => $staff->exists ? $staff->accessStatus() : [
+                'label' => 'Not provisioned',
+                'tone' => 'neutral',
+                'description' => 'Saving with login enabled will provision a linked staff account automatically.',
+            ],
         ];
     }
 
@@ -144,7 +156,7 @@ class StaffController extends Controller
         $staff = Staff::query()
             ->with([
                 'services' => fn ($query) => $query->orderBy('name'),
-                'user:id,name,email,role',
+                'user:id,name,email,role,password_setup_required,last_password_reset_sent_at',
             ])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $query->where(function ($nested) use ($filters) {
@@ -190,6 +202,7 @@ class StaffController extends Controller
             'is_active' => true,
             'can_login' => false,
             'access_permissions' => [],
+            'employee_code' => $this->generateNextEmployeeCode(),
         ]);
 
         return view('app.staff.form', $this->formViewData('create', $staff));
@@ -201,6 +214,7 @@ class StaffController extends Controller
 
         $staff = Staff::query()->create([
             'full_name' => $data['full_name'],
+            'employee_code' => $data['employee_code'] ?: $this->generateNextEmployeeCode(),
             'job_title' => $data['job_title'],
             'department' => $data['department'] ?: null,
             'phone' => $data['phone'] ?: null,
@@ -208,16 +222,24 @@ class StaffController extends Controller
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],
-            'user_id' => $data['user_id'] ?? null,
             'notes' => $data['notes'] ?: null,
             'access_permissions' => $data['access_permissions'],
         ]);
 
         $staff->services()->sync($data['service_ids']);
 
-        return redirect()
-            ->route('app.staff.index')
-            ->with('success', 'Staff record created successfully.');
+        $resetLink = null;
+
+        if ($staff->can_login) {
+            $resetLink = $this->provisionStaffAccess($staff, ! $staff->user_id, $data['access_level'] ?? 'staff');
+        }
+
+        return $this->redirectWithAccessMessage(
+            route('app.staff.index'),
+            'Staff record created successfully.',
+            $staff,
+            $resetLink
+        );
     }
 
     public function edit(Staff $staff)
@@ -231,6 +253,7 @@ class StaffController extends Controller
 
         $staff->update([
             'full_name' => $data['full_name'],
+            'employee_code' => $data['employee_code'] ?: ($staff->employee_code ?: $this->generateNextEmployeeCode()),
             'job_title' => $data['job_title'],
             'department' => $data['department'] ?: null,
             'phone' => $data['phone'] ?: null,
@@ -238,16 +261,63 @@ class StaffController extends Controller
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],
-            'user_id' => $data['user_id'] ?? null,
             'notes' => $data['notes'] ?: null,
             'access_permissions' => $data['access_permissions'],
         ]);
 
         $staff->services()->sync($data['service_ids']);
 
+        $resetLink = null;
+
+        if ($staff->can_login) {
+            $resetLink = $this->provisionStaffAccess($staff, true, $data['access_level'] ?? ($staff->user?->role === 'admin' ? 'admin' : 'staff'));
+        }
+
+        return $this->redirectWithAccessMessage(
+            route('app.staff.index'),
+            'Staff record updated successfully.',
+            $staff,
+            $resetLink
+        );
+    }
+
+    public function sendAccessInvite(Request $request, Staff $staff)
+    {
+        abort_unless($staff->exists, 404);
+
+        $resetLink = $this->provisionStaffAccess($staff, true, $staff->user?->role === 'admin' ? 'admin' : 'staff');
+
+        return $this->redirectWithAccessMessage(
+            route('app.staff.edit', $staff),
+            'A fresh password setup link was generated for this staff account.',
+            $staff,
+            $resetLink
+        );
+    }
+
+    public function updateAccessStatus(Request $request, Staff $staff)
+    {
+        $validated = $request->validate([
+            'can_login' => ['required', Rule::in(['0', '1'])],
+        ]);
+
+        if ($validated['can_login'] === '1') {
+            $staff->update(['can_login' => true]);
+            $resetLink = $this->provisionStaffAccess($staff, false, $staff->user?->role === 'admin' ? 'admin' : 'staff');
+
+            return $this->redirectWithAccessMessage(
+                route('app.staff.edit', $staff),
+                'Login access has been enabled for this staff member.',
+                $staff,
+                $resetLink
+            );
+        }
+
+        $staff->update(['can_login' => false]);
+
         return redirect()
-            ->route('app.staff.index')
-            ->with('success', 'Staff record updated successfully.');
+            ->route('app.staff.edit', $staff)
+            ->with('success', 'Login access has been suspended for this staff member.');
     }
 
     public function updateStatus(Request $request, Staff $staff)
@@ -287,5 +357,139 @@ class StaffController extends Controller
         return redirect()
             ->route('app.staff.index', $request->only(['search', 'department', 'operational_role', 'status', 'login', 'page']))
             ->with('success', 'Staff record removed successfully.');
+    }
+
+    protected function generateNextEmployeeCode(): string
+    {
+        $latest = Staff::withTrashed()
+            ->whereNotNull('employee_code')
+            ->where('employee_code', 'like', 'LND-%')
+            ->orderByDesc('employee_code')
+            ->value('employee_code');
+
+        $nextNumber = 1;
+
+        if (is_string($latest) && preg_match('/LND-(\d+)/', $latest, $matches) === 1) {
+            $nextNumber = ((int) $matches[1]) + 1;
+        }
+
+        do {
+            $candidate = 'LND-'.str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            $nextNumber++;
+        } while (Staff::withTrashed()->where('employee_code', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    protected function provisionStaffAccess(Staff $staff, bool $refreshResetLink, string $accessLevel = 'staff'): ?string
+    {
+        $staff->loadMissing('user');
+
+        if (blank($staff->email)) {
+            throw ValidationException::withMessages([
+                'email' => 'A work email is required before access can be provisioned.',
+            ]);
+        }
+
+        $staffEmail = Str::lower(trim((string) $staff->email));
+        $existingUser = User::query()->whereRaw('LOWER(email) = ?', [$staffEmail])->first();
+
+        if ($existingUser && $existingUser->role === 'admin' && $existingUser->id !== $staff->user_id) {
+            throw ValidationException::withMessages([
+                'email' => 'This email already belongs to an admin account. Use a dedicated staff work email for staff access.',
+            ]);
+        }
+
+        if ($staff->user_id && $existingUser && $existingUser->id !== $staff->user_id) {
+            throw ValidationException::withMessages([
+                'email' => 'This work email already belongs to another internal user account.',
+            ]);
+        }
+
+        if ($existingUser) {
+            $linkedStaff = Staff::query()
+                ->where('user_id', $existingUser->id)
+                ->whereKeyNot($staff->id)
+                ->first();
+
+            if ($linkedStaff) {
+                throw ValidationException::withMessages([
+                    'email' => 'This work email is already linked to another staff profile.',
+                ]);
+            }
+        }
+
+        if (! $staff->user_id) {
+            $user = $existingUser;
+
+            if (! $user) {
+                $user = User::query()->create([
+                    'name' => $staff->full_name,
+                    'email' => $staffEmail,
+                    'password' => Hash::make(Str::password(32)),
+                    'password_setup_required' => true,
+                    'role' => $accessLevel === 'admin' ? 'admin' : 'staff',
+                ]);
+            } elseif (! in_array($user->role, ['staff', 'admin'], true)) {
+                throw ValidationException::withMessages([
+                    'email' => 'Only staff or admin internal accounts can be linked to staff access.',
+                ]);
+            }
+
+            $staff->update([
+                'user_id' => $user->id,
+                'can_login' => true,
+            ]);
+
+            $staff->setRelation('user', $user);
+        }
+
+        $user = $staff->fresh(['user'])->user;
+
+        if (! $user) {
+            return null;
+        }
+
+        $user->forceFill([
+            'name' => $staff->full_name,
+            'email' => $staffEmail,
+            'role' => $accessLevel === 'admin' ? 'admin' : 'staff',
+        ]);
+
+        if ($refreshResetLink || $user->password_setup_required) {
+            $user->forceFill([
+                'password_setup_required' => true,
+                'last_password_reset_sent_at' => now(),
+            ])->save();
+
+            return $this->generateResetLinkFor($user);
+        }
+
+        $user->save();
+
+        return null;
+    }
+
+    protected function generateResetLinkFor(User $user): string
+    {
+        $token = Password::broker()->createToken($user);
+
+        return route('password.reset', [
+            'token' => $token,
+            'email' => $user->email,
+        ]);
+    }
+
+    protected function redirectWithAccessMessage(string $route, string $message, Staff $staff, ?string $resetLink = null)
+    {
+        $redirect = redirect()->to($route)->with('success', $message);
+
+        if (! $resetLink) {
+            return $redirect;
+        }
+
+        return $redirect->with('staff_access_link', $resetLink)
+            ->with('staff_access_email', $staff->email)
+            ->with('staff_access_name', $staff->full_name);
     }
 }

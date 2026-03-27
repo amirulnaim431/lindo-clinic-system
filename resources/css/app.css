@@ -1423,6 +1423,11 @@
             rgba(38, 29, 29, 0.96);
     }
 
+    .selection-card.is-disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+    }
+
     .selection-input {
         position: absolute;
         opacity: 0;
@@ -1451,6 +1456,59 @@
         color: var(--app-muted);
         font-size: 0.82rem;
         line-height: 1.55;
+    }
+
+    .staff-form-hero {
+        overflow: hidden;
+    }
+
+    .staff-form-hero__body {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+        gap: 1.4rem;
+        align-items: stretch;
+        background:
+            radial-gradient(circle at top left, rgba(201, 146, 115, 0.18), transparent 30%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+            rgba(31, 24, 24, 0.96);
+    }
+
+    .staff-form-hero__stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .staff-brief-card,
+    .staff-access-status-card {
+        border: 1px solid rgba(201, 146, 115, 0.16);
+        border-radius: 1rem;
+        padding: 1rem;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+            rgba(44, 34, 34, 0.92);
+    }
+
+    .staff-form-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+        gap: 1.25rem;
+        align-items: start;
+    }
+
+    .staff-access-panel {
+        position: sticky;
+        top: 1.2rem;
+    }
+
+    .staff-access-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .staff-access-actions form {
+        margin: 0;
     }
 
     .timeline-grid {
@@ -2705,6 +2763,20 @@
         min-height: auto;
         border-right: none;
         border-bottom: 1px solid var(--app-border);
+    }
+
+    .staff-form-hero__body,
+    .staff-form-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-form-hero__stats {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-access-panel {
+        position: static;
+        top: auto;
     }
 }
 

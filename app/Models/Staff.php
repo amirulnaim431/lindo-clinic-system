@@ -76,6 +76,7 @@ class Staff extends Model
 
     protected $fillable = [
         'full_name',
+        'employee_code',
         'job_title',
         'department',
         'phone',
@@ -204,5 +205,49 @@ class Staff extends Model
     public function leaves(): HasMany
     {
         return $this->hasMany(StaffLeave::class, 'staff_id');
+    }
+
+    public function accessStatus(): array
+    {
+        if (! $this->user_id || ! $this->user) {
+            return [
+                'label' => 'Not provisioned',
+                'tone' => 'neutral',
+                'description' => 'No internal login has been created for this staff member yet.',
+            ];
+        }
+
+        if (! $this->is_active || ! $this->can_login) {
+            return [
+                'label' => 'Suspended',
+                'tone' => 'neutral',
+                'description' => 'The linked account is retained, but sign-in is currently disabled.',
+            ];
+        }
+
+        if ($this->user->password_setup_required) {
+            return [
+                'label' => 'Invite pending',
+                'tone' => 'warning',
+                'description' => 'A password setup link should be completed before the account is considered active.',
+            ];
+        }
+
+        return [
+            'label' => 'Active',
+            'tone' => 'success',
+            'description' => 'The linked account is provisioned and can access the internal workspace.',
+        ];
+    }
+
+    public function accessLevelLabel(): string
+    {
+        if (! $this->user) {
+            return 'No internal access';
+        }
+
+        return $this->user->role === 'admin'
+            ? 'Super admin access'
+            : 'Operational staff access';
     }
 }

@@ -89,6 +89,12 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::put('/staff/{staff}', [StaffController::class, 'update'])
             ->middleware('app_permission:staff.manage')
             ->name('staff.update');
+        Route::post('/staff/{staff}/access/invite', [StaffController::class, 'sendAccessInvite'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.access.invite');
+        Route::patch('/staff/{staff}/access/status', [StaffController::class, 'updateAccessStatus'])
+            ->middleware('app_permission:staff.manage')
+            ->name('staff.access.status');
         Route::patch('/staff/{staff}/status', [StaffController::class, 'updateStatus'])
             ->middleware('app_permission:staff.manage')
             ->name('staff.status');

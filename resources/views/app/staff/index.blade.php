@@ -104,10 +104,12 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($staff as $member)
+                                        @php($accessStatus = $member->accessStatus())
                                         <tr>
                                             <td>
                                                 <div class="selection-card__title">{{ $member->full_name }}</div>
                                                 <div class="small-note">{{ $member->job_title ?: 'No job title set' }}</div>
+                                                <div class="small-note mt-2">{{ $member->employee_code ?: 'No employee code' }}</div>
                                                 @if ($member->email || $member->phone)
                                                     <div class="small-note mt-2">
                                                         {{ $member->email ?: 'No email' }}
@@ -136,13 +138,18 @@
                                             </td>
                                             <td>
                                                 @if ($member->user)
-                                                    <div class="selection-card__title">{{ $member->user->name }}</div>
+                                                    <div class="selection-card__title">{{ $accessStatus['label'] }}</div>
                                                     <div class="small-note">{{ $member->user->email }}</div>
+                                                    <div class="small-note mt-2">{{ $member->accessLevelLabel() }}</div>
+                                                    @if ($member->user->last_password_reset_sent_at)
+                                                        <div class="small-note mt-2">Last setup link: {{ $member->user->last_password_reset_sent_at->diffForHumans() }}</div>
+                                                    @endif
                                                     <div class="mt-2">
                                                         <x-status-pill :label="$member->can_login ? 'Login enabled' : 'Login disabled'" :tone="$member->can_login ? 'success' : 'neutral'" />
                                                     </div>
                                                 @else
-                                                    <span class="small-note">No linked login user</span>
+                                                    <div class="selection-card__title">{{ $accessStatus['label'] }}</div>
+                                                    <span class="small-note">{{ $accessStatus['description'] }}</span>
                                                 @endif
                                             </td>
                                             <td>
