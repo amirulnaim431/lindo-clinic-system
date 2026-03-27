@@ -335,7 +335,7 @@ class DashboardController extends Controller
     private function buildRevenueBreakdown(Collection $groups): array
     {
         $rows = $groups->flatMap(function ($group) {
-            return $group->items->map(function ($item) {
+            return $group->items->map(function ($item) use ($group) {
                 $serviceName = $item->service?->name ?: 'Service';
                 $categoryKey = $this->resolveRevenueCategory($serviceName);
                 $startsAt = $item->starts_at ?: $group->starts_at;
