@@ -200,4 +200,9 @@ class Staff extends Model
     {
         return $this->hasMany(AppointmentItem::class, 'staff_id');
     }
+
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(StaffLeave::class, 'staff_id');
+    }
 }

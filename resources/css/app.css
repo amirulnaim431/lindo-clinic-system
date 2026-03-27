@@ -1978,6 +1978,12 @@
     gap: 0.45rem;
     align-content: start;
     background: rgba(255, 255, 255, 0.82);
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    border-left: 0;
+    border-top: 0;
 }
 
 .hr-schedule-cell__label {
@@ -2013,6 +2019,10 @@
 
 .hr-schedule-cell--training {
     background: linear-gradient(180deg, rgba(243, 247, 255, 0.96) 0%, rgba(228, 236, 248, 0.9) 100%);
+}
+
+.hr-schedule-cell--pending {
+    background: linear-gradient(180deg, rgba(255, 248, 240, 0.96) 0%, rgba(255, 238, 212, 0.9) 100%);
 }
 
 .hr-schedule-cell--half {
@@ -2064,6 +2074,11 @@
     color: #9f546c;
 }
 
+.hr-mini-pill--pending {
+    background: rgba(255, 238, 212, 1);
+    color: #9a6b24;
+}
+
 .hr-summary-card__hint {
     margin-top: 0.7rem;
     font-size: 0.8rem;
@@ -2080,6 +2095,9 @@
     display: grid;
     gap: 0.75rem;
     min-height: 180px;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
 }
 
 .hr-month-calendar-card__stats,
@@ -2102,6 +2120,118 @@
 .hr-month-calendar-card--working {
     border-color: rgba(124, 173, 146, 0.24);
     background: linear-gradient(180deg, rgba(246, 251, 247, 0.96), rgba(255, 250, 252, 0.94));
+}
+
+.hr-month-calendar-card--pending {
+    border-color: rgba(224, 182, 111, 0.32);
+    background: linear-gradient(180deg, rgba(255, 248, 240, 0.96), rgba(255, 251, 246, 0.94));
+}
+
+.hr-leave-modal {
+    width: min(1120px, calc(100vw - 2rem));
+}
+
+.hr-leave-modal__body {
+    display: grid;
+    gap: 1rem;
+}
+
+.hr-leave-modal__grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+    align-items: start;
+}
+
+.hr-leave-panel {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1rem;
+    border: 1px solid rgba(212, 185, 194, 0.24);
+    border-radius: 1.5rem;
+    background: rgba(255, 252, 253, 0.92);
+}
+
+.hr-leave-records {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.hr-leave-record {
+    display: grid;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(212, 185, 194, 0.24);
+    background: rgba(252, 247, 249, 0.9);
+}
+
+.hr-leave-record__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.hr-leave-record__meta {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #9b7d88;
+}
+
+.hr-leave-record__reason {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #4f3944;
+}
+
+.hr-leave-record__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.hr-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.hr-status-badge--approved {
+    background: rgba(230, 244, 236, 1);
+    border-color: rgba(124, 173, 146, 0.28);
+    color: #4a7b5f;
+}
+
+.hr-status-badge--pending {
+    background: rgba(255, 238, 212, 1);
+    border-color: rgba(224, 182, 111, 0.28);
+    color: #9a6b24;
+}
+
+.hr-status-badge--rejected {
+    background: rgba(252, 230, 236, 1);
+    border-color: rgba(209, 123, 149, 0.28);
+    color: #9f546c;
+}
+
+.btn-small {
+    min-height: 38px;
+    padding: 0.55rem 0.95rem;
+    font-size: 0.82rem;
+}
+
+.hr-leave-request-form .form-textarea {
+    min-height: 120px;
 }
 
 .modal-close {
@@ -2618,7 +2748,8 @@
     .hr-schedule-stats--three,
     .calendar-editor__grid,
     .calendar-editor__item-grid,
-    .calendar-editor__fields--compact {
+    .calendar-editor__fields--compact,
+    .hr-leave-modal__grid {
         grid-template-columns: 1fr;
     }
 

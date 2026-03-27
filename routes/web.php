@@ -69,6 +69,10 @@ Route::middleware(['auth', 'staff_or_admin'])
 
         Route::get('/hr/staff-schedule', [HrScheduleController::class, 'index'])
             ->name('hr.schedule');
+        Route::post('/hr/staff-schedule/leaves', [HrScheduleController::class, 'storeLeave'])
+            ->name('hr.schedule.leaves.store');
+        Route::patch('/hr/staff-schedule/leaves/{staffLeave}', [HrScheduleController::class, 'reviewLeave'])
+            ->name('hr.schedule.leaves.review');
 
         Route::get('/staff', [StaffController::class, 'index'])
             ->middleware('app_permission:staff.view')

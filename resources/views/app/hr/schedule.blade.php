@@ -6,7 +6,7 @@
                     <div>
                         <div class="page-kicker">HR workspace</div>
                         <h2 class="panel-title-display">Staff Schedule</h2>
-                        <p class="panel-subtitle">Mockup preview using current staff records. This gives HR and admin a clear weekly roster board now, while we wait for the final scheduling rules and controls.</p>
+                        <p class="panel-subtitle">Live HR schedule workspace for roster visibility, leave control, and quick leave requests from the calendar itself.</p>
                     </div>
 
                     <div class="hr-schedule-toolbar">
@@ -29,6 +29,14 @@
                         </div>
                     </div>
                 </div>
+
+                @if (session('success'))
+                    <div class="alert alert-success">{{ session('success') }}</div>
+                @endif
+
+                @if ($errors->any())
+                    <div class="alert alert-error">{{ $errors->first() }}</div>
+                @endif
 
                 <div class="stats-grid hr-schedule-stats hr-schedule-stats--three">
                     @foreach ($hrSummaryCards as $card)
@@ -75,7 +83,7 @@
 
                     <div class="col-12">
                         <div class="filter-bar__head">
-                            <div class="small-note">Designed as an easy weekly planning view for HR. Leave, off days, training, and working coverage are all visible at a glance.</div>
+                            <div class="small-note">Leave, off days, training, and working coverage are all visible at a glance, and every board click now opens the detailed leave workflow.</div>
                             <div class="btn-row">
                                 <button type="submit" class="btn btn-primary">Apply filters</button>
                                 <a href="{{ route('app.hr.schedule') }}" class="btn btn-secondary">Reset</a>
@@ -102,9 +110,12 @@
                                     <div class="selection-card__title">{{ $coverage['label'] }}</div>
                                     <div class="small-note">{{ $coverage['display'] }}</div>
                                 </div>
-                                <div class="hr-coverage-card__stats">
+                            <div class="hr-coverage-card__stats">
                                     <span class="hr-mini-pill hr-mini-pill--working">{{ $coverage['working'] }} working</span>
                                     <span class="hr-mini-pill hr-mini-pill--leave">{{ $coverage['leave'] }} leave</span>
+                                    @if (($coverage['pending'] ?? 0) > 0)
+                                        <span class="hr-mini-pill hr-mini-pill--pending">{{ $coverage['pending'] }} pending</span>
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
@@ -125,7 +136,11 @@
                             @foreach ($leaveHighlights as $entry)
                                 <div class="hr-leave-item">
                                     <div class="selection-card__title">{{ $entry['staff']->full_name }}</div>
-                                    <div class="small-note">{{ \Carbon\Carbon::parse($entry['shift']['date'])->format('D, d M') }} - {{ $entry['shift']['note'] }}</div>
+                                    <div class="small-note">
+                                        {{ optional($entry['leave']->start_date)->format('d M') }} - {{ optional($entry['leave']->end_date)->format('d M') }}
+                                        | {{ \App\Models\StaffLeave::statusOptions()[$entry['leave']->status] ?? str($entry['leave']->status)->title()->toString() }}
+                                    </div>
+                                    <div class="small-note">{{ $entry['leave']->reason }}</div>
                                 </div>
                             @endforeach
                         </div>
@@ -163,19 +178,15 @@
                 <x-section-heading
                     kicker="{{ $viewMode === 'month' ? 'Monthly roster' : 'Weekly roster' }}"
                     title="{{ $viewMode === 'month' ? 'Monthly schedule calendar' : 'Weekly schedule board' }}"
-                    subtitle="{{ $viewMode === 'month' ? 'Monthly view uses a real clinic calendar. Leave is color-coded so HR can scan busy and blocked dates faster.' : 'A premium planning board mockup built from your current staff list. Final editing tools can plug into this layout later.' }}" />
+                    subtitle="{{ $viewMode === 'month' ? 'Monthly view uses a real clinic calendar. Leave is color-coded so HR can scan busy and blocked dates faster.' : 'Weekly view keeps the detailed staff board, and each cell now opens leave detail and leave request actions.' }}" />
             </div>
             <div class="panel-body">
-                @php
-                    $activeBoardRows = $viewMode === 'month' ? $monthScheduleRows : $scheduleRows;
-                    $activeBoardDays = $viewMode === 'month' ? $monthDays : $weekDays;
-                    $dayCount = max(1, $activeBoardDays->count());
-                @endphp
+                @php($dayCount = max(1, $weekDays->count()))
 
                 @if ($viewMode === 'month')
                     <div class="month-grid hr-month-calendar-grid">
                         @foreach ($monthCalendarDays as $day)
-                            <a href="{{ $day['url'] }}" class="month-day-card hr-month-calendar-card {{ $day['is_selected'] ? 'is-selected' : '' }} {{ $day['is_outside_month'] ? 'is-outside-month' : '' }} hr-month-calendar-card--{{ $day['tone'] }}">
+                            <button type="button" class="month-day-card hr-month-calendar-card {{ $day['is_selected'] ? 'is-selected' : '' }} {{ $day['is_outside_month'] ? 'is-outside-month' : '' }} hr-month-calendar-card--{{ $day['tone'] }}" data-hr-leave='@json($day['modal'])'>
                                 <div class="month-day-card__head">
                                     <span class="month-day-card__number">{{ $day['day_number'] }}</span>
                                     <span class="small-note">{{ $day['label'] }}</span>
@@ -183,6 +194,9 @@
                                 <div class="hr-month-calendar-card__stats">
                                     <span class="hr-mini-pill hr-mini-pill--working">{{ $day['working'] }} working</span>
                                     <span class="hr-mini-pill hr-mini-pill--leave">{{ $day['leave'] }} leave</span>
+                                    @if ($day['pending'] > 0)
+                                        <span class="hr-mini-pill hr-mini-pill--pending">{{ $day['pending'] }} pending</span>
+                                    @endif
                                 </div>
                                 @if ($day['training'] > 0)
                                     <div class="small-note">{{ $day['training'] }} training</div>
@@ -196,21 +210,21 @@
                                 @else
                                     <div class="small-note">No leave recorded</div>
                                 @endif
-                            </a>
+                            </button>
                         @endforeach
                     </div>
-                @elseif ($activeBoardRows->count())
+                @elseif ($scheduleRows->count())
                     <div class="hr-schedule-board-wrap">
                         <div class="hr-schedule-board hr-schedule-board--{{ $viewMode }}" style="grid-template-columns: minmax(240px, 1.2fr) repeat({{ $dayCount }}, minmax(170px, 1fr));">
                             <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
-                            @foreach ($activeBoardDays as $day)
+                            @foreach ($weekDays as $day)
                                 <div class="hr-schedule-board__header">
                                     <div>{{ $day->format('D') }}</div>
                                     <div class="small-note">{{ $day->format('d M') }}</div>
                                 </div>
                             @endforeach
 
-                            @foreach ($activeBoardRows as $row)
+                            @foreach ($scheduleRows as $row)
                                 <div class="hr-schedule-board__staff">
                                     <div class="selection-card__title">{{ $row['staff']->full_name }}</div>
                                     <div class="small-note">{{ $row['staff']->job_title ?: 'No title set' }}</div>
@@ -224,11 +238,11 @@
                                 </div>
 
                                 @foreach ($row['days'] as $shift)
-                                    <div class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}">
+                                    <button type="button" class="hr-schedule-cell hr-schedule-cell--{{ $shift['tone'] }}" data-day-label="{{ \Carbon\Carbon::parse($shift['date'])->format('D d M') }}" data-hr-leave='@json($shift['modal'])'>
                                         <div class="hr-schedule-cell__label">{{ $shift['label'] }}</div>
                                         <div class="hr-schedule-cell__time">{{ $shift['time'] }}</div>
                                         <div class="hr-schedule-cell__note">{{ $shift['note'] }}</div>
-                                    </div>
+                                    </button>
                                 @endforeach
                             @endforeach
                         </div>
@@ -280,6 +294,81 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" id="hr-summary-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div
+        id="hr-leave-modal"
+        class="modal-shell hidden"
+        aria-hidden="true"
+        data-request-url="{{ route('app.hr.schedule.leaves.store') }}"
+        data-review-url-template="{{ route('app.hr.schedule.leaves.review', ['staffLeave' => '__LEAVE__']) }}"
+        data-csrf="{{ csrf_token() }}"
+    >
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card hr-leave-modal">
+                <div class="modal-header">
+                    <div class="modal-header__row">
+                        <div>
+                            <div class="modal-kicker">Leave detail</div>
+                            <h3 id="hr-leave-title" class="modal-title">-</h3>
+                            <p id="hr-leave-subtitle" class="modal-subtitle">-</p>
+                        </div>
+                        <button type="button" id="hr-leave-close-top" class="modal-close" aria-label="Close">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body hr-leave-modal__body">
+                    <div class="btn-row btn-row--between revenue-detail-toolbar">
+                        <div id="hr-leave-summary" class="small-note">-</div>
+                        <div class="btn-row">
+                            <button type="button" id="hr-leave-export" class="modal-btn modal-btn--secondary">Export CSV</button>
+                            <button type="button" id="hr-leave-print" class="modal-btn modal-btn--secondary">Print</button>
+                        </div>
+                    </div>
+                    <div class="hr-leave-modal__grid">
+                        <div class="hr-leave-panel">
+                            <div class="panel-kicker">Recorded leave</div>
+                            <div id="hr-leave-records" class="hr-leave-records"></div>
+                        </div>
+                        <div class="hr-leave-panel">
+                            <div class="panel-kicker">Request leave</div>
+                            <form method="POST" action="{{ route('app.hr.schedule.leaves.store') }}" class="stack hr-leave-request-form">
+                                @csrf
+                                <div class="field-block">
+                                    <label class="field-label" for="hr-leave-staff-id">Team member</label>
+                                    <select id="hr-leave-staff-id" name="staff_id" class="form-select" required>
+                                        <option value="">Select team member</option>
+                                        @foreach ($requestableStaff as $member)
+                                            <option value="{{ $member['id'] }}">{{ $member['name'] }} | {{ $member['job_title'] }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="col-6 field-block">
+                                        <label class="field-label" for="hr-leave-start-date">From</label>
+                                        <input id="hr-leave-start-date" name="start_date" type="date" class="form-input" required>
+                                    </div>
+                                    <div class="col-6 field-block">
+                                        <label class="field-label" for="hr-leave-end-date">To</label>
+                                        <input id="hr-leave-end-date" name="end_date" type="date" class="form-input" required>
+                                    </div>
+                                </div>
+                                <div class="field-block">
+                                    <label class="field-label" for="hr-leave-reason">Reason</label>
+                                    <textarea id="hr-leave-reason" name="reason" class="form-textarea" rows="4" placeholder="Reason for leave request" required></textarea>
+                                </div>
+                                <div class="btn-row">
+                                    <button type="submit" class="btn btn-primary">Submit leave request</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="hr-leave-close-bottom" class="modal-btn modal-btn--secondary">Close</button>
                 </div>
             </div>
         </div>
@@ -451,6 +540,239 @@
             summaryModal?.addEventListener('click', (event) => {
                 if (event.target === summaryModal || event.target.classList.contains('modal-backdrop')) {
                     closeSummaryModal();
+                }
+            });
+
+            const leaveButtons = document.querySelectorAll('[data-hr-leave]');
+            const leaveModal = document.getElementById('hr-leave-modal');
+            const leaveTitle = document.getElementById('hr-leave-title');
+            const leaveSubtitle = document.getElementById('hr-leave-subtitle');
+            const leaveSummary = document.getElementById('hr-leave-summary');
+            const leaveRecords = document.getElementById('hr-leave-records');
+            const leaveStaffInput = document.getElementById('hr-leave-staff-id');
+            const leaveStartInput = document.getElementById('hr-leave-start-date');
+            const leaveEndInput = document.getElementById('hr-leave-end-date');
+            const leaveReasonInput = document.getElementById('hr-leave-reason');
+            const leaveExport = document.getElementById('hr-leave-export');
+            const leavePrint = document.getElementById('hr-leave-print');
+            const leaveCloseTop = document.getElementById('hr-leave-close-top');
+            const leaveCloseBottom = document.getElementById('hr-leave-close-bottom');
+            let activeLeavePayload = null;
+
+            const csrfToken = leaveModal?.dataset.csrf || '';
+            const reviewUrlTemplate = leaveModal?.dataset.reviewUrlTemplate || '';
+
+            const statusBadgeClass = (status) => {
+                if (status === 'approved') {
+                    return 'hr-status-badge hr-status-badge--approved';
+                }
+
+                if (status === 'rejected') {
+                    return 'hr-status-badge hr-status-badge--rejected';
+                }
+
+                return 'hr-status-badge hr-status-badge--pending';
+            };
+
+            const closeLeaveModal = () => {
+                leaveModal?.classList.add('hidden');
+                leaveModal?.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            };
+
+            const leaveCsvRows = (payload) => {
+                const records = Array.isArray(payload?.records) ? payload.records : [];
+
+                return [
+                    ['Staff Member', 'Job Title', 'Department', 'Date Range', 'Status', 'Reason', 'Review Notes', 'Requested By', 'Reviewed By'],
+                    ...records.map((record) => [
+                        record.staff_name || '',
+                        record.job_title || '',
+                        record.department || '',
+                        record.date_range || '',
+                        record.status_label || '',
+                        record.reason || '',
+                        record.review_notes || '',
+                        record.requested_by || '',
+                        record.reviewed_by || '',
+                    ]),
+                ];
+            };
+
+            const exportLeaveCsv = (payload) => {
+                const rows = leaveCsvRows(payload);
+                const csv = rows
+                    .map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+                    .join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'hr-leave-detail.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            };
+
+            const printLeaveDetail = (payload) => {
+                const records = Array.isArray(payload?.records) ? payload.records : [];
+                const printWindow = window.open('', '_blank', 'width=1080,height=760');
+
+                if (!printWindow) {
+                    return;
+                }
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${escapeHtml(payload?.title || 'Leave detail')}</title>
+                            <style>
+                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
+                                h1 { margin: 0 0 8px; font-size: 28px; }
+                                p { margin: 0 0 16px; color: #7c6670; }
+                                table { width: 100%; border-collapse: collapse; }
+                                th, td { border: 1px solid #d9c2cb; padding: 10px 12px; text-align: left; vertical-align: top; }
+                                th { background: #fdf4f7; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>${escapeHtml(payload?.title || 'Leave detail')}</h1>
+                            <p>${escapeHtml(payload?.subtitle || '')}</p>
+                            <p>${escapeHtml(payload?.summary || '')}</p>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Staff Member</th>
+                                        <th>Job Title</th>
+                                        <th>Department</th>
+                                        <th>Date Range</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Review Notes</th>
+                                        <th>Requested By</th>
+                                        <th>Reviewed By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${records.length ? records.map((record) => `
+                                        <tr>
+                                            <td>${escapeHtml(record.staff_name || '-')}</td>
+                                            <td>${escapeHtml(record.job_title || '-')}</td>
+                                            <td>${escapeHtml(record.department || '-')}</td>
+                                            <td>${escapeHtml(record.date_range || '-')}</td>
+                                            <td>${escapeHtml(record.status_label || '-')}</td>
+                                            <td>${escapeHtml(record.reason || '-')}</td>
+                                            <td>${escapeHtml(record.review_notes || '-')}</td>
+                                            <td>${escapeHtml(record.requested_by || '-')}</td>
+                                            <td>${escapeHtml(record.reviewed_by || '-')}</td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="9">No leave recorded.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            };
+
+            const buildLeaveRecords = (payload) => {
+                const records = Array.isArray(payload?.records) ? payload.records : [];
+
+                if (!records.length) {
+                    return '<div class="empty-state empty-state--dashed"><div class="empty-state__title">No leave recorded for this selection.</div><div class="small-note">Use the request form to capture a new leave block here.</div></div>';
+                }
+
+                return records.map((record) => {
+                    const reviewButtons = record.status === 'pending'
+                        ? `
+                            <div class="hr-leave-record__actions">
+                                <form method="POST" action="${escapeHtml(reviewUrlTemplate.replace('__LEAVE__', record.id || ''))}">
+                                    <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
+                                    <input type="hidden" name="_method" value="PATCH">
+                                    <input type="hidden" name="status" value="approved">
+                                    <button type="submit" class="btn btn-primary btn-small">Approve</button>
+                                </form>
+                                <form method="POST" action="${escapeHtml(reviewUrlTemplate.replace('__LEAVE__', record.id || ''))}">
+                                    <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
+                                    <input type="hidden" name="_method" value="PATCH">
+                                    <input type="hidden" name="status" value="rejected">
+                                    <button type="submit" class="btn btn-secondary btn-small">Reject</button>
+                                </form>
+                            </div>
+                        `
+                        : '';
+
+                    return `
+                        <div class="hr-leave-record">
+                            <div class="hr-leave-record__head">
+                                <div>
+                                    <div class="selection-card__title">${escapeHtml(record.staff_name || '-')}</div>
+                                    <div class="small-note">${escapeHtml(record.job_title || '-')} | ${escapeHtml(record.department || '-')}</div>
+                                </div>
+                                <span class="${statusBadgeClass(record.status)}">${escapeHtml(record.status_label || '-')}</span>
+                            </div>
+                            <div class="hr-leave-record__meta">${escapeHtml(record.date_range || '-')}</div>
+                            <div class="hr-leave-record__reason">${escapeHtml(record.reason || '-')}</div>
+                            <div class="small-note">Requested by ${escapeHtml(record.requested_by || '-')}</div>
+                            ${record.reviewed_by ? `<div class="small-note">Reviewed by ${escapeHtml(record.reviewed_by)}${record.review_notes ? ` | ${escapeHtml(record.review_notes)}` : ''}</div>` : ''}
+                            ${reviewButtons}
+                        </div>
+                    `;
+                }).join('');
+            };
+
+            const openLeaveModal = (payload) => {
+                activeLeavePayload = payload;
+                leaveTitle.textContent = payload?.title || 'Leave detail';
+                leaveSubtitle.textContent = payload?.subtitle || 'Leave detail';
+                leaveSummary.textContent = payload?.summary || 'Leave detail';
+                leaveRecords.innerHTML = buildLeaveRecords(payload);
+
+                const defaults = payload?.request_defaults || {};
+                leaveStaffInput.value = defaults.staff_id || '';
+                leaveStartInput.value = defaults.start_date || '';
+                leaveEndInput.value = defaults.end_date || defaults.start_date || '';
+                leaveReasonInput.value = defaults.reason || '';
+
+                leaveModal.classList.remove('hidden');
+                leaveModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+            };
+
+            leaveButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    let payload = {};
+
+                    try {
+                        payload = JSON.parse(button.dataset.hrLeave || '{}');
+                    } catch (error) {
+                        payload = {};
+                    }
+
+                    openLeaveModal(payload);
+                });
+            });
+
+            leaveExport?.addEventListener('click', () => {
+                if (activeLeavePayload) {
+                    exportLeaveCsv(activeLeavePayload);
+                }
+            });
+
+            leavePrint?.addEventListener('click', () => {
+                if (activeLeavePayload) {
+                    printLeaveDetail(activeLeavePayload);
+                }
+            });
+
+            leaveCloseTop?.addEventListener('click', closeLeaveModal);
+            leaveCloseBottom?.addEventListener('click', closeLeaveModal);
+            leaveModal?.addEventListener('click', (event) => {
+                if (event.target === leaveModal || event.target.classList.contains('modal-backdrop')) {
+                    closeLeaveModal();
                 }
             });
         })();
