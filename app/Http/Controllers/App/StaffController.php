@@ -228,17 +228,17 @@ class StaffController extends Controller
 
         $staff->services()->sync($data['service_ids']);
 
-        $resetLink = null;
+        $delivery = null;
 
         if ($staff->can_login) {
-            $resetLink = $this->provisionStaffAccess($staff, ! $staff->user_id, $data['access_level'] ?? 'staff');
+            $delivery = $this->provisionStaffAccess($staff, ! $staff->user_id, $data['access_level'] ?? 'staff');
         }
 
         return $this->redirectWithAccessMessage(
             route('app.staff.index'),
             'Staff record created successfully.',
             $staff,
-            $resetLink
+            $delivery
         );
     }
 
@@ -267,17 +267,17 @@ class StaffController extends Controller
 
         $staff->services()->sync($data['service_ids']);
 
-        $resetLink = null;
+        $delivery = null;
 
         if ($staff->can_login) {
-            $resetLink = $this->provisionStaffAccess($staff, true, $data['access_level'] ?? ($staff->user?->role === 'admin' ? 'admin' : 'staff'));
+            $delivery = $this->provisionStaffAccess($staff, true, $data['access_level'] ?? ($staff->user?->role === 'admin' ? 'admin' : 'staff'));
         }
 
         return $this->redirectWithAccessMessage(
             route('app.staff.index'),
             'Staff record updated successfully.',
             $staff,
-            $resetLink
+            $delivery
         );
     }
 
@@ -285,13 +285,13 @@ class StaffController extends Controller
     {
         abort_unless($staff->exists, 404);
 
-        $resetLink = $this->provisionStaffAccess($staff, true, $staff->user?->role === 'admin' ? 'admin' : 'staff');
+        $delivery = $this->provisionStaffAccess($staff, true, $staff->user?->role === 'admin' ? 'admin' : 'staff');
 
         return $this->redirectWithAccessMessage(
             route('app.staff.edit', $staff),
-            'A fresh password setup link was generated for this staff account.',
+            'A fresh password setup email was triggered for this staff account.',
             $staff,
-            $resetLink
+            $delivery
         );
     }
 
@@ -303,13 +303,13 @@ class StaffController extends Controller
 
         if ($validated['can_login'] === '1') {
             $staff->update(['can_login' => true]);
-            $resetLink = $this->provisionStaffAccess($staff, false, $staff->user?->role === 'admin' ? 'admin' : 'staff');
+            $delivery = $this->provisionStaffAccess($staff, false, $staff->user?->role === 'admin' ? 'admin' : 'staff');
 
             return $this->redirectWithAccessMessage(
                 route('app.staff.edit', $staff),
                 'Login access has been enabled for this staff member.',
                 $staff,
-                $resetLink
+                $delivery
             );
         }
 
@@ -381,7 +381,7 @@ class StaffController extends Controller
         return $candidate;
     }
 
-    protected function provisionStaffAccess(Staff $staff, bool $refreshResetLink, string $accessLevel = 'staff'): ?string
+    protected function provisionStaffAccess(Staff $staff, bool $refreshResetLink, string $accessLevel = 'staff'): ?array
     {
         $staff->loadMissing('user');
 
@@ -462,7 +462,7 @@ class StaffController extends Controller
                 'last_password_reset_sent_at' => now(),
             ])->save();
 
-            return $this->generateResetLinkFor($user);
+            return $this->dispatchPasswordSetupNotification($user);
         }
 
         $user->save();
@@ -470,26 +470,47 @@ class StaffController extends Controller
         return null;
     }
 
-    protected function generateResetLinkFor(User $user): string
+    protected function dispatchPasswordSetupNotification(User $user): array
     {
         $token = Password::broker()->createToken($user);
+        $user->sendPasswordResetNotification($token);
 
-        return route('password.reset', [
-            'token' => $token,
-            'email' => $user->email,
-        ]);
+        $mailer = (string) config('mail.default', 'log');
+
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return [
+                'mode' => 'logged',
+                'link' => route('password.reset', [
+                    'token' => $token,
+                    'email' => $user->email,
+                ]),
+                'mailer' => $mailer,
+            ];
+        }
+
+        return [
+            'mode' => 'email',
+            'mailer' => $mailer,
+        ];
     }
 
-    protected function redirectWithAccessMessage(string $route, string $message, Staff $staff, ?string $resetLink = null)
+    protected function redirectWithAccessMessage(string $route, string $message, Staff $staff, ?array $delivery = null)
     {
         $redirect = redirect()->to($route)->with('success', $message);
 
-        if (! $resetLink) {
+        if (! $delivery) {
             return $redirect;
         }
 
-        return $redirect->with('staff_access_link', $resetLink)
-            ->with('staff_access_email', $staff->email)
-            ->with('staff_access_name', $staff->full_name);
+        $redirect->with('staff_access_email', $staff->email)
+            ->with('staff_access_name', $staff->full_name)
+            ->with('staff_access_delivery_mode', $delivery['mode'] ?? 'email')
+            ->with('staff_access_mailer', $delivery['mailer'] ?? null);
+
+        if (($delivery['mode'] ?? null) === 'logged' && ! empty($delivery['link'])) {
+            $redirect->with('staff_access_link', $delivery['link']);
+        }
+
+        return $redirect;
     }
 }

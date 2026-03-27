@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Staff;
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class StaffAccessManagementTest extends TestCase
@@ -13,6 +15,8 @@ class StaffAccessManagementTest extends TestCase
 
     public function test_admin_can_provision_staff_login_from_staff_form(): void
     {
+        Notification::fake();
+
         $admin = User::factory()->create([
             'role' => 'admin',
             'email' => 'admin@lindo.com',
@@ -31,7 +35,7 @@ class StaffAccessManagementTest extends TestCase
         ]);
 
         $response->assertRedirect(route('app.staff.index'));
-        $response->assertSessionHas('staff_access_link');
+        $response->assertSessionHas('staff_access_delivery_mode', 'logged');
 
         $staff = Staff::query()->where('email', 'aisyah@lindo.com')->firstOrFail();
         $this->assertNotNull($staff->user_id);
@@ -42,10 +46,13 @@ class StaffAccessManagementTest extends TestCase
         $this->assertSame('staff', $user->role);
         $this->assertTrue($user->password_setup_required);
         $this->assertNotNull($user->last_password_reset_sent_at);
+        Notification::assertSentTo($user, ResetPassword::class);
     }
 
     public function test_admin_can_provision_super_admin_access_for_executive_staff(): void
     {
+        Notification::fake();
+
         $admin = User::factory()->create([
             'role' => 'admin',
             'email' => 'admin@lindo.com',
@@ -64,12 +71,13 @@ class StaffAccessManagementTest extends TestCase
         ]);
 
         $response->assertRedirect(route('app.staff.index'));
-        $response->assertSessionHas('staff_access_link');
+        $response->assertSessionHas('staff_access_delivery_mode', 'logged');
 
         $staff = Staff::query()->where('email', 'board.member@lindo.com')->firstOrFail();
         $user = User::query()->findOrFail($staff->user_id);
 
         $this->assertSame('admin', $user->role);
         $this->assertTrue($user->password_setup_required);
+        Notification::assertSentTo($user, ResetPassword::class);
     }
 }

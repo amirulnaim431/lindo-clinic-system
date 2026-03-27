@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\StaffPasswordSetupNotification;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -122,5 +123,10 @@ class User extends Authenticatable
         }
 
         return $staffProfile->department === 'Human Resources';
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new StaffPasswordSetupNotification($token));
     }
 }

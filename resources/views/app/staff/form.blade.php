@@ -14,14 +14,20 @@
     @endphp
 
     <div class="stack">
-        @if (session('staff_access_link'))
+        @if (session('staff_access_delivery_mode') === 'email')
             <div class="alert alert-success">
-                <div><strong>Setup link ready.</strong> Share this secure link with {{ session('staff_access_name') ?: 'the staff member' }} so they can create or reset their password.</div>
+                <div><strong>Invite email sent.</strong> A password setup email was sent to {{ session('staff_access_email') ?: 'the staff member' }}.</div>
+            </div>
+        @endif
+
+        @if (session('staff_access_delivery_mode') === 'logged')
+            <div class="alert alert-success">
+                <div><strong>Email delivery is not active on this server.</strong> The current mailer is set to `{{ session('staff_access_mailer') }}`, so the invite was written to logs instead of being delivered.</div>
                 <div class="mt-2" style="word-break: break-all;">
                     <a href="{{ session('staff_access_link') }}" target="_blank" rel="noopener">{{ session('staff_access_link') }}</a>
                 </div>
                 @if (session('staff_access_email'))
-                    <div class="field-note mt-2">Login email: {{ session('staff_access_email') }}</div>
+                    <div class="field-note mt-2">Fallback setup link for {{ session('staff_access_email') }}</div>
                 @endif
             </div>
         @endif
