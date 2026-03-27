@@ -29,6 +29,7 @@ class HrScheduleController extends Controller
             ->map(fn (int $offset) => $weekStart->copy()->addDays($offset))
             ->values();
         $monthStart = $selectedDate->copy()->startOfMonth();
+        $monthEnd = $selectedDate->copy()->endOfMonth();
         $monthDays = collect();
         $monthCursor = $monthStart->copy();
 
@@ -38,6 +39,19 @@ class HrScheduleController extends Controller
             }
 
             $monthCursor->addDay();
+        }
+
+        $monthGridStart = $monthStart->copy()->startOfWeek(Carbon::TUESDAY);
+        $monthGridEnd = $monthEnd->copy()->endOfWeek(Carbon::SATURDAY);
+        $monthGridDays = collect();
+        $gridCursor = $monthGridStart->copy();
+
+        while ($gridCursor->lte($monthGridEnd)) {
+            if (in_array($gridCursor->dayOfWeek, [Carbon::TUESDAY, Carbon::WEDNESDAY, Carbon::THURSDAY, Carbon::FRIDAY, Carbon::SATURDAY], true)) {
+                $monthGridDays->push($gridCursor->copy());
+            }
+
+            $gridCursor->addDay();
         }
 
         $staff = Staff::query()
@@ -157,6 +171,51 @@ class HrScheduleController extends Controller
             ];
         })->values();
 
+        $monthCalendarDays = $monthGridDays->map(function (Carbon $date) use ($staff, $monthStart, $selectedDate, $filters) {
+            $working = 0;
+            $leave = 0;
+            $training = 0;
+            $leaveNames = [];
+
+            foreach ($staff as $member) {
+                $shift = $this->buildMockShift($member, $date);
+
+                if ($shift['status'] === 'leave') {
+                    $leave++;
+                    $leaveNames[] = $member->full_name;
+                    continue;
+                }
+
+                if ($shift['status'] === 'training') {
+                    $training++;
+                }
+
+                if (in_array($shift['status'], ['working', 'half_day', 'training'], true)) {
+                    $working++;
+                }
+            }
+
+            return [
+                'date' => $date->toDateString(),
+                'day_number' => $date->format('j'),
+                'label' => $date->format('D'),
+                'working' => $working,
+                'leave' => $leave,
+                'training' => $training,
+                'leave_names' => collect($leaveNames)->take(3)->values(),
+                'is_selected' => $date->isSameDay($selectedDate),
+                'is_outside_month' => ! $date->isSameMonth($monthStart),
+                'tone' => $leave > 0 ? 'leave' : ($training > 0 ? 'training' : 'working'),
+                'url' => route('app.hr.schedule', array_filter([
+                    'view' => 'month',
+                    'date' => $date->toDateString(),
+                    'search' => $filters['search'] !== '' ? $filters['search'] : null,
+                    'department' => $filters['department'] !== '' ? $filters['department'] : null,
+                    'status' => $filters['status'] !== 'active' ? $filters['status'] : null,
+                ])),
+            ];
+        })->values();
+
         $activeDays = $viewMode === 'week' ? $weekDays : $monthDays;
 
         $leaveHighlights = $staff
@@ -235,6 +294,7 @@ class HrScheduleController extends Controller
             'selectedDateLabel' => $selectedDateLabel,
             'scheduleRows' => $scheduleRows,
             'monthScheduleRows' => $monthScheduleRows,
+            'monthCalendarDays' => $monthCalendarDays,
             'weekDays' => $weekDays,
             'monthDays' => $monthDays,
             'weekStart' => $weekStart,

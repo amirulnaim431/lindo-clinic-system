@@ -162,8 +162,8 @@
             <div class="panel-header">
                 <x-section-heading
                     kicker="{{ $viewMode === 'month' ? 'Monthly roster' : 'Weekly roster' }}"
-                    title="{{ $viewMode === 'month' ? 'Monthly schedule board' : 'Weekly schedule board' }}"
-                    subtitle="{{ $viewMode === 'month' ? 'Monthly view now uses the same board layout as weekly, expanded across all clinic operating days in the selected month.' : 'A premium planning board mockup built from your current staff list. Final editing tools can plug into this layout later.' }}" />
+                    title="{{ $viewMode === 'month' ? 'Monthly schedule calendar' : 'Weekly schedule board' }}"
+                    subtitle="{{ $viewMode === 'month' ? 'Monthly view uses a real clinic calendar. Leave is color-coded so HR can scan busy and blocked dates faster.' : 'A premium planning board mockup built from your current staff list. Final editing tools can plug into this layout later.' }}" />
             </div>
             <div class="panel-body">
                 @php
@@ -172,9 +172,36 @@
                     $dayCount = max(1, $activeBoardDays->count());
                 @endphp
 
-                @if ($activeBoardRows->count())
+                @if ($viewMode === 'month')
+                    <div class="month-grid hr-month-calendar-grid">
+                        @foreach ($monthCalendarDays as $day)
+                            <a href="{{ $day['url'] }}" class="month-day-card hr-month-calendar-card {{ $day['is_selected'] ? 'is-selected' : '' }} {{ $day['is_outside_month'] ? 'is-outside-month' : '' }} hr-month-calendar-card--{{ $day['tone'] }}">
+                                <div class="month-day-card__head">
+                                    <span class="month-day-card__number">{{ $day['day_number'] }}</span>
+                                    <span class="small-note">{{ $day['label'] }}</span>
+                                </div>
+                                <div class="hr-month-calendar-card__stats">
+                                    <span class="hr-mini-pill hr-mini-pill--working">{{ $day['working'] }} working</span>
+                                    <span class="hr-mini-pill hr-mini-pill--leave">{{ $day['leave'] }} leave</span>
+                                </div>
+                                @if ($day['training'] > 0)
+                                    <div class="small-note">{{ $day['training'] }} training</div>
+                                @endif
+                                @if ($day['leave_names']->count())
+                                    <div class="hr-month-calendar-card__names">
+                                        @foreach ($day['leave_names'] as $name)
+                                            <span class="chip">{{ $name }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="small-note">No leave recorded</div>
+                                @endif
+                            </a>
+                        @endforeach
+                    </div>
+                @elseif ($activeBoardRows->count())
                     <div class="hr-schedule-board-wrap">
-                        <div class="hr-schedule-board hr-schedule-board--{{ $viewMode }}" style="grid-template-columns: minmax(240px, 1.2fr) repeat({{ $dayCount }}, minmax({{ $viewMode === 'month' ? '140px' : '170px' }}, 1fr));">
+                        <div class="hr-schedule-board hr-schedule-board--{{ $viewMode }}" style="grid-template-columns: minmax(240px, 1.2fr) repeat({{ $dayCount }}, minmax(170px, 1fr));">
                             <div class="hr-schedule-board__header hr-schedule-board__header--staff">Team member</div>
                             @foreach ($activeBoardDays as $day)
                                 <div class="hr-schedule-board__header">

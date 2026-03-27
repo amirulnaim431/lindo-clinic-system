@@ -2072,6 +2072,38 @@
     color: var(--app-accent-strong);
 }
 
+.hr-month-calendar-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.hr-month-calendar-card {
+    display: grid;
+    gap: 0.75rem;
+    min-height: 180px;
+}
+
+.hr-month-calendar-card__stats,
+.hr-month-calendar-card__names {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.hr-month-calendar-card--leave {
+    border-color: rgba(209, 123, 149, 0.34);
+    background: linear-gradient(180deg, rgba(255, 240, 245, 0.96), rgba(255, 248, 250, 0.94));
+}
+
+.hr-month-calendar-card--training {
+    border-color: rgba(122, 150, 190, 0.28);
+    background: linear-gradient(180deg, rgba(243, 247, 255, 0.96), rgba(250, 251, 255, 0.94));
+}
+
+.hr-month-calendar-card--working {
+    border-color: rgba(124, 173, 146, 0.24);
+    background: linear-gradient(180deg, rgba(246, 251, 247, 0.96), rgba(255, 250, 252, 0.94));
+}
+
 .modal-close {
     width: 2.5rem;
     height: 2.5rem;
@@ -2581,6 +2613,7 @@
     .calendar-days-row,
     .month-grid,
     .calendar-switcher,
+    .hr-month-calendar-grid,
     .hr-schedule-summary-row,
     .hr-schedule-stats--three,
     .calendar-editor__grid,
