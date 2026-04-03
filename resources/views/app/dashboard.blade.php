@@ -195,12 +195,12 @@
                         subtitle="Useful for reviewing where current demand is coming from." />
                 </div>
                 <div class="panel-body stack">
-                    @forelse ($sourceBreakdown as $source)
+                    @foreach ($sourceBreakdown as $source)
                         <div class="summary-pill">
                             <span class="summary-pill__label">{{ $source['source'] }}</span>
                             <span class="summary-pill__value">{{ $source['appointments'] }} appointment{{ $source['appointments'] === 1 ? '' : 's' }}</span>
                         </div>
-                    @endforelse
+                    @endforeach
                 </div>
             </div>
         </section>
