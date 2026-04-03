@@ -868,17 +868,20 @@
         z-index: 20;
         border: 1px solid var(--app-border-strong);
         border-radius: var(--radius-lg);
-        background: rgba(27, 22, 22, 0.98);
+        background:
+            linear-gradient(180deg, rgba(255, 253, 253, 0.98), rgba(255, 247, 250, 0.98));
         box-shadow: var(--app-shadow-md);
         overflow: hidden;
+        backdrop-filter: blur(12px);
     }
 
     .customer-suggestion {
         width: 100%;
         text-align: left;
         padding: 0.85rem 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid var(--app-border);
         background: transparent;
+        color: var(--app-text-strong);
         cursor: pointer;
     }
 
@@ -888,16 +891,16 @@
 
     .customer-suggestion:hover,
     .customer-suggestion.is-active {
-        background: rgba(255, 255, 255, 0.04);
+        background: linear-gradient(180deg, rgba(201, 141, 159, 0.16), rgba(255, 250, 251, 0.96));
     }
 
     .customer-picked {
         margin-top: 0.55rem;
         border: 1px solid var(--app-border);
         border-radius: 1rem;
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 249, 251, 0.96);
         padding: 0.75rem 0.9rem;
-        color: var(--app-muted);
+        color: var(--app-muted-strong);
         font-size: 0.78rem;
     }
 
