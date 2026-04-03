@@ -1,7 +1,6 @@
 <x-guest-layout>
     <div class="auth-kicker">Verify email</div>
     <h2 class="panel-title-display">Activate your internal access.</h2>
-    <p class="panel-subtitle">Before entering the clinic workspace, confirm your email using the verification link we sent.</p>
 
     @if (session('status') == 'verification-link-sent')
         <div class="alert alert-success mt-4">

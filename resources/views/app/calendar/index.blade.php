@@ -40,7 +40,6 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="small-note">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'Person In Charge') : 'Showing the full operational board' }}</div>
                         <div class="btn-row btn-row--compact-mobile">
                             <button type="submit" class="btn btn-primary">Apply</button>
                             <a href="{{ route('app.calendar', ['view' => $viewMode, 'date' => $selectedDateIso, 'anchor' => $viewMode === 'month' ? $monthAnchor : $weekAnchor]) }}" class="btn btn-secondary">Reset</a>
@@ -133,9 +132,6 @@
                         <div class="compact-label">Daily timeline</div>
                         <h3 class="panel-title-display">Appointments for {{ $selectedDate->format('d M Y') }}</h3>
                     </div>
-                    @if ($canManageAppointments)
-                        <div class="small-note">Drag blocks to reschedule.</div>
-                    @endif
                 </div>
             </div>
 
@@ -187,7 +183,6 @@
                         <div class="timeline-empty-overlay">
                             <div class="timeline-empty-overlay__card">
                                 <div class="empty-state__title">No appointments on this day</div>
-                                <p class="empty-state__body">Use any open row to create a booking directly from the board.</p>
                                 <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-primary mt-5 pointer-events-auto">Create appointment</a>
                             </div>
                         </div>
@@ -227,7 +222,7 @@
                                 <div class="modal-panel modal-panel--wide">
                                     <div class="modal-panel__label">Total Balance Membership</div>
                                     <div id="modal-membership-balance" class="modal-panel__value">Coming soon</div>
-                                    <div id="modal-membership-balance-note" class="small-note" style="margin-top: 0.55rem;">Pending input</div>
+                                    <div id="modal-membership-balance-note" class="small-note hidden" style="margin-top: 0.55rem;"></div>
                                 </div>
                             </div>
                         @endif
@@ -298,7 +293,6 @@
                             <div class="filter-bar__head">
                                 <div>
                                     <div class="modal-panel__label">Linked Visit Flow</div>
-                                    <div class="small-note" style="margin-top: 0.35rem;">Adjust service, assigned person in charge, and exact timing directly here.</div>
                                 </div>
                             </div>
                             <div id="calendar-edit-items" class="calendar-editor__items"></div>
@@ -329,7 +323,6 @@
                         <div>
                             <div class="modal-kicker">Busy time slot</div>
                             <h3 id="overflow-modal-title" class="modal-title">More appointments</h3>
-                            <p class="modal-subtitle">Extra appointments hidden to keep the board readable.</p>
                         </div>
                         <button type="button" id="calendar-overflow-close-top" class="modal-close" aria-label="Close">&times;</button>
                     </div>

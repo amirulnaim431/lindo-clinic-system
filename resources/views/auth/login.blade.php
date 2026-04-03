@@ -1,7 +1,6 @@
 <x-guest-layout>
     <div class="auth-kicker">Secure sign in</div>
     <h2 class="panel-title-display">Access the clinic workspace.</h2>
-    <p class="panel-subtitle">Use your internal account to open appointments, customer records, and staff operations.</p>
 
     <x-auth-session-status class="alert alert-success mt-4" :status="session('status')" />
 

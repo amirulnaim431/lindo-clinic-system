@@ -54,24 +54,20 @@
                     <div>
                         <div class="section-kicker">Provisioning workspace</div>
                         <div class="panel-title-display">{{ $mode === 'create' ? 'Set up the staff member first, then decide their access tier.' : 'Review identity, access tier, and account readiness at a glance.' }}</div>
-                        <div class="panel-subtitle">Use work email as the sign-in ID. Employee code remains the internal reference for HR, audit, and support.</div>
                     </div>
 
                     <div class="staff-form-hero__stats">
                         <div class="staff-brief-card">
                             <div class="micro-label">Employee code</div>
                             <div class="selection-card__title mt-2">{{ old('employee_code', $staff->employee_code ?: 'Auto-generated on save') }}</div>
-                            <div class="selection-card__meta">Internal reference used for reporting and administration.</div>
                         </div>
                         <div class="staff-brief-card">
                             <div class="micro-label">Access status</div>
                             <div class="selection-card__title mt-2">{{ $accessStatus['label'] }}</div>
-                            <div class="selection-card__meta">{{ $accessStatus['description'] }}</div>
                         </div>
                         <div class="staff-brief-card">
                             <div class="micro-label">Access tier</div>
                             <div class="selection-card__title mt-2">{{ $linkedUser ? $staff->accessLevelLabel() : $accessPreviewLabel }}</div>
-                            <div class="selection-card__meta">{{ $linkedUser ? ($linkedUser->role === 'admin' ? 'Full internal privileges are enabled for this account.' : 'Permissions below determine what this staff member can access.') : 'Choose operational or super admin access below.' }}</div>
                         </div>
                     </div>
                 </div>

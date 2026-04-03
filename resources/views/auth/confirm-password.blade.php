@@ -1,7 +1,6 @@
 <x-guest-layout>
     <div class="auth-kicker">Secure confirmation</div>
     <h2 class="panel-title-display">Confirm your password.</h2>
-    <p class="panel-subtitle">This action requires a quick password check before continuing.</p>
 
     <form method="POST" action="{{ route('password.confirm') }}" class="auth-form">
         @csrf

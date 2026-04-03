@@ -6,7 +6,6 @@
                     <div>
                         <div class="page-kicker">HR workspace</div>
                         <h2 class="panel-title-display">Staff Schedule</h2>
-                        <p class="panel-subtitle">Live HR schedule workspace for roster visibility, leave control, and quick leave requests from the calendar itself.</p>
                     </div>
 
                     <div class="hr-schedule-toolbar">
@@ -43,8 +42,6 @@
                         <button type="button" class="stat-card stat-card--interactive hr-summary-card" data-hr-summary='@json($card)'>
                             <div class="metric-label">{{ $card['label'] }}</div>
                             <div class="stat-value">{{ $card['value'] }}</div>
-                            <div class="metric-meta">{{ $card['meta'] }}</div>
-                            <div class="hr-summary-card__hint">Open detail list</div>
                         </button>
                     @endforeach
                 </div>
@@ -83,7 +80,6 @@
 
                     <div class="col-12">
                         <div class="filter-bar__head">
-                            <div class="small-note">Leave, off days, training, and working coverage are all visible at a glance, and every board click now opens the detailed leave workflow.</div>
                             <div class="btn-row">
                                 <button type="submit" class="btn btn-primary">Apply filters</button>
                                 <a href="{{ route('app.hr.schedule') }}" class="btn btn-secondary">Reset</a>
@@ -166,8 +162,6 @@
                                 <span class="chip">{{ $owner->full_name }}</span>
                             @endforeach
                         </div>
-                    @else
-                        <div class="small-note">No dedicated HR staff found yet, so admin remains the fallback controller.</div>
                     @endif
                 </div>
             </section>
@@ -268,7 +262,6 @@
                 </div>
                 <div class="modal-body">
                     <div class="btn-row btn-row--between revenue-detail-toolbar">
-                        <div class="small-note">Detailed HR roster insight for the selected summary card.</div>
                         <div class="btn-row">
                             <button type="button" id="hr-summary-export" class="modal-btn modal-btn--secondary">Export CSV</button>
                             <button type="button" id="hr-summary-print" class="modal-btn modal-btn--secondary">Print</button>
@@ -682,7 +675,7 @@
                 const records = Array.isArray(payload?.records) ? payload.records : [];
 
                 if (!records.length) {
-                    return '<div class="empty-state empty-state--dashed"><div class="empty-state__title">No leave recorded for this selection.</div><div class="small-note">Use the request form to capture a new leave block here.</div></div>';
+                    return '<div class="empty-state empty-state--dashed"><div class="empty-state__title">No leave recorded for this selection.</div></div>';
                 }
 
                 return records.map((record) => {

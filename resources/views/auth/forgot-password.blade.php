@@ -1,7 +1,6 @@
 <x-guest-layout>
     <div class="auth-kicker">Password recovery</div>
     <h2 class="panel-title-display">Reset access safely.</h2>
-    <p class="panel-subtitle">Enter the email linked to your clinic account and we will send a secure password reset link.</p>
 
     <x-auth-session-status class="alert alert-success mt-4" :status="session('status')" />
 

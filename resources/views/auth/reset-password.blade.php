@@ -1,7 +1,6 @@
 <x-guest-layout>
     <div class="auth-kicker">Reset password</div>
     <h2 class="panel-title-display">Choose a new password.</h2>
-    <p class="panel-subtitle">Complete the reset for your Lindo internal account.</p>
 
     <form method="POST" action="{{ route('password.store') }}" class="auth-form">
         @csrf

@@ -56,7 +56,6 @@
                         <span>
                             <span class="app-brand__eyebrow">Lindo Clinic</span>
                             <span class="app-brand__title">Clinic Workspace</span>
-                            <span class="app-brand__subtitle">Daily operations, scheduling, CRM, and staff coordination in one live workspace.</span>
                         </span>
                     @endif
                 </a>
@@ -191,9 +190,6 @@
                     <div>
                         <div class="page-kicker">Clinic workspace</div>
                         <h1 class="page-title">{{ $title ?? 'Dashboard' }}</h1>
-                        @isset($subtitle)
-                            <p class="page-subtitle">{{ $subtitle }}</p>
-                        @endisset
                     </div>
 
                     <div class="topbar-badges">

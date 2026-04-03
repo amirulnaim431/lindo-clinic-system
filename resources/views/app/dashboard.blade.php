@@ -101,14 +101,10 @@
             <button type="button" class="stat-card stat-card--interactive metric-card-button" data-metric-card='@json($newCustomersPayload)'>
                 <div class="metric-label">New Customers</div>
                 <div class="stat-value">{{ $kpi['new_customers'] ?? 0 }}</div>
-                <div class="metric-meta">First visit in this period</div>
-                <div class="metric-hint">Open detail list</div>
             </button>
             <button type="button" class="stat-card stat-card--interactive metric-card-button" data-metric-card='@json($existingCustomersPayload)'>
                 <div class="metric-label">Existing Customers</div>
                 <div class="stat-value">{{ $kpi['existing_customers'] ?? 0 }}</div>
-                <div class="metric-meta">Returning customers in this period</div>
-                <div class="metric-hint">Open detail list</div>
             </button>
             <button type="button" class="stat-card stat-card--membership stat-card--interactive metric-card-button" data-metric-card='@json($membershipPayload)'>
                 <div class="metric-label">Membership</div>
@@ -126,8 +122,6 @@
                         <span class="membership-stat-row__value">{{ $membershipSummary['black'] ?? 0 }}</span>
                     </div>
                 </div>
-                <div class="metric-meta">{{ $periodLabel }}</div>
-                <div class="metric-hint">Open member list</div>
             </button>
             <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />
         </section>
@@ -139,7 +133,6 @@
                     <div class="revenue-focus__date">Date Range</div>
                     <div class="revenue-focus__range">{{ $periodLabel }}</div>
                     <div class="revenue-focus__total">RM {{ number_format($revenueBreakdown['total'] ?? 0, 0) }}</div>
-                    <div class="revenue-focus__hint">Tap to view customer and service details</div>
                 </div>
             </button>
 
@@ -148,7 +141,6 @@
                     <button type="button" class="revenue-group-card revenue-card-button" data-revenue-card='@json($group)'>
                         <div class="revenue-group-card__label">{{ $group['label'] }}</div>
                         <div class="revenue-group-card__value">RM {{ number_format($group['amount'], 0) }}</div>
-                        <div class="revenue-group-card__hint">Open detail list</div>
                     </button>
                 @endforeach
             </div>
@@ -190,7 +182,6 @@
                     @else
                         <div class="empty-state empty-state--dashed">
                             <div class="empty-state__title">No service activity yet</div>
-                            <div class="empty-state__body">Once appointments exist in this period, the demand ranking will appear here.</div>
                         </div>
                     @endif
                 </div>
@@ -209,8 +200,6 @@
                             <span class="summary-pill__label">{{ $source['source'] }}</span>
                             <span class="summary-pill__value">{{ $source['appointments'] }} appointment{{ $source['appointments'] === 1 ? '' : 's' }}</span>
                         </div>
-                    @empty
-                        <div class="small-note">No source data recorded for this period.</div>
                     @endforelse
                 </div>
             </div>
@@ -237,7 +226,6 @@
                         @empty
                             <div class="empty-state empty-state--dashed" style="grid-column: 1 / -1;">
                                 <div class="empty-state__title">No staff load found</div>
-                                <div class="empty-state__body">This view fills automatically once matching appointments exist.</div>
                             </div>
                         @endforelse
                     </div>
@@ -245,9 +233,6 @@
             </div>
         </section>
 
-        <div class="print-only small-note">
-            Printed from Lindo Clinic dashboard for {{ $periodLabel }}.
-        </div>
     </div>
 
     <div id="metric-detail-modal" class="modal-shell hidden" aria-hidden="true">
@@ -266,7 +251,6 @@
                 </div>
                 <div class="modal-body">
                     <div class="btn-row btn-row--between revenue-detail-toolbar">
-                        <div class="small-note">Customer list for this selected dashboard metric.</div>
                         <div class="btn-row">
                             <a id="metric-detail-export" href="#" class="modal-btn modal-btn--secondary">Export CSV</a>
                             <button type="button" id="metric-detail-print" class="modal-btn modal-btn--secondary">Print</button>
@@ -312,7 +296,6 @@
                 </div>
                 <div class="modal-body">
                     <div class="btn-row btn-row--between revenue-detail-toolbar">
-                        <div class="small-note">Customer and service lines contributing to this revenue total.</div>
                         <div class="btn-row">
                             <a id="revenue-detail-export" href="#" class="modal-btn modal-btn--secondary">Export CSV</a>
                             <button type="button" id="revenue-detail-print" class="modal-btn modal-btn--secondary">Print</button>

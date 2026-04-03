@@ -140,9 +140,6 @@
             <div class="ops-card__body">
                 <div class="ops-kicker">{{ $isCheckInMode ? 'Status' : 'Appointments' }}</div>
                 <h2 class="ops-title">{{ $isCheckInMode ? 'Status' : "Book and manage today's appointments" }}</h2>
-                @if (! $isCheckInMode)
-                    <div class="ops-subtitle">Choose services, find an available team member, and confirm the booking without jumping between screens.</div>
-                @endif
 
                 <div class="metrics-grid" style="margin-top:22px;">
                     <div class="metric-card">
@@ -174,7 +171,6 @@
                 <div class="ops-card__header">
                     <div class="ops-kicker">Booking builder</div>
                     <h3 class="panel-title-display" style="font-size:24px;">Create a booking</h3>
-                    <div class="ops-subtitle" style="max-width:none;">Start with the service selection, then review only the workable time and staff combinations.</div>
                 </div>
 
                 <div class="ops-card__body">
@@ -197,7 +193,6 @@
                                         <div style="display:flex;align-items:start;justify-content:space-between;gap:14px;">
                                             <div>
                                                 <div class="service-card__title">{{ $service->name }}</div>
-                                                <div class="service-card__meta">{{ $service->description ?: 'Operational service available for appointment scheduling.' }}</div>
                                             </div>
                                             <span class="service-card__badge">{{ (int) ($service->duration_minutes ?? 60) }} mins</span>
                                         </div>
@@ -215,12 +210,10 @@
                                 <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
                                     <input type="radio" name="arrangement_mode" value="same_slot" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'same_slot' ? 'checked' : '' }}>
                                     <div class="arrangement-card__title">Same slot</div>
-                                    <div class="arrangement-card__meta">All selected services happen within the same appointment block. Best for consultation during treatment or parallel handling with different staff.</div>
                                 </label>
                                 <label class="arrangement-card {{ $selectedArrangementMode === 'back_to_back' ? 'is-selected' : '' }}">
                                     <input type="radio" name="arrangement_mode" value="back_to_back" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'back_to_back' ? 'checked' : '' }}>
                                     <div class="arrangement-card__title">Back-to-back</div>
-                                    <div class="arrangement-card__meta">Services are scheduled sequentially inside one visit. Best for consultation before or after nails, facial, or other treatment steps.</div>
                                 </label>
                             </div>
                         </div>
@@ -228,7 +221,6 @@
                         <div class="workflow-panel">
                             <div class="ops-kicker">Service workflow</div>
                             <div class="selection-card__title" style="margin-top:6px;">Set the service order used for back-to-back visits</div>
-                            <div class="small-note" style="margin-top:6px;">This order matters only for sequential visits. Same-slot visits still keep the service lineup for staff awareness.</div>
                             <div id="workflow-list" class="workflow-list"></div>
                         </div>
 
@@ -256,7 +248,6 @@
                 <div class="ops-card__header">
                     <div class="ops-kicker">Availability</div>
                     <h3 class="panel-title-display" style="font-size:24px;">Available staff and times</h3>
-                    <div class="ops-subtitle" style="max-width:none;">Only workable combinations are shown, so the front desk can pick and confirm quickly.</div>
                 </div>
 
                 <div class="ops-card__body">
@@ -274,7 +265,6 @@
                             @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
                                 <div class="eligibility-card">
                                     <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
-                                    <div class="small-note" style="margin-top:6px;">Eligible staff pool</div>
                                     @if (empty($serviceSummary['eligible_staff']))
                                         <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
                                     @else
@@ -321,7 +311,6 @@
                         <div id="selected-slot-card" class="booking-panel hidden">
                             <div class="ops-kicker">Confirm booking</div>
                             <div class="booking-panel__title">Create appointment at <span id="selected-slot-time-label">-</span></div>
-                            <div class="booking-panel__subtitle">Pick the valid staff combination, then capture customer details. This preserves the operational staffing logic from the availability engine.</div>
 
                             <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form">
                                 @csrf
