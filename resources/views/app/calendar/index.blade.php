@@ -31,8 +31,12 @@
                             <label for="staff_id" class="field-label">PIC</label>
                             <select id="staff_id" name="staff_id" class="form-select">
                                 <option value="">All PIC</option>
-                                @foreach ($staffList as $staff)
-                                    <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}</option>
+                                @foreach ($picGroups as $group)
+                                    <optgroup label="{{ $group['label'] }}">
+                                        @foreach ($group['staff'] as $staff)
+                                            <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->full_name }}</option>
+                                        @endforeach
+                                    </optgroup>
                                 @endforeach
                             </select>
                         </div>

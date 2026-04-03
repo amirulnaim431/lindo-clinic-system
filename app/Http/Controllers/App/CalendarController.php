@@ -46,13 +46,14 @@ class CalendarController extends Controller
         $monthEnd = $selectedDate->copy()->endOfMonth()->endOfDay();
         $staffId = trim((string) $request->input('staff_id', ''));
 
-        $staffList = $this->buildPicList(
+        $staffList = Staff::sortForPicSelector(
             Staff::query()
             ->select('id', 'full_name', 'role_key', 'job_title', 'operational_role')
             ->where('is_active', true)
             ->orderBy('full_name')
             ->get()
         );
+        $picGroups = Staff::groupForPicSelector($staffList);
 
         $rangeStart = $viewMode === 'month' ? $monthStart : $weekStart;
         $rangeEnd = $viewMode === 'month' ? $monthEnd : $weekEnd;
@@ -141,6 +142,7 @@ class CalendarController extends Controller
             'timelineHeightPx' => count($slots) * self::ROW_HEIGHT_PX,
             'rowHeightPx' => self::ROW_HEIGHT_PX,
             'staffList' => $staffList,
+            'picGroups' => $picGroups,
             'staffId' => $staffId,
             'selectedStaff' => $selectedStaff,
             'selectedDate' => $selectedDate,
@@ -518,48 +520,6 @@ class CalendarController extends Controller
         ]);
 
         return $parts === [] ? null : implode(' | ', $parts);
-    }
-
-    private function buildPicList(Collection $staffList): Collection
-    {
-        return $staffList
-            ->sort(function ($left, $right) {
-                $leftRole = $this->normalizePicRole($left->operational_role ?: $left->role_key);
-                $rightRole = $this->normalizePicRole($right->operational_role ?: $right->role_key);
-                $leftRank = $this->picRoleRank($leftRole);
-                $rightRank = $this->picRoleRank($rightRole);
-
-                if ($leftRank === $rightRank) {
-                    return strcasecmp($left->full_name, $right->full_name);
-                }
-
-                return $leftRank <=> $rightRank;
-            })
-            ->values();
-    }
-
-    private function normalizePicRole(?string $role): string
-    {
-        $normalized = mb_strtolower(trim((string) $role));
-
-        return match ($normalized) {
-            'doctor' => 'doctor',
-            'aesthetic', 'aestatic', 'nurse' => 'aesthetic',
-            'beautician' => 'beautician',
-            'management' => 'management',
-            default => 'others',
-        };
-    }
-
-    private function picRoleRank(string $role): int
-    {
-        return match ($role) {
-            'doctor' => 1,
-            'aesthetic' => 2,
-            'beautician' => 3,
-            'management' => 4,
-            default => 5,
-        };
     }
 
     private function formatSourceLabel(?string $source): ?string

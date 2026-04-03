@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Staff extends Model
 {
@@ -66,6 +67,13 @@ class Staff extends Model
             'label' => 'HR schedule',
             'description' => 'Open the HR staff schedule workspace and manage roster visibility.',
         ],
+    ];
+
+    public const PIC_GROUP_LABELS = [
+        'management' => 'Management',
+        'aesthetic' => 'Aesthetic',
+        'doctor' => 'Doctor',
+        'others' => 'Others',
     ];
 
     protected $table = 'staff';
@@ -135,6 +143,65 @@ class Staff extends Model
     public static function accessPermissionOptions(): array
     {
         return self::ACCESS_PERMISSION_OPTIONS;
+    }
+
+    public static function normalizePicGroup(?string $role): string
+    {
+        $normalized = mb_strtolower(trim((string) $role));
+
+        return match ($normalized) {
+            'management' => 'management',
+            'aesthetic', 'aestatic', 'nurse', 'beautician' => 'aesthetic',
+            'doctor' => 'doctor',
+            default => 'others',
+        };
+    }
+
+    public static function picGroupLabel(?string $role): string
+    {
+        $group = self::normalizePicGroup($role);
+
+        return self::PIC_GROUP_LABELS[$group]
+            ?? str($group)->replace('_', ' ')->title()->toString();
+    }
+
+    public static function picGroupRank(?string $role): int
+    {
+        return match (self::normalizePicGroup($role)) {
+            'management' => 1,
+            'aesthetic' => 2,
+            'doctor' => 3,
+            default => 4,
+        };
+    }
+
+    public static function sortForPicSelector(Collection $staffList): Collection
+    {
+        return $staffList
+            ->sort(function (self $left, self $right) {
+                $leftRank = self::picGroupRank($left->operational_role ?: $left->role_key ?: $left->role);
+                $rightRank = self::picGroupRank($right->operational_role ?: $right->role_key ?: $right->role);
+
+                if ($leftRank === $rightRank) {
+                    return strcasecmp($left->full_name, $right->full_name);
+                }
+
+                return $leftRank <=> $rightRank;
+            })
+            ->values();
+    }
+
+    public static function groupForPicSelector(Collection $staffList): Collection
+    {
+        return self::sortForPicSelector($staffList)
+            ->groupBy(fn (self $staff) => self::normalizePicGroup($staff->operational_role ?: $staff->role_key ?: $staff->role))
+            ->map(fn (Collection $group, string $key) => [
+                'key' => $key,
+                'label' => self::PIC_GROUP_LABELS[$key]
+                    ?? str($key)->replace('_', ' ')->title()->toString(),
+                'staff' => $group->values(),
+            ])
+            ->values();
     }
 
     public function getOperationalRoleAttribute($value): ?string
