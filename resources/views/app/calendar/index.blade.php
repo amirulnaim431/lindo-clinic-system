@@ -735,7 +735,43 @@
             };
 
             const closePicPanels = () => {
-                picPanels.forEach((panel) => panel.classList.add('hidden'));
+                picPanels.forEach((panel) => {
+                    panel.classList.add('hidden');
+                    panel.style.top = '';
+                    panel.style.left = '';
+                    panel.style.right = '';
+                });
+            };
+
+            const positionPicPanel = (panel, toggle) => {
+                if (!panel || !toggle) {
+                    return;
+                }
+
+                const container = panel.offsetParent;
+
+                if (!container) {
+                    return;
+                }
+
+                const containerRect = container.getBoundingClientRect();
+                const toggleRect = toggle.getBoundingClientRect();
+
+                panel.style.right = 'auto';
+                panel.style.left = '0px';
+                panel.style.top = '0px';
+                panel.classList.remove('hidden');
+
+                const panelRect = panel.getBoundingClientRect();
+                const panelWidth = panelRect.width || Math.min(containerRect.width, 320);
+                const gap = 8;
+                const rawLeft = toggleRect.right - containerRect.left - panelWidth;
+                const maxLeft = Math.max(0, containerRect.width - panelWidth);
+                const left = Math.min(Math.max(0, rawLeft), maxLeft);
+                const top = Math.max(0, toggleRect.bottom - containerRect.top + gap);
+
+                panel.style.left = `${left}px`;
+                panel.style.top = `${top}px`;
             };
 
             const parseEventPayload = (button) => {
@@ -1081,7 +1117,7 @@
                     const isHidden = targetPanel?.classList.contains('hidden');
                     closePicPanels();
                     if (targetPanel && isHidden) {
-                        targetPanel.classList.remove('hidden');
+                        positionPicPanel(targetPanel, toggle);
                     }
                 });
             });
