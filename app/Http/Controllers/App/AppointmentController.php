@@ -54,10 +54,16 @@ class AppointmentController extends Controller
             ->values()
             ->all();
 
-        $services = Service::query()
-            ->where('is_active', true)
-            ->orderBy('category_key')
-            ->orderBy('display_order')
+        $servicesQuery = Service::query()
+            ->where('is_active', true);
+
+        if (Service::supportsCatalogFields()) {
+            $servicesQuery
+                ->orderBy('category_key')
+                ->orderBy('display_order');
+        }
+
+        $services = $servicesQuery
             ->orderBy('name')
             ->get();
 
@@ -66,7 +72,9 @@ class AppointmentController extends Controller
                 return [
                     'key' => $key,
                     'label' => $label,
-                    'services' => $services->where('category_key', $key)->values(),
+                    'services' => $services
+                        ->filter(fn ($service) => (Service::supportsCatalogFields() ? $service->category_key : 'consultations') === $key)
+                        ->values(),
                 ];
             })
             ->filter(fn (array $group) => $group['services']->isNotEmpty())
@@ -108,13 +116,18 @@ class AppointmentController extends Controller
         $customSchedule = [];
 
         if (! empty($filters['service_ids'])) {
-            $selectedServices = Service::query()
+            $selectedServicesQuery = Service::query()
                 ->with(['staff' => function ($query) {
                     $query->where('is_active', true)->orderBy('full_name');
                 }])
                 ->whereIn('id', $filters['service_ids'])
-                ->where('is_active', true)
-                ->orderBy('display_order')
+                ->where('is_active', true);
+
+            if (Service::supportsCatalogFields()) {
+                $selectedServicesQuery->orderBy('display_order');
+            }
+
+            $selectedServices = $selectedServicesQuery
                 ->orderBy('name')
                 ->get();
 
@@ -194,13 +207,18 @@ class AppointmentController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $selectedServices = Service::query()
+        $selectedServicesQuery = Service::query()
             ->with(['staff' => function ($query) {
                 $query->where('is_active', true)->orderBy('full_name');
             }])
             ->whereIn('id', $validated['service_ids'])
-            ->where('is_active', true)
-            ->orderBy('display_order')
+            ->where('is_active', true);
+
+        if (Service::supportsCatalogFields()) {
+            $selectedServicesQuery->orderBy('display_order');
+        }
+
+        $selectedServices = $selectedServicesQuery
             ->orderBy('name')
             ->get();
 

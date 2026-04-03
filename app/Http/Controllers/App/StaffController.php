@@ -56,12 +56,18 @@ class StaffController extends Controller
 
     protected function serviceOptions()
     {
-        return Service::query()
+        $query = Service::query()
             ->where('is_active', true)
             ->whereNotNull('name')
-            ->where('name', '!=', '')
-            ->orderBy('category_key')
-            ->orderBy('display_order')
+            ->where('name', '!=', '');
+
+        if (Service::supportsCatalogFields()) {
+            $query
+                ->orderBy('category_key')
+                ->orderBy('display_order');
+        }
+
+        return $query
             ->orderBy('name')
             ->get();
     }

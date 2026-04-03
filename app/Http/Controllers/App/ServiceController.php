@@ -13,6 +13,8 @@ class ServiceController extends Controller
 {
     public function index(Request $request): View
     {
+        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+
         $search = trim((string) $request->input('search', ''));
         $category = trim((string) $request->input('category', ''));
         $status = trim((string) $request->input('status', 'active'));
@@ -49,6 +51,8 @@ class ServiceController extends Controller
 
     public function create(): View
     {
+        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+
         return $this->formView('create', new Service([
             'is_active' => true,
             'is_promo' => false,
@@ -60,6 +64,8 @@ class ServiceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+
         $service = Service::query()->create($this->validatedData($request));
 
         return redirect()
@@ -69,11 +75,15 @@ class ServiceController extends Controller
 
     public function edit(Service $service): View
     {
+        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+
         return $this->formView('edit', $service);
     }
 
     public function update(Request $request, Service $service): RedirectResponse
     {
+        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+
         $service->update($this->validatedData($request, $service));
 
         return redirect()

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Throwable;
+use Illuminate\Support\Facades\Schema;
 
 class Service extends Model
 {
@@ -48,10 +50,66 @@ class Service extends Model
         return self::CATEGORY_OPTIONS;
     }
 
+    public static function supportsCatalogFields(): bool
+    {
+        static $supportsCatalogFields = null;
+
+        if ($supportsCatalogFields === null) {
+            try {
+                $supportsCatalogFields =
+                    Schema::hasColumn('services', 'category_key')
+                    && Schema::hasColumn('services', 'description')
+                    && Schema::hasColumn('services', 'promo_price')
+                    && Schema::hasColumn('services', 'is_promo')
+                    && Schema::hasColumn('services', 'display_order');
+            } catch (Throwable) {
+                $supportsCatalogFields = false;
+            }
+        }
+
+        return $supportsCatalogFields;
+    }
+
+    public function getCategoryKeyAttribute($value): string
+    {
+        if (! self::supportsCatalogFields()) {
+            return 'consultations';
+        }
+
+        return filled($value) ? (string) $value : 'consultations';
+    }
+
     public function getCategoryLabelAttribute(): string
     {
         return self::CATEGORY_OPTIONS[$this->category_key]
             ?? str((string) $this->category_key)->replace('_', ' ')->title()->toString();
+    }
+
+    public function getPromoPriceAttribute($value): ?int
+    {
+        if (! self::supportsCatalogFields() || $value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    public function getIsPromoAttribute($value): bool
+    {
+        if (! self::supportsCatalogFields()) {
+            return false;
+        }
+
+        return (bool) $value;
+    }
+
+    public function getDisplayOrderAttribute($value): int
+    {
+        if (! self::supportsCatalogFields() || $value === null || $value === '') {
+            return 0;
+        }
+
+        return (int) $value;
     }
 
     public function appointments()
