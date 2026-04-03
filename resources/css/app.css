@@ -675,7 +675,11 @@
     }
 
     .metric-card--action {
+        appearance: none;
         display: block;
+        width: 100%;
+        border: 1px solid var(--app-border);
+        text-align: left;
         transition: 180ms ease;
         box-shadow: var(--app-shadow-sm);
     }

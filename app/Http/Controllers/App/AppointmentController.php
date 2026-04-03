@@ -108,9 +108,7 @@ class AppointmentController extends Controller
             }
         }
 
-        $appointmentGroups = $appointmentGroupsQuery
-            ->paginate(20)
-            ->withQueryString();
+        $appointmentGroups = $appointmentGroupsQuery->get();
 
         $availability = null;
         $customSchedule = [];

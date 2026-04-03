@@ -13,7 +13,7 @@
         $selectedArrangementMode = $filters['arrangement_mode'] ?? 'same_slot';
         $services = $services ?? collect();
         $availability = $availability ?? null;
-        $appointmentGroups = $appointmentGroups ?? collect();
+        $appointmentGroups = collect($appointmentGroups ?? []);
         $statusOptions = $statusOptions ?? [];
         $quickCreate = $quickCreate ?? ['prefilled_slot' => null, 'slot_is_available' => false, 'slot_combinations' => [], 'message' => null];
         $statusPalette = [
@@ -55,25 +55,47 @@
         }
         $summaryCards = [
             [
+                'key' => 'total',
                 'label' => 'Total',
                 'value' => $dailyStatusCounts['total'],
                 'status' => null,
             ],
             [
+                'key' => 'checked_in',
                 'label' => 'Checked In',
                 'value' => $dailyStatusCounts['checked_in'],
                 'status' => 'checked_in',
             ],
             [
+                'key' => 'completed',
                 'label' => 'Completed',
                 'value' => $dailyStatusCounts['completed'],
                 'status' => 'completed',
             ],
             [
+                'key' => 'reschedule',
                 'label' => 'Reschedule',
                 'value' => $dailyStatusCounts['reschedule'],
                 'status' => 'reschedule',
             ],
+        ];
+        $appointmentGroupBuckets = [
+            'total' => $appointmentGroups->values(),
+            'checked_in' => $appointmentGroups->filter(function ($group) {
+                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+
+                return $statusValue === 'checked_in';
+            })->values(),
+            'completed' => $appointmentGroups->filter(function ($group) {
+                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+
+                return $statusValue === 'completed';
+            })->values(),
+            'reschedule' => $appointmentGroups->filter(function ($group) {
+                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+
+                return in_array($statusValue, ['cancelled', 'no_show'], true);
+            })->values(),
         ];
         $selectedServiceLabels = $services->whereIn('id', $selectedServiceIds)->pluck('name')->values()->all();
         $selectedServiceOrderIds = collect($filters['service_order'] ?? [])
@@ -153,9 +175,6 @@
             <div class="panel-body">
                 <form method="GET" action="{{ route('app.appointments.index') }}" class="form-grid" data-preserve-scroll-form>
                     <input type="hidden" name="mode" value="{{ $mode }}">
-                    @if ($selectedStatus)
-                        <input type="hidden" name="status" value="{{ $selectedStatus }}">
-                    @endif
                     <div class="col-4 field-block">
                         <label class="field-label" for="date">Appointment date</label>
                         <input id="date" name="date" type="date" value="{{ $selectedDate }}" class="form-input" required>
@@ -182,24 +201,16 @@
                         <div class="metric-card__meta">{{ \Carbon\Carbon::parse($selectedDate)->format('l') }}</div>
                     </div>
                     @foreach ($summaryCards as $card)
-                        @php
-                            $cardUrl = route('app.appointments.index', array_filter([
-                                'mode' => $mode,
-                                'date' => $selectedDate,
-                                'status' => $card['status'],
-                            ]));
-                            $isActiveCard = ($card['status'] === null && $selectedStatus === null) || ($card['status'] !== null && $selectedStatus === $card['status']);
-                        @endphp
-                        <a href="{{ $cardUrl }}" class="metric-card metric-card--action {{ $isActiveCard ? 'is-active' : '' }}" data-preserve-scroll-link>
+                        <button type="button" class="metric-card metric-card--action" data-open-summary="{{ $card['key'] }}">
                             <div class="metric-card__label">{{ $card['label'] }}</div>
                             <div class="metric-card__value">{{ $card['value'] }}</div>
-                        </a>
+                        </button>
                     @endforeach
                 </div>
             </div>
         </section>
 
-        @if (! $isCheckInMode)
+        @if (false)
         <section class="ops-grid" id="appointment-list-panel">
             <div class="ops-card">
                 <div class="ops-card__header">
@@ -665,6 +676,85 @@
         @endif
     </div>
 
+    @if (! $isCheckInMode)
+        <div id="appointment-summary-modal" class="modal-shell hidden" aria-hidden="true">
+            <div class="modal-backdrop" data-close-summary-modal></div>
+            <div class="modal-stage">
+                <div class="modal-card" style="width:min(920px, 100%);">
+                    <div class="modal-header">
+                        <div class="modal-header__row">
+                            <div>
+                                <div class="modal-kicker">Appointments</div>
+                                <h3 id="appointment-summary-title" class="modal-title">Appointments</h3>
+                                <p class="modal-subtitle">For {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</p>
+                            </div>
+                            <div class="btn-row">
+                                <button type="button" class="btn btn-secondary" id="appointment-summary-print">Print list</button>
+                                <button type="button" class="btn btn-secondary" data-close-summary-modal>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        @foreach ($summaryCards as $card)
+                            <div class="appointment-summary-panel hidden" data-summary-panel="{{ $card['key'] }}">
+                                <div class="schedule-list" style="max-height:60vh; overflow-y:auto; padding-right:0.2rem;">
+                                    @forelse ($appointmentGroupBuckets[$card['key']] as $group)
+                                        @php
+                                            $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+                                            $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
+                                            $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
+                                                ? 'Reschedule'
+                                                : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
+                                            $membershipLabel = $group->customer?->membership_type ?: 'No membership';
+                                            $membershipCode = $group->customer?->membership_code ?: null;
+                                            $membershipBalance = $formatMembershipBalance($group->customer?->current_package);
+                                        @endphp
+                                        <article class="schedule-card">
+                                            <div class="schedule-card__head">
+                                                <div>
+                                                    <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
+                                                    <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
+                                                    <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
+                                                    <div class="schedule-card__meta-stack">
+                                                        <div class="schedule-card__membership">{{ $membershipLabel }}@if ($membershipCode) • {{ $membershipCode }} @endif</div>
+                                                        <div class="schedule-card__balance">Membership balance: {{ $membershipBalance }}</div>
+                                                    </div>
+                                                </div>
+                                                <span class="status-chip" style="background: {{ $statusStyle['bg'] }}; border-color: {{ $statusStyle['border'] }}; color: {{ $statusStyle['text'] }};">
+                                                    <span class="status-dot"></span>
+                                                    {{ $statusLabel }}
+                                                </span>
+                                            </div>
+
+                                            <div style="display:grid;gap:10px;margin-top:16px;">
+                                                @foreach ($group->items as $item)
+                                                    <div class="service-line">
+                                                        <div>
+                                                            <div class="service-line__name">{{ $item->service?->name ?? 'Service' }}</div>
+                                                            @if ($item->starts_at && $item->ends_at)
+                                                                <div class="service-card__meta">{{ $item->starts_at->format('d M Y h:i A') }} - {{ $item->ends_at->format('h:i A') }}</div>
+                                                            @endif
+                                                        </div>
+                                                        <div class="service-line__staff">{{ $item->staff?->full_name ?? 'Unassigned' }}@if($item->staff?->role_key) ({{ $item->staff->role_key }}) @endif</div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </article>
+                                    @empty
+                                        <div class="empty-card">
+                                            <div class="empty-card__title">No appointments found</div>
+                                            <div class="empty-card__body">There are no {{ strtolower($card['label']) }} appointments for this date.</div>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const serviceCheckboxes = Array.from(document.querySelectorAll('.service-checkbox'));
@@ -699,6 +789,12 @@
             const selectedServicesSeed = @json($selectedServiceOrderIds);
             const serviceCatalog = @json($serviceCatalog);
             const scrollStorageKey = 'lindo-appointments-scroll';
+            const summaryModal = document.getElementById('appointment-summary-modal');
+            const summaryTitle = document.getElementById('appointment-summary-title');
+            const summaryPanels = Array.from(document.querySelectorAll('[data-summary-panel]'));
+            const summaryButtons = Array.from(document.querySelectorAll('[data-open-summary]'));
+            const summaryCloseButtons = Array.from(document.querySelectorAll('[data-close-summary-modal]'));
+            const summaryPrintButton = document.getElementById('appointment-summary-print');
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
             let activeCategoryKey = defaultCategoryKey;
@@ -728,6 +824,57 @@
                 link.addEventListener('click', () => {
                     sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
                 });
+            });
+
+            function openSummaryModal(summaryKey, summaryLabel) {
+                if (!summaryModal) {
+                    return;
+                }
+
+                summaryPanels.forEach((panel) => {
+                    panel.classList.toggle('hidden', panel.dataset.summaryPanel !== summaryKey);
+                });
+
+                if (summaryTitle) {
+                    summaryTitle.textContent = summaryLabel;
+                }
+
+                summaryModal.classList.remove('hidden');
+                summaryModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeSummaryModal() {
+                if (!summaryModal) {
+                    return;
+                }
+
+                summaryModal.classList.add('hidden');
+                summaryModal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            summaryButtons.forEach((button) => {
+                button.addEventListener('click', function () {
+                    openSummaryModal(
+                        this.dataset.openSummary || 'total',
+                        this.querySelector('.metric-card__label')?.textContent?.trim() || 'Appointments'
+                    );
+                });
+            });
+
+            summaryCloseButtons.forEach((button) => {
+                button.addEventListener('click', closeSummaryModal);
+            });
+
+            summaryPrintButton?.addEventListener('click', function () {
+                window.print();
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeSummaryModal();
+                }
             });
 
             function buildHiddenInputs(container, inputName, values) {
