@@ -75,7 +75,6 @@ class Staff extends Model
         'doctor' => 'Doctor',
         'hr' => 'HR',
         'tea_lady' => 'Tea Lady',
-        'others' => 'Others',
     ];
 
     protected $table = 'staff';
@@ -191,6 +190,10 @@ class Staff extends Model
             return 'tea_lady';
         }
 
+        if ($normalizedRole === 'others') {
+            return 'management';
+        }
+
         return $normalizedRole;
     }
 
@@ -221,18 +224,16 @@ class Staff extends Model
                     'management' => 1,
                     'aesthetic' => 2,
                     'doctor' => 3,
-                    'others' => 4,
-                    'hr' => 5,
-                    'tea_lady' => 6,
+                    'hr' => 4,
+                    'tea_lady' => 5,
                     default => 7,
                 };
                 $rightRank = match (self::picGroupKeyForStaff($right)) {
                     'management' => 1,
                     'aesthetic' => 2,
                     'doctor' => 3,
-                    'others' => 4,
-                    'hr' => 5,
-                    'tea_lady' => 6,
+                    'hr' => 4,
+                    'tea_lady' => 5,
                     default => 7,
                 };
 
