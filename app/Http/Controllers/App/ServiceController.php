@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Service;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -13,33 +14,41 @@ class ServiceController extends Controller
 {
     public function index(Request $request): View
     {
-        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+        $catalogReady = Service::supportsCatalogFields();
 
         $search = trim((string) $request->input('search', ''));
         $category = trim((string) $request->input('category', ''));
         $status = trim((string) $request->input('status', 'active'));
 
-        $services = Service::query()
-            ->when($search !== '', function ($query) use ($search) {
-                $like = '%'.$search.'%';
-                $query->where(function ($builder) use ($like) {
-                    $builder
-                        ->where('name', 'like', $like)
-                        ->orWhere('description', 'like', $like);
-                });
-            })
-            ->when($category !== '', fn ($query) => $query->where('category_key', $category))
-            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->orderByRaw('CASE WHEN is_active = 1 THEN 0 ELSE 1 END')
-            ->orderBy('category_key')
-            ->orderBy('display_order')
-            ->orderBy('name')
-            ->paginate(24)
-            ->withQueryString();
+        if ($catalogReady) {
+            $services = Service::query()
+                ->when($search !== '', function ($query) use ($search) {
+                    $like = '%'.$search.'%';
+                    $query->where(function ($builder) use ($like) {
+                        $builder
+                            ->where('name', 'like', $like)
+                            ->orWhere('description', 'like', $like);
+                    });
+                })
+                ->when($category !== '', fn ($query) => $query->where('category_key', $category))
+                ->when($status === 'active', fn ($query) => $query->where('is_active', true))
+                ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
+                ->orderByRaw('CASE WHEN is_active = 1 THEN 0 ELSE 1 END')
+                ->orderBy('category_key')
+                ->orderBy('display_order')
+                ->orderBy('name')
+                ->paginate(24)
+                ->withQueryString();
+        } else {
+            $services = new LengthAwarePaginator([], 0, 24, 1, [
+                'path' => route('app.services.index'),
+                'pageName' => 'page',
+            ]);
+        }
 
         return view('app.services.index', [
             'services' => $services,
+            'catalogReady' => $catalogReady,
             'filters' => [
                 'search' => $search,
                 'category' => $category,
@@ -51,7 +60,7 @@ class ServiceController extends Controller
 
     public function create(): View
     {
-        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+        abort_if(! Service::supportsCatalogFields(), 404);
 
         return $this->formView('create', new Service([
             'is_active' => true,
@@ -64,7 +73,11 @@ class ServiceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+        if (! Service::supportsCatalogFields()) {
+            return redirect()
+                ->route('app.services.index')
+                ->with('error', 'Run the latest migration before adding services.');
+        }
 
         $service = Service::query()->create($this->validatedData($request));
 
@@ -75,14 +88,18 @@ class ServiceController extends Controller
 
     public function edit(Service $service): View
     {
-        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+        abort_if(! Service::supportsCatalogFields(), 404);
 
         return $this->formView('edit', $service);
     }
 
     public function update(Request $request, Service $service): RedirectResponse
     {
-        abort_unless(Service::supportsCatalogFields(), 503, 'Run the latest migration before opening the service catalog.');
+        if (! Service::supportsCatalogFields()) {
+            return redirect()
+                ->route('app.services.index')
+                ->with('error', 'Run the latest migration before updating services.');
+        }
 
         $service->update($this->validatedData($request, $service));
 

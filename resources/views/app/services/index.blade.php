@@ -4,11 +4,29 @@
             <div class="alert alert-success">{{ session('success') }}</div>
         @endif
 
+        @if (session('error'))
+            <div class="alert alert-error">{{ session('error') }}</div>
+        @endif
+
+        @if (! ($catalogReady ?? false))
+            <section class="panel">
+                <div class="panel-body stack">
+                    <div class="alert alert-error">
+                        Service setup is almost ready. Run the latest migration first, then this page will unlock service categories, promo services, and manager editing.
+                    </div>
+                </div>
+            </section>
+        @endif
+
         <section class="panel">
             <div class="panel-body stack">
                 <div class="filter-bar__head">
                     <div class="page-actions">
-                        <a href="{{ route('app.services.create') }}" class="btn btn-primary">Add Service</a>
+                        @if ($catalogReady ?? false)
+                            <a href="{{ route('app.services.create') }}" class="btn btn-primary">Add Service</a>
+                        @else
+                            <button type="button" class="btn btn-primary" disabled>Add Service</button>
+                        @endif
                     </div>
                 </div>
 
@@ -20,7 +38,7 @@
 
                     <div class="col-3 field-block">
                         <label class="field-label" for="category">Category</label>
-                        <select id="category" name="category" class="form-select">
+                        <select id="category" name="category" class="form-select" @disabled(! ($catalogReady ?? false))>
                             <option value="">All categories</option>
                             @foreach ($categoryOptions as $key => $label)
                                 <option value="{{ $key }}" @selected($filters['category'] === $key)>{{ $label }}</option>
@@ -81,7 +99,11 @@
                                         <td>{{ $service->is_promo ? ($service->promo_price !== null ? 'RM '.number_format($service->promo_price, 0) : 'Yes') : '-' }}</td>
                                         <td>{{ $service->is_active ? 'Active' : 'Inactive' }}</td>
                                         <td>
-                                            <a href="{{ route('app.services.edit', $service) }}" class="btn btn-secondary">Edit</a>
+                                            @if ($catalogReady ?? false)
+                                                <a href="{{ route('app.services.edit', $service) }}" class="btn btn-secondary">Edit</a>
+                                            @else
+                                                <button type="button" class="btn btn-secondary" disabled>Edit</button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
