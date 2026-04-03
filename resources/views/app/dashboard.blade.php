@@ -74,7 +74,7 @@
                     <div class="col-3 field-block">
                         <label class="field-label" for="staff_id">Person In Charge</label>
                         <select id="staff_id" name="staff_id" class="form-select">
-                            <option value="">All PIC</option>
+                            <option value="">All Person In Charge</option>
                             @foreach ($picGroups as $group)
                                 <optgroup label="{{ $group['label'] }}">
                                     @foreach ($group['staff'] as $s)

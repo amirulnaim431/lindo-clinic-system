@@ -28,9 +28,9 @@
                         <input type="hidden" name="date" value="{{ $selectedDateIso }}">
                         <input type="hidden" name="anchor" value="{{ $viewMode === 'month' ? $monthAnchor : $weekAnchor }}">
                         <div class="field-block">
-                            <label for="staff_id" class="field-label">PIC</label>
+                            <label for="staff_id" class="field-label">Person In Charge</label>
                             <select id="staff_id" name="staff_id" class="form-select">
-                                <option value="">All PIC</option>
+                                <option value="">All Person In Charge</option>
                                 @foreach ($picGroups as $group)
                                     <optgroup label="{{ $group['label'] }}">
                                         @foreach ($group['staff'] as $staff)
@@ -40,7 +40,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="small-note">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'PIC') : 'Showing the full operational board' }}</div>
+                        <div class="small-note">{{ $selectedStaff ? $selectedStaff->full_name.' - '.($selectedStaff->job_title ?: 'Person In Charge') : 'Showing the full operational board' }}</div>
                         <div class="btn-row btn-row--compact-mobile">
                             <button type="submit" class="btn btn-primary">Apply</button>
                             <a href="{{ route('app.calendar', ['view' => $viewMode, 'date' => $selectedDateIso, 'anchor' => $viewMode === 'month' ? $monthAnchor : $weekAnchor]) }}" class="btn btn-secondary">Reset</a>
@@ -298,7 +298,7 @@
                             <div class="filter-bar__head">
                                 <div>
                                     <div class="modal-panel__label">Linked Visit Flow</div>
-                                    <div class="small-note" style="margin-top: 0.35rem;">Adjust service, assigned PIC, and exact timing directly here.</div>
+                                    <div class="small-note" style="margin-top: 0.35rem;">Adjust service, assigned person in charge, and exact timing directly here.</div>
                                 </div>
                             </div>
                             <div id="calendar-edit-items" class="calendar-editor__items"></div>
@@ -621,7 +621,7 @@
                                 </div>
                             </div>
                             <div class="field-block calendar-editor__control">
-                                <label class="field-label">PIC</label>
+                                <label class="field-label">Person In Charge</label>
                                 <div class="calendar-editor__control-shell calendar-editor__control-shell--select">
                                     <select class="field-input select-input calendar-editor__input" data-edit-field="staff_id"></select>
                                 </div>
