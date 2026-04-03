@@ -64,7 +64,8 @@ class CalendarController extends Controller
                 'items.service:id,name',
                 'items.staff:id,full_name,role_key,job_title',
             ])
-            ->whereBetween('starts_at', [$rangeStart, $rangeEnd])
+            ->where('starts_at', '<=', $rangeEnd)
+            ->where('ends_at', '>=', $rangeStart)
             ->when($staffId !== '', function ($query) use ($staffId) {
                 $query->whereHas('items', function ($itemQuery) use ($staffId) {
                     $itemQuery->where('staff_id', $staffId);

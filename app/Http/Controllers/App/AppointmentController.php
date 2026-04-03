@@ -28,6 +28,7 @@ class AppointmentController extends Controller
             'service_ids' => $request->input('service_ids', []),
             'service_order' => $request->input('service_order', []),
             'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
+            'custom_schedule' => $request->input('custom_schedule', []),
             'staff_id' => $request->input('staff_id'),
             'status' => $this->normalizeStatusFilter($request->input('status')),
             'slot' => $this->sanitizeSlot($request->input('slot')),
@@ -55,17 +56,34 @@ class AppointmentController extends Controller
 
         $services = Service::query()
             ->where('is_active', true)
+            ->orderBy('category_key')
+            ->orderBy('display_order')
             ->orderBy('name')
             ->get();
+
+        $serviceCategories = collect(Service::categoryOptions())
+            ->map(function (string $label, string $key) use ($services) {
+                return [
+                    'key' => $key,
+                    'label' => $label,
+                    'services' => $services->where('category_key', $key)->values(),
+                ];
+            })
+            ->filter(fn (array $group) => $group['services']->isNotEmpty())
+            ->values();
 
         $staffList = Staff::query()
             ->where('is_active', true)
             ->orderBy('full_name')
             ->get(['id', 'full_name', 'role_key']);
 
+        $selectedDayStart = Carbon::parse($filters['date'])->startOfDay();
+        $selectedDayEnd = Carbon::parse($filters['date'])->endOfDay();
+
         $appointmentGroupsQuery = AppointmentGroup::query()
             ->with(['customer', 'items.staff', 'items.service'])
-            ->whereDate('starts_at', $filters['date'])
+            ->where('starts_at', '<=', $selectedDayEnd)
+            ->where('ends_at', '>=', $selectedDayStart)
             ->orderBy('starts_at');
 
         if (! empty($filters['staff_id'])) {
@@ -87,6 +105,7 @@ class AppointmentController extends Controller
             ->withQueryString();
 
         $availability = null;
+        $customSchedule = [];
 
         if (! empty($filters['service_ids'])) {
             $selectedServices = Service::query()
@@ -95,17 +114,25 @@ class AppointmentController extends Controller
                 }])
                 ->whereIn('id', $filters['service_ids'])
                 ->where('is_active', true)
+                ->orderBy('display_order')
                 ->orderBy('name')
                 ->get();
 
             if ($selectedServices->isNotEmpty()) {
                 $selectedServices = $this->reorderServices($selectedServices, $filters['service_order']);
-
-                $availability = $this->buildAvailability(
+                $customSchedule = $this->normalizeCustomScheduleInput(
+                    $filters['custom_schedule'],
                     $selectedServices,
-                    Carbon::parse($filters['date']),
-                    $filters['arrangement_mode']
+                    Carbon::parse($filters['date'])
                 );
+
+                $availability = $filters['arrangement_mode'] === 'custom'
+                    ? $this->buildCustomAvailability($selectedServices, $customSchedule)
+                    : $this->buildAvailability(
+                        $selectedServices,
+                        Carbon::parse($filters['date']),
+                        $filters['arrangement_mode']
+                    );
             }
         }
 
@@ -137,8 +164,10 @@ class AppointmentController extends Controller
             'mode',
             'filters',
             'services',
+            'serviceCategories',
             'staffList',
             'availability',
+            'customSchedule',
             'appointmentGroups',
             'statusOptions',
             'quickCreate'
@@ -150,12 +179,15 @@ class AppointmentController extends Controller
         $validated = $request->validate([
             'customer_id' => ['nullable', 'string', Rule::exists('customers', 'id')],
             'date' => ['required', 'date_format:Y-m-d'],
-            'slot' => ['required', 'date_format:H:i'],
-            'arrangement_mode' => ['required', Rule::in(['same_slot', 'back_to_back'])],
+            'slot' => ['nullable', 'date_format:H:i'],
+            'arrangement_mode' => ['required', Rule::in(['same_slot', 'back_to_back', 'custom'])],
             'service_ids' => ['required', 'array', 'min:1'],
             'service_ids.*' => ['required', 'string', Rule::exists('services', 'id')],
             'service_order' => ['nullable', 'array'],
             'service_order.*' => ['required', 'string', Rule::exists('services', 'id')],
+            'custom_schedule' => ['nullable', 'array'],
+            'custom_schedule.*.date' => ['nullable', 'date_format:Y-m-d'],
+            'custom_schedule.*.start_time' => ['nullable', 'date_format:H:i'],
             'selected_combination' => ['required', 'string'],
             'customer_full_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:50'],
@@ -168,6 +200,7 @@ class AppointmentController extends Controller
             }])
             ->whereIn('id', $validated['service_ids'])
             ->where('is_active', true)
+            ->orderBy('display_order')
             ->orderBy('name')
             ->get();
 
@@ -180,6 +213,12 @@ class AppointmentController extends Controller
         $selectedServices = $this->reorderServices($selectedServices, $validated['service_order'] ?? []);
         $arrangementMode = $this->normalizeArrangementMode($validated['arrangement_mode']);
         $serviceOrderIds = $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
+
+        if ($arrangementMode !== 'custom' && empty($validated['slot'])) {
+            return back()
+                ->withErrors(['slot' => 'Choose an available slot before creating the appointment.'])
+                ->withInput();
+        }
 
         $decodedCombination = json_decode($validated['selected_combination'], true);
 
@@ -219,17 +258,35 @@ class AppointmentController extends Controller
         }
 
         $date = Carbon::parse($validated['date']);
-        $visitStart = $date->copy()->setTimeFromTimeString($validated['slot'].':00');
-        $serviceSchedules = $this->buildServiceSchedules($selectedServices, $visitStart, $arrangementMode);
-        $visitEnd = collect($serviceSchedules)->max(fn ($schedule) => $schedule['end']) ?? $visitStart->copy()->addMinutes($durationMinutes);
+        $customSchedule = $this->normalizeCustomScheduleInput(
+            $validated['custom_schedule'] ?? [],
+            $selectedServices,
+            $date
+        );
 
-        $clinicEnd = $date->copy()->setTime(18, 0, 0);
+        if ($arrangementMode === 'custom') {
+            $serviceSchedules = $this->buildCustomServiceSchedules($selectedServices, $customSchedule);
 
-        if ($visitEnd->gt($clinicEnd)) {
-            return back()
-                ->withErrors(['slot' => 'The selected service arrangement extends past clinic hours. Please choose an earlier slot.'])
-                ->withInput();
+            if (count($serviceSchedules) !== $selectedServices->count()) {
+                return back()
+                    ->withErrors(['custom_schedule' => 'Set a date and time for every selected service in custom mode.'])
+                    ->withInput();
+            }
+        } else {
+            $visitStart = $date->copy()->setTimeFromTimeString($validated['slot'].':00');
+            $serviceSchedules = $this->buildServiceSchedules($selectedServices, $visitStart, $arrangementMode);
+            $visitEnd = collect($serviceSchedules)->max(fn ($schedule) => $schedule['end']) ?? $visitStart->copy()->addMinutes($durationMinutes);
+            $clinicEnd = $date->copy()->setTime(18, 0, 0);
+
+            if ($visitEnd->gt($clinicEnd)) {
+                return back()
+                    ->withErrors(['slot' => 'The selected service arrangement extends past clinic hours. Please choose an earlier slot.'])
+                    ->withInput();
+            }
         }
+
+        $visitStart = collect($serviceSchedules)->min(fn ($schedule) => $schedule['start']) ?? $date->copy()->setTime(9, 0);
+        $visitEnd = collect($serviceSchedules)->max(fn ($schedule) => $schedule['end']) ?? $visitStart->copy()->addMinutes($durationMinutes);
 
         $chosenStaffIds = array_values($serviceStaffMap);
 
@@ -775,6 +832,7 @@ class AppointmentController extends Controller
             return [
                 'id' => (string) $service->id,
                 'name' => $service->name,
+                'category_key' => $service->category_key,
                 'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
                 'eligible_staff' => $service->staff
                     ->where('is_active', true)
@@ -883,6 +941,106 @@ class AppointmentController extends Controller
             'duration_minutes' => $durationMinutes,
             'fully_booked_message' => $fullyBookedMessage,
             'arrangement_mode' => $arrangementMode,
+        ];
+    }
+
+    private function buildCustomAvailability(Collection $selectedServices, array $customSchedule): array
+    {
+        $servicesSummary = $selectedServices->map(function ($service) use ($customSchedule) {
+            $serviceId = (string) $service->id;
+            $schedule = $customSchedule[$serviceId] ?? null;
+
+            return [
+                'id' => $serviceId,
+                'name' => $service->name,
+                'category_key' => $service->category_key,
+                'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
+                'scheduled_date' => $schedule['date'] ?? null,
+                'scheduled_time' => $schedule['start_time'] ?? null,
+                'eligible_staff' => $service->staff
+                    ->where('is_active', true)
+                    ->map(fn ($staff) => [
+                        'id' => (string) $staff->id,
+                        'full_name' => $staff->full_name,
+                        'role_key' => $staff->role_key,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        })->values()->all();
+
+        $missingSchedules = collect($servicesSummary)
+            ->filter(fn ($service) => empty($service['scheduled_date']) || empty($service['scheduled_time']))
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        if ($missingSchedules !== []) {
+            return [
+                'selected_services' => $servicesSummary,
+                'services_without_eligible_staff' => [],
+                'viable_slots' => [],
+                'slots' => [],
+                'duration_minutes' => 0,
+                'fully_booked_message' => null,
+                'arrangement_mode' => 'custom',
+                'custom_schedule' => $customSchedule,
+                'custom_combinations' => [],
+                'custom_ready' => false,
+                'custom_missing_message' => 'Choose date and time for each selected service to check availability.',
+            ];
+        }
+
+        $serviceSchedules = $this->buildCustomServiceSchedules($selectedServices, $customSchedule);
+        $availableStaffByService = [];
+
+        foreach ($selectedServices as $service) {
+            $serviceId = (string) $service->id;
+            $serviceSchedule = $serviceSchedules[$serviceId];
+
+            $availableStaffByService[$serviceId] = [
+                'service_name' => $service->name,
+                'staff' => $service->staff()
+                    ->where('staff.is_active', true)
+                    ->whereDoesntHave('appointmentItems', function ($query) use ($serviceSchedule) {
+                        $query->where('starts_at', '<', $serviceSchedule['end'])
+                            ->where('ends_at', '>', $serviceSchedule['start']);
+                    })
+                    ->orderBy('staff.full_name')
+                    ->get(['staff.id', 'staff.full_name', 'staff.role_key'])
+                    ->map(fn ($staff) => [
+                        'id' => (string) $staff->id,
+                        'full_name' => $staff->full_name,
+                        'role_key' => $staff->role_key,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        $combinations = $this->generateValidCombinations(
+            $availableStaffByService,
+            (int) collect($serviceSchedules)->sum('duration_minutes'),
+            'custom',
+            $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all()
+        );
+
+        return [
+            'selected_services' => $servicesSummary,
+            'services_without_eligible_staff' => collect($availableStaffByService)
+                ->filter(fn ($service) => empty($service['staff']))
+                ->pluck('service_name')
+                ->values()
+                ->all(),
+            'viable_slots' => [],
+            'slots' => [],
+            'duration_minutes' => (int) collect($serviceSchedules)->sum('duration_minutes'),
+            'fully_booked_message' => empty($combinations) ? 'All eligible staff are fully booked for the chosen custom schedule.' : null,
+            'arrangement_mode' => 'custom',
+            'custom_schedule' => $customSchedule,
+            'custom_combinations' => $combinations,
+            'custom_ready' => true,
+            'custom_missing_message' => null,
         ];
     }
 
@@ -998,9 +1156,62 @@ class AppointmentController extends Controller
         return $schedules;
     }
 
+    private function buildCustomServiceSchedules(Collection $selectedServices, array $customSchedule): array
+    {
+        $schedules = [];
+
+        foreach ($selectedServices as $service) {
+            $serviceId = (string) $service->id;
+            $schedule = $customSchedule[$serviceId] ?? null;
+
+            if (! $schedule || empty($schedule['date']) || empty($schedule['start_time'])) {
+                continue;
+            }
+
+            $duration = max(30, (int) ($service->duration_minutes ?: 60));
+            $start = Carbon::createFromFormat('Y-m-d H:i', $schedule['date'].' '.$schedule['start_time']);
+            $end = $start->copy()->addMinutes($duration);
+            $clinicStart = $start->copy()->setTime(9, 0);
+            $clinicEnd = $start->copy()->setTime(18, 0);
+
+            if ($start->lt($clinicStart) || $end->gt($clinicEnd)) {
+                continue;
+            }
+
+            $schedules[$serviceId] = [
+                'start' => $start,
+                'end' => $end,
+                'duration_minutes' => $duration,
+            ];
+        }
+
+        return $schedules;
+    }
+
     private function normalizeArrangementMode(mixed $arrangementMode): string
     {
-        return $arrangementMode === 'back_to_back' ? 'back_to_back' : 'same_slot';
+        return in_array($arrangementMode, ['back_to_back', 'custom'], true)
+            ? (string) $arrangementMode
+            : 'same_slot';
+    }
+
+    private function normalizeCustomScheduleInput(mixed $input, Collection $selectedServices, Carbon $defaultDate): array
+    {
+        $rows = is_array($input) ? $input : [];
+
+        return $selectedServices
+            ->mapWithKeys(function (Service $service) use ($rows, $defaultDate) {
+                $serviceId = (string) $service->id;
+                $row = $rows[$serviceId] ?? [];
+                $date = is_array($row) ? trim((string) ($row['date'] ?? '')) : '';
+                $startTime = is_array($row) ? trim((string) ($row['start_time'] ?? '')) : '';
+
+                return [$serviceId => [
+                    'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? $date : $defaultDate->toDateString(),
+                    'start_time' => preg_match('/^\d{2}:\d{2}$/', $startTime) === 1 ? $startTime : '',
+                ]];
+            })
+            ->all();
     }
 
     private function normalizeStatusFilter(mixed $status): ?string

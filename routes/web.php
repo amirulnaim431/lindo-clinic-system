@@ -6,6 +6,7 @@ use App\Http\Controllers\App\CustomerController;
 use App\Http\Controllers\App\CustomerImportController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\HrScheduleController;
+use App\Http\Controllers\App\ServiceController;
 use App\Http\Controllers\App\StaffController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ProfileController;
@@ -50,6 +51,21 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::post('/appointments', [AppointmentController::class, 'store'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.store');
+        Route::get('/services', [ServiceController::class, 'index'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('services.index');
+        Route::get('/services/create', [ServiceController::class, 'create'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('services.create');
+        Route::post('/services', [ServiceController::class, 'store'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('services.store');
+        Route::get('/services/{service}/edit', [ServiceController::class, 'edit'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('services.edit');
+        Route::put('/services/{service}', [ServiceController::class, 'update'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('services.update');
         Route::patch('/appointments/items/{appointmentItem}/reschedule', [AppointmentController::class, 'rescheduleItem'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.items.reschedule');

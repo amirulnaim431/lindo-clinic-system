@@ -60,6 +60,8 @@ class StaffController extends Controller
             ->where('is_active', true)
             ->whereNotNull('name')
             ->where('name', '!=', '')
+            ->orderBy('category_key')
+            ->orderBy('display_order')
             ->orderBy('name')
             ->get();
     }

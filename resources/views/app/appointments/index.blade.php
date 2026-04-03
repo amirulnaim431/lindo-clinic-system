@@ -89,15 +89,27 @@
             ->filter()
             ->values()
             ->all();
+        $serviceCategories = collect($serviceCategories ?? []);
         $serviceCatalog = $services->mapWithKeys(function ($service) {
             return [
                 (string) $service->id => [
                     'id' => (string) $service->id,
                     'name' => $service->name,
+                    'category_key' => $service->category_key,
+                    'description' => $service->description,
                     'duration' => (int) ($service->duration_minutes ?? 60),
+                    'price' => $service->price,
+                    'promo_price' => $service->promo_price,
+                    'is_promo' => (bool) $service->is_promo,
                 ],
             ];
         })->all();
+        $selectedCategoryKey = collect($selectedServiceIds)
+            ->map(fn ($id) => $services->firstWhere('id', $id)?->category_key)
+            ->filter()
+            ->first();
+        $defaultCategoryKey = $selectedCategoryKey
+            ?: ($serviceCategories->first()['key'] ?? 'consultations');
         $formatMembershipBalance = function ($value) {
             $raw = trim((string) $value);
 
@@ -113,6 +125,7 @@
 
             return $raw;
         };
+        $customSchedule = $customSchedule ?? [];
     @endphp
 
 
@@ -136,6 +149,27 @@
             <div class="flash flash--warn">{{ $quickCreate['message'] }}</div>
         @endif
 
+        <section class="panel" id="appointment-date-panel">
+            <div class="panel-body">
+                <form method="GET" action="{{ route('app.appointments.index') }}" class="form-grid" data-preserve-scroll-form>
+                    <input type="hidden" name="mode" value="{{ $mode }}">
+                    @if ($selectedStatus)
+                        <input type="hidden" name="status" value="{{ $selectedStatus }}">
+                    @endif
+                    <div class="col-4 field-block">
+                        <label class="field-label" for="date">Appointment date</label>
+                        <input id="date" name="date" type="date" value="{{ $selectedDate }}" class="form-input" required>
+                    </div>
+                    <div class="col-8 field-block" style="align-self:end;">
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-primary">Apply date</button>
+                            <a href="{{ route('app.appointments.index', ['mode' => $mode]) }}" class="btn btn-secondary" data-preserve-scroll-link>Today</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
         <section class="ops-card ops-card--hero">
             <div class="ops-card__body">
                 <div class="ops-kicker">{{ $isCheckInMode ? 'Status' : 'Appointments' }}</div>
@@ -156,7 +190,7 @@
                             ]));
                             $isActiveCard = ($card['status'] === null && $selectedStatus === null) || ($card['status'] !== null && $selectedStatus === $card['status']);
                         @endphp
-                        <a href="{{ $cardUrl }}" class="metric-card metric-card--action {{ $isActiveCard ? 'is-active' : '' }}">
+                        <a href="{{ $cardUrl }}" class="metric-card metric-card--action {{ $isActiveCard ? 'is-active' : '' }}" data-preserve-scroll-link>
                             <div class="metric-card__label">{{ $card['label'] }}</div>
                             <div class="metric-card__value">{{ $card['value'] }}</div>
                         </a>
@@ -166,88 +200,234 @@
         </section>
 
         @if (! $isCheckInMode)
-        <section class="booking-grid">
+        <section class="ops-grid" id="appointment-list-panel">
             <div class="ops-card">
                 <div class="ops-card__header">
-                    <div class="ops-kicker">Booking builder</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">Create a booking</h3>
+                    <div class="filter-bar__head">
+                        <div>
+                            <div class="ops-kicker">{{ $isCheckInMode ? 'Status update' : 'Daily appointments' }}</div>
+                            <h3 class="panel-title-display" style="font-size:24px;">Appointments for {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h3>
+                        </div>
+                        <div class="page-actions">
+                            @if ($selectedStatus)
+                                <a href="{{ route('app.appointments.index', array_filter(['mode' => $mode, 'date' => $selectedDate])) }}" class="btn btn-secondary" data-preserve-scroll-link>Reset list</a>
+                            @endif
+                            <button type="button" class="btn btn-secondary" onclick="window.print()">Print list</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="ops-card__body">
-                    <form method="GET" action="{{ route('app.appointments.index') }}" class="form-stack">
-                        <input type="hidden" name="slot" value="{{ $prefilledSlot }}">
-                        <div id="service-order-inputs">
-                            @foreach ($selectedServiceOrderIds as $serviceOrderId)
-                                <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
-                            @endforeach
-                        </div>
-
-                        <div>
-                            <div class="ops-kicker">Services</div>
-                            <h4 class="panel-title-display" style="font-size:18px;">Choose services</h4>
-                            <div class="service-grid" style="margin-top:14px;">
-                                @forelse ($services as $service)
-                                    @php $isSelected = in_array((string) $service->id, $selectedServiceIds, true); @endphp
-                                    <label class="service-card {{ $isSelected ? 'is-selected' : '' }}">
-                                        <input type="checkbox" name="service_ids[]" value="{{ $service->id }}" class="selection-input service-checkbox" {{ $isSelected ? 'checked' : '' }}>
-                                        <div style="display:flex;align-items:start;justify-content:space-between;gap:14px;">
-                                            <div>
-                                                <div class="service-card__title">{{ $service->name }}</div>
-                                            </div>
-                                            <span class="service-card__badge">{{ (int) ($service->duration_minutes ?? 60) }} mins</span>
+                    <div class="schedule-list">
+                        @forelse ($appointmentGroups as $group)
+                            @php
+                                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
+                                $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
+                                $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
+                                    ? 'Reschedule'
+                                    : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
+                                $membershipLabel = $group->customer?->membership_type ?: 'No membership';
+                                $membershipCode = $group->customer?->membership_code ?: null;
+                                $membershipBalance = $formatMembershipBalance($group->customer?->current_package);
+                            @endphp
+                            <article class="schedule-card">
+                                <div class="schedule-card__head">
+                                    <div>
+                                        <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
+                                        <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
+                                        <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
+                                        <div class="schedule-card__meta-stack">
+                                            <div class="schedule-card__membership">{{ $membershipLabel }}@if ($membershipCode) • {{ $membershipCode }} @endif</div>
+                                            <div class="schedule-card__balance">Membership balance: {{ $membershipBalance }}</div>
                                         </div>
-                                    </label>
-                                @empty
-                                    <div class="flash flash--warn" style="grid-column:1 / -1;">No active services found. Activate clinic services first before checking appointment availability.</div>
-                                @endforelse
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="ops-kicker">Visit setup</div>
-                            <h4 class="panel-title-display" style="font-size:18px;">Choose service arrangement</h4>
-                            <div class="arrangement-grid" style="margin-top:14px;">
-                                <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
-                                    <input type="radio" name="arrangement_mode" value="same_slot" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'same_slot' ? 'checked' : '' }}>
-                                    <div class="arrangement-card__title">Same slot</div>
-                                </label>
-                                <label class="arrangement-card {{ $selectedArrangementMode === 'back_to_back' ? 'is-selected' : '' }}">
-                                    <input type="radio" name="arrangement_mode" value="back_to_back" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'back_to_back' ? 'checked' : '' }}>
-                                    <div class="arrangement-card__title">Back-to-back</div>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="workflow-panel">
-                            <div class="ops-kicker">Service workflow</div>
-                            <div class="selection-card__title" style="margin-top:6px;">Set the service order used for back-to-back visits</div>
-                            <div id="workflow-list" class="workflow-list"></div>
-                        </div>
-
-                        <div>
-                            <div class="ops-kicker">Date</div>
-                            <h4 class="panel-title-display" style="font-size:18px;">Choose the clinic day</h4>
-                            <div class="field-row" style="margin-top:14px;">
-                                <div class="field-block">
-                                    <label for="date">Appointment date</label>
-                                    <input id="date" name="date" type="date" value="{{ $selectedDate }}" class="field-input" required>
+                                    </div>
+                                    <span class="status-chip" style="background: {{ $statusStyle['bg'] }}; border-color: {{ $statusStyle['border'] }}; color: {{ $statusStyle['text'] }};">
+                                        <span class="status-dot"></span>
+                                        {{ $statusLabel }}
+                                    </span>
                                 </div>
-                                <button type="submit" class="action-btn action-btn--primary" style="min-width:190px;">Check Availability</button>
-                                <a href="{{ route('app.appointments.index') }}" class="action-btn action-btn--secondary">Clear</a>
+
+                                <div style="display:grid;gap:10px;margin-top:16px;">
+                                    @foreach ($group->items as $item)
+                                        <div class="service-line">
+                                            <div>
+                                                <div class="service-line__name">{{ $item->service?->name ?? 'Service' }}</div>
+                                                @if ($item->starts_at && $item->ends_at)
+                                                    <div class="service-card__meta">{{ $item->starts_at->format('d M Y h:i A') }} - {{ $item->ends_at->format('h:i A') }}</div>
+                                                @endif
+                                            </div>
+                                            <div class="service-line__staff">{{ $item->staff?->full_name ?? 'Unassigned' }}@if($item->staff?->role_key) ({{ $item->staff->role_key }}) @endif</div>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                @if ($isCheckInMode)
+                                    <form method="POST" action="{{ route('app.appointments.status', $group) }}" style="margin-top:16px;display:grid;gap:8px;" data-preserve-scroll-form>
+                                        @csrf
+                                        @method('PATCH')
+                                        <label for="status-{{ $group->id }}" class="field-label" style="color: var(--app-accent-strong);">Status update</label>
+                                        <select id="status-{{ $group->id }}" name="status" onchange="this.form.submit()" class="field-input select-input">
+                                            @foreach ($statusOptions as $option)
+                                                @php
+                                                    $optionValue = $option instanceof \BackedEnum ? $option->value : (is_string($option) ? $option : '');
+                                                    $optionLabel = in_array($optionValue, ['cancelled', 'no_show'], true)
+                                                        ? 'Reschedule'
+                                                        : ($option instanceof \App\Enums\AppointmentStatus ? $option->label() : \Illuminate\Support\Str::headline(str_replace('_', ' ', $optionValue)));
+                                                @endphp
+                                                <option value="{{ $optionValue }}" @selected($statusValue === $optionValue)>{{ $optionLabel }}</option>
+                                            @endforeach
+                                        </select>
+                                    </form>
+                                @endif
+                            </article>
+                        @empty
+                            <div class="empty-card">
+                                <div class="empty-card__title">No appointment groups found</div>
                             </div>
-                        </div>
-                    </form>
+                        @endforelse
+                    </div>
+
+                    @if (method_exists($appointmentGroups, 'links'))
+                        <div class="pagination-wrap">{{ $appointmentGroups->links() }}</div>
+                    @endif
                 </div>
             </div>
-
         </section>
+        @endif
+
+        @if (! $isCheckInMode)
+            <section class="booking-grid" id="booking-builder-panel">
+                <div class="ops-card">
+                    <div class="ops-card__header">
+                        <div class="ops-kicker">Booking builder</div>
+                        <h3 class="panel-title-display" style="font-size:24px;">Create a booking</h3>
+                    </div>
+
+                    <div class="ops-card__body">
+                        <form method="GET" action="{{ route('app.appointments.index') }}" class="form-stack" data-preserve-scroll-form>
+                            <input type="hidden" name="mode" value="{{ $mode }}">
+                            <input type="hidden" name="date" value="{{ $selectedDate }}">
+                            <input type="hidden" name="slot" value="{{ $prefilledSlot }}">
+                            <div id="service-order-inputs">
+                                @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                    <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
+                                @endforeach
+                            </div>
+
+                            <div>
+                                <div class="ops-kicker">Categories</div>
+                                <div class="btn-row" style="margin-top:14px;flex-wrap:wrap;">
+                                    @foreach ($serviceCategories as $category)
+                                        <button
+                                            type="button"
+                                            class="btn {{ $defaultCategoryKey === $category['key'] ? 'btn-primary' : 'btn-secondary' }} service-category-tab"
+                                            data-category-tab="{{ $category['key'] }}"
+                                        >
+                                            {{ $category['label'] }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="ops-kicker">Services</div>
+                                <h4 class="panel-title-display" style="font-size:18px;">Choose services</h4>
+                                <div class="service-grid" style="margin-top:14px;">
+                                    @forelse ($services as $service)
+                                        @php $isSelected = in_array((string) $service->id, $selectedServiceIds, true); @endphp
+                                        <label
+                                            class="service-card {{ $isSelected ? 'is-selected' : '' }} {{ $service->category_key !== $defaultCategoryKey ? 'hidden' : '' }}"
+                                            data-service-category="{{ $service->category_key }}"
+                                        >
+                                            <input type="checkbox" name="service_ids[]" value="{{ $service->id }}" class="selection-input service-checkbox" {{ $isSelected ? 'checked' : '' }}>
+                                            <div style="display:flex;align-items:start;justify-content:space-between;gap:14px;">
+                                                <div>
+                                                    <div class="service-card__title">{{ $service->name }}</div>
+                                                    @if ($service->is_promo && $service->promo_price !== null)
+                                                        <div class="service-card__meta">Promo RM {{ number_format($service->promo_price, 0) }}</div>
+                                                    @endif
+                                                </div>
+                                                <span class="service-card__badge">{{ (int) ($service->duration_minutes ?? 60) }} mins</span>
+                                            </div>
+                                        </label>
+                                    @empty
+                                        <div class="flash flash--warn" style="grid-column:1 / -1;">No active services found. Add services in the new Services page first.</div>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="ops-kicker">Visit setup</div>
+                                <h4 class="panel-title-display" style="font-size:18px;">Choose service arrangement</h4>
+                                <div class="arrangement-grid" style="margin-top:14px;">
+                                    <label class="arrangement-card {{ $selectedArrangementMode === 'same_slot' ? 'is-selected' : '' }}">
+                                        <input type="radio" name="arrangement_mode" value="same_slot" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'same_slot' ? 'checked' : '' }}>
+                                        <div class="arrangement-card__title">Same slot</div>
+                                    </label>
+                                    <label class="arrangement-card {{ $selectedArrangementMode === 'back_to_back' ? 'is-selected' : '' }}">
+                                        <input type="radio" name="arrangement_mode" value="back_to_back" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'back_to_back' ? 'checked' : '' }}>
+                                        <div class="arrangement-card__title">Back-to-back</div>
+                                    </label>
+                                    <label class="arrangement-card {{ $selectedArrangementMode === 'custom' ? 'is-selected' : '' }}">
+                                        <input type="radio" name="arrangement_mode" value="custom" class="selection-input arrangement-radio" {{ $selectedArrangementMode === 'custom' ? 'checked' : '' }}>
+                                        <div class="arrangement-card__title">Custom</div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="workflow-panel" class="workflow-panel {{ $selectedArrangementMode === 'back_to_back' ? '' : 'hidden' }}">
+                                <div class="ops-kicker">Service workflow</div>
+                                <div class="selection-card__title" style="margin-top:6px;">Set the service order used for back-to-back visits</div>
+                                <div id="workflow-list" class="workflow-list"></div>
+                            </div>
+
+                            <div id="custom-schedule-panel" class="workflow-panel {{ $selectedArrangementMode === 'custom' ? '' : 'hidden' }}">
+                                <div class="ops-kicker">Custom scheduling</div>
+                                <div class="selection-card__title" style="margin-top:6px;">Choose date and time for each selected service</div>
+                                <div id="custom-schedule-grid" class="form-grid" style="margin-top:14px;">
+                                    @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                        @php $service = $services->firstWhere('id', $serviceOrderId); @endphp
+                                        @if ($service)
+                                            <div class="col-12 service-custom-row" data-custom-service-id="{{ $serviceOrderId }}">
+                                                <div class="panel" style="margin:0;">
+                                                    <div class="panel-body">
+                                                        <div class="filter-bar__head" style="margin-bottom:1rem;">
+                                                            <div class="selection-card__title">{{ $service->name }}</div>
+                                                            <div class="small-note">{{ (int) ($service->duration_minutes ?? 60) }} mins</div>
+                                                        </div>
+                                                        <div class="form-grid">
+                                                            <div class="col-6 field-block">
+                                                                <label class="field-label" for="custom-date-{{ $serviceOrderId }}">Date</label>
+                                                                <input id="custom-date-{{ $serviceOrderId }}" name="custom_schedule[{{ $serviceOrderId }}][date]" type="date" class="form-input" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
+                                                            </div>
+                                                            <div class="col-6 field-block">
+                                                                <label class="field-label" for="custom-time-{{ $serviceOrderId }}">Start time</label>
+                                                                <input id="custom-time-{{ $serviceOrderId }}" name="custom_schedule[{{ $serviceOrderId }}][start_time]" type="time" class="form-input" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="btn-row">
+                                <button type="submit" class="action-btn action-btn--primary" style="min-width:190px;">Check Availability</button>
+                                <a href="{{ route('app.appointments.index', ['date' => $selectedDate]) }}" class="action-btn action-btn--secondary" data-preserve-scroll-link>Clear</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
         @endif
 
         @if (! $isCheckInMode && ! empty($availability))
             <section class="ops-card">
                 <div class="ops-card__header">
                     <div class="ops-kicker">Availability</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">Available staff and times</h3>
+                    <h3 class="panel-title-display" style="font-size:24px;">{{ $selectedArrangementMode === 'custom' ? 'Available staff for selected custom schedule' : 'Available staff and times' }}</h3>
                 </div>
 
                 <div class="ops-card__body">
@@ -261,10 +441,17 @@
                             <div class="flash flash--warn">{{ $availability['fully_booked_message'] }}</div>
                         @endif
 
+                        @if (! empty($availability['custom_missing_message']))
+                            <div class="flash flash--warn">{{ $availability['custom_missing_message'] }}</div>
+                        @endif
+
                         <div class="eligibility-grid">
                             @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
                                 <div class="eligibility-card">
                                     <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
+                                    @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
+                                        <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
+                                    @endif
                                     @if (empty($serviceSummary['eligible_staff']))
                                         <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
                                     @else
@@ -278,7 +465,7 @@
                             @endforeach
                         </div>
 
-                        @if (count($slotOptions))
+                        @if ($selectedArrangementMode !== 'custom' && count($slotOptions))
                             <div>
                                 <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                                     <div>
@@ -308,11 +495,17 @@
                             </div>
                         @endif
 
-                        <div id="selected-slot-card" class="booking-panel hidden">
+                        <div id="selected-slot-card" class="booking-panel {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
                             <div class="ops-kicker">Confirm booking</div>
-                            <div class="booking-panel__title">Create appointment at <span id="selected-slot-time-label">-</span></div>
+                            <div class="booking-panel__title">
+                                @if ($selectedArrangementMode === 'custom')
+                                    Create custom appointment
+                                @else
+                                    Create appointment at <span id="selected-slot-time-label">-</span>
+                                @endif
+                            </div>
 
-                            <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form">
+                            <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form" data-preserve-scroll-form>
                                 @csrf
                                 <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
                                 <input type="hidden" name="date" value="{{ $selectedDate }}">
@@ -327,6 +520,10 @@
                                         <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
                                     @endforeach
                                 </div>
+                                @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][date]" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
+                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][start_time]" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
+                                @endforeach
 
                                 <div class="field-block">
                                     <label for="selected_combination_select">Staff combination</label>
@@ -370,7 +567,7 @@
             </section>
         @endif
 
-        @if ($isCheckInMode)
+        @if (false)
         <section class="ops-grid">
             <div class="ops-card">
                 <div class="ops-card__header">
@@ -470,19 +667,29 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const serviceCheckboxes = document.querySelectorAll('.service-checkbox');
-            const arrangementRadios = document.querySelectorAll('.arrangement-radio');
-            const slotButtons = document.querySelectorAll('.slot-select-button');
+            const serviceCheckboxes = Array.from(document.querySelectorAll('.service-checkbox'));
+            const arrangementRadios = Array.from(document.querySelectorAll('.arrangement-radio'));
+            const slotButtons = Array.from(document.querySelectorAll('.slot-select-button'));
             const slotCard = document.getElementById('selected-slot-card');
             const slotTimeLabel = document.getElementById('selected-slot-time-label');
             const slotInput = document.getElementById('selected-slot-input');
             const comboInput = document.getElementById('selected-combination-input');
             const comboSelect = document.getElementById('selected_combination_select');
             const workflowList = document.getElementById('workflow-list');
+            const workflowPanel = document.getElementById('workflow-panel');
+            const customSchedulePanel = document.getElementById('custom-schedule-panel');
+            const customScheduleGrid = document.getElementById('custom-schedule-grid');
             const serviceOrderInputs = document.getElementById('service-order-inputs');
             const bookingServiceOrderInputs = document.getElementById('booking-service-order-inputs');
+            const serviceCategoryTabs = Array.from(document.querySelectorAll('.service-category-tab'));
+            const serviceCards = Array.from(document.querySelectorAll('[data-service-category]'));
             const prefilledSlot = @json($prefilledSlot);
             const slotAvailable = @json($quickCreate['slot_is_available']);
+            const customCombinations = @json($availability['custom_combinations'] ?? []);
+            const selectedArrangementMode = @json($selectedArrangementMode);
+            const defaultDate = @json($selectedDate);
+            const defaultCategoryKey = @json($defaultCategoryKey);
+            const customScheduleSeed = @json($customSchedule);
             const customerIdInput = document.getElementById('customer_id');
             const customerNameInput = document.getElementById('customer_full_name');
             const customerPhoneInput = document.getElementById('customer_phone');
@@ -491,8 +698,37 @@
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const selectedServicesSeed = @json($selectedServiceOrderIds);
             const serviceCatalog = @json($serviceCatalog);
+            const scrollStorageKey = 'lindo-appointments-scroll';
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
+            let activeCategoryKey = defaultCategoryKey;
+
+            const restoreScroll = sessionStorage.getItem(scrollStorageKey);
+
+            if (restoreScroll) {
+                window.requestAnimationFrame(() => {
+                    window.scrollTo({ top: Number(restoreScroll), behavior: 'auto' });
+                    sessionStorage.removeItem(scrollStorageKey);
+                });
+            }
+
+            document.querySelectorAll('[data-preserve-scroll-form]').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+                });
+            });
+
+            document.querySelectorAll('[data-preserve-scroll-link]').forEach((link) => {
+                link.addEventListener('click', () => {
+                    sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+                });
+            });
+
+            document.querySelectorAll('.pagination-wrap a').forEach((link) => {
+                link.addEventListener('click', () => {
+                    sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+                });
+            });
 
             function buildHiddenInputs(container, inputName, values) {
                 if (!container) {
@@ -507,6 +743,20 @@
                     input.name = inputName;
                     input.value = value;
                     container.appendChild(input);
+                });
+            }
+
+            function applyCategoryTabState(categoryKey) {
+                activeCategoryKey = categoryKey || defaultCategoryKey;
+
+                serviceCategoryTabs.forEach((button) => {
+                    const isActive = button.dataset.categoryTab === activeCategoryKey;
+                    button.classList.toggle('btn-primary', isActive);
+                    button.classList.toggle('btn-secondary', !isActive);
+                });
+
+                serviceCards.forEach((card) => {
+                    card.classList.toggle('hidden', card.dataset.serviceCategory !== activeCategoryKey);
                 });
             }
 
@@ -559,16 +809,77 @@
                 });
             }
 
+            function renderCustomScheduleRows() {
+                if (!customScheduleGrid) {
+                    return;
+                }
+
+                const currentValues = {};
+                customScheduleGrid.querySelectorAll('[data-custom-service-id]').forEach((row) => {
+                    const serviceId = row.dataset.customServiceId;
+                    currentValues[serviceId] = {
+                        date: row.querySelector('input[type="date"]')?.value || '',
+                        start_time: row.querySelector('input[type="time"]')?.value || '',
+                    };
+                });
+
+                if (!selectedServiceOrder.length) {
+                    customScheduleGrid.innerHTML = '<div class="col-12 small-note">Select one or more services first.</div>';
+                    return;
+                }
+
+                customScheduleGrid.innerHTML = '';
+
+                selectedServiceOrder.forEach((serviceId) => {
+                    const service = serviceCatalog[serviceId];
+
+                    if (!service) {
+                        return;
+                    }
+
+                    const schedule = currentValues[serviceId] || customScheduleSeed[serviceId] || {};
+                    const row = document.createElement('div');
+                    row.className = 'col-12 service-custom-row';
+                    row.dataset.customServiceId = serviceId;
+                    row.innerHTML = `
+                        <div class="panel" style="margin:0;">
+                            <div class="panel-body">
+                                <div class="filter-bar__head" style="margin-bottom:1rem;">
+                                    <div class="selection-card__title">${service.name}</div>
+                                    <div class="small-note">${service.duration} mins</div>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="col-6 field-block">
+                                        <label class="field-label" for="custom-date-${serviceId}">Date</label>
+                                        <input id="custom-date-${serviceId}" name="custom_schedule[${serviceId}][date]" type="date" class="form-input" value="${schedule.date || defaultDate}">
+                                    </div>
+                                    <div class="col-6 field-block">
+                                        <label class="field-label" for="custom-time-${serviceId}">Start time</label>
+                                        <input id="custom-time-${serviceId}" name="custom_schedule[${serviceId}][start_time]" type="time" class="form-input" value="${schedule.start_time || ''}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    customScheduleGrid.appendChild(row);
+                });
+            }
+
             function syncServiceOrderUi() {
                 buildHiddenInputs(serviceOrderInputs, 'service_order[]', selectedServiceOrder);
                 buildHiddenInputs(bookingServiceOrderInputs, 'service_order[]', selectedServiceOrder);
                 renderWorkflowList();
+                renderCustomScheduleRows();
             }
 
             function updateArrangementCards() {
                 arrangementRadios.forEach((radio) => {
                     radio.closest('.arrangement-card')?.classList.toggle('is-selected', radio.checked);
                 });
+
+                const mode = arrangementRadios.find((radio) => radio.checked)?.value || selectedArrangementMode;
+                workflowPanel?.classList.toggle('hidden', mode !== 'back_to_back');
+                customSchedulePanel?.classList.toggle('hidden', mode !== 'custom');
             }
 
             serviceCheckboxes.forEach((checkbox) => {
@@ -576,6 +887,12 @@
                     this.closest('.service-card')?.classList.toggle('is-selected', this.checked);
                     syncServiceOrderFromSelection();
                     syncServiceOrderUi();
+                });
+            });
+
+            serviceCategoryTabs.forEach((button) => {
+                button.addEventListener('click', function () {
+                    applyCategoryTabState(this.dataset.categoryTab || defaultCategoryKey);
                 });
             });
 
@@ -822,6 +1139,15 @@
             syncServiceOrderFromSelection();
             syncServiceOrderUi();
             updateArrangementCards();
+            applyCategoryTabState(defaultCategoryKey);
+
+            if (selectedArrangementMode === 'custom' && customCombinations.length) {
+                setCombinations(customCombinations);
+
+                if (slotCard) {
+                    slotCard.classList.remove('hidden');
+                }
+            }
         });
     </script>
 </x-internal-layout>
