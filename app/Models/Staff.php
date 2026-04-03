@@ -73,6 +73,8 @@ class Staff extends Model
         'management' => 'Management',
         'aesthetic' => 'Aesthetic',
         'doctor' => 'Doctor',
+        'hr' => 'HR',
+        'tea_lady' => 'Tea Lady',
         'others' => 'Others',
     ];
 
@@ -157,6 +159,41 @@ class Staff extends Model
         };
     }
 
+    public static function shouldIncludeInPicSelector(self $staff): bool
+    {
+        $search = mb_strtolower(trim(implode(' ', array_filter([
+            $staff->job_title,
+            $staff->department,
+            $staff->operational_role,
+            $staff->role_key,
+            $staff->role,
+        ]))));
+
+        return ! str_contains($search, 'multimedia');
+    }
+
+    public static function picGroupKeyForStaff(self $staff): string
+    {
+        $jobTitle = mb_strtolower(trim((string) $staff->job_title));
+        $department = mb_strtolower(trim((string) $staff->department));
+        $role = $staff->operational_role ?: $staff->role_key ?: $staff->role;
+        $normalizedRole = self::normalizePicGroup($role);
+
+        if (str_contains($jobTitle, 'chief operating officer') || $jobTitle === 'coo') {
+            return 'management';
+        }
+
+        if (str_contains($department, 'human resources') || str_contains($jobTitle, 'human resources') || preg_match('/\bhr\b/u', $jobTitle)) {
+            return 'hr';
+        }
+
+        if (str_contains($jobTitle, 'tea lady')) {
+            return 'tea_lady';
+        }
+
+        return $normalizedRole;
+    }
+
     public static function picGroupLabel(?string $role): string
     {
         $group = self::normalizePicGroup($role);
@@ -178,9 +215,26 @@ class Staff extends Model
     public static function sortForPicSelector(Collection $staffList): Collection
     {
         return $staffList
+            ->filter(fn (self $staff) => self::shouldIncludeInPicSelector($staff))
             ->sort(function (self $left, self $right) {
-                $leftRank = self::picGroupRank($left->operational_role ?: $left->role_key ?: $left->role);
-                $rightRank = self::picGroupRank($right->operational_role ?: $right->role_key ?: $right->role);
+                $leftRank = match (self::picGroupKeyForStaff($left)) {
+                    'management' => 1,
+                    'aesthetic' => 2,
+                    'doctor' => 3,
+                    'others' => 4,
+                    'hr' => 5,
+                    'tea_lady' => 6,
+                    default => 7,
+                };
+                $rightRank = match (self::picGroupKeyForStaff($right)) {
+                    'management' => 1,
+                    'aesthetic' => 2,
+                    'doctor' => 3,
+                    'others' => 4,
+                    'hr' => 5,
+                    'tea_lady' => 6,
+                    default => 7,
+                };
 
                 if ($leftRank === $rightRank) {
                     return strcasecmp($left->full_name, $right->full_name);
@@ -194,7 +248,7 @@ class Staff extends Model
     public static function groupForPicSelector(Collection $staffList): Collection
     {
         return self::sortForPicSelector($staffList)
-            ->groupBy(fn (self $staff) => self::normalizePicGroup($staff->operational_role ?: $staff->role_key ?: $staff->role))
+            ->groupBy(fn (self $staff) => self::picGroupKeyForStaff($staff))
             ->map(fn (Collection $group, string $key) => [
                 'key' => $key,
                 'label' => self::PIC_GROUP_LABELS[$key]
