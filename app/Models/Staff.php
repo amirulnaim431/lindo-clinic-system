@@ -73,6 +73,7 @@ class Staff extends Model
         'management' => 'Management',
         'aesthetic' => 'Aesthetic',
         'doctor' => 'Doctor',
+        'nurse' => 'Nurse',
         'hr' => 'HR',
         'tea_lady' => 'Tea Lady',
     ];
@@ -152,8 +153,9 @@ class Staff extends Model
 
         return match ($normalized) {
             'management' => 'management',
-            'aesthetic', 'aestatic', 'nurse', 'beautician' => 'aesthetic',
+            'aesthetic', 'aestatic', 'beautician' => 'aesthetic',
             'doctor' => 'doctor',
+            'nurse' => 'nurse',
             default => 'others',
         };
     }
@@ -224,16 +226,18 @@ class Staff extends Model
                     'management' => 1,
                     'aesthetic' => 2,
                     'doctor' => 3,
-                    'hr' => 4,
-                    'tea_lady' => 5,
+                    'nurse' => 4,
+                    'hr' => 5,
+                    'tea_lady' => 6,
                     default => 7,
                 };
                 $rightRank = match (self::picGroupKeyForStaff($right)) {
                     'management' => 1,
                     'aesthetic' => 2,
                     'doctor' => 3,
-                    'hr' => 4,
-                    'tea_lady' => 5,
+                    'nurse' => 4,
+                    'hr' => 5,
+                    'tea_lady' => 6,
                     default => 7,
                 };
 
