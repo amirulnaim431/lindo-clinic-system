@@ -748,7 +748,7 @@
                     return;
                 }
 
-                const container = panel.offsetParent;
+                const container = panel.closest('.calendar-control-grid--with-popover');
 
                 if (!container) {
                     return;
