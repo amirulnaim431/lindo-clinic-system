@@ -689,6 +689,7 @@
                                 <p class="modal-subtitle">For {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</p>
                             </div>
                             <div class="btn-row">
+                                <button type="button" class="btn btn-secondary" id="appointment-summary-export">Extract doc</button>
                                 <button type="button" class="btn btn-secondary" id="appointment-summary-print">Print list</button>
                                 <button type="button" class="btn btn-secondary" data-close-summary-modal>Close</button>
                             </div>
@@ -794,6 +795,7 @@
             const summaryPanels = Array.from(document.querySelectorAll('[data-summary-panel]'));
             const summaryButtons = Array.from(document.querySelectorAll('[data-open-summary]'));
             const summaryCloseButtons = Array.from(document.querySelectorAll('[data-close-summary-modal]'));
+            const summaryExportButton = document.getElementById('appointment-summary-export');
             const summaryPrintButton = document.getElementById('appointment-summary-print');
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
@@ -869,6 +871,45 @@
 
             summaryPrintButton?.addEventListener('click', function () {
                 window.print();
+            });
+
+            summaryExportButton?.addEventListener('click', function () {
+                const activePanel = summaryPanels.find((panel) => !panel.classList.contains('hidden'));
+
+                if (!activePanel) {
+                    return;
+                }
+
+                const escapeHtml = (value) => String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                const title = summaryTitle?.textContent?.trim() || 'Appointments';
+                const dateLabel = @json(\Carbon\Carbon::parse($selectedDate)->format('d M Y'));
+                const bodyText = activePanel.innerText.trim();
+                const documentHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(title)} - ${escapeHtml(dateLabel)}</title>
+</head>
+<body>
+    <h1>${escapeHtml(title)}</h1>
+    <p>For ${escapeHtml(dateLabel)}</p>
+    <pre style="font-family: Georgia, serif; white-space: pre-wrap;">${escapeHtml(bodyText)}</pre>
+</body>
+</html>`;
+
+                const blob = new Blob(['\ufeff', documentHtml], { type: 'application/msword' });
+                const link = document.createElement('a');
+                const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'appointments';
+                link.href = URL.createObjectURL(blob);
+                link.download = `${safeTitle}-${dateLabel.replace(/\s+/g, '-')}.doc`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.setTimeout(() => URL.revokeObjectURL(link.href), 500);
             });
 
             document.addEventListener('keydown', function (event) {
