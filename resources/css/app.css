@@ -1220,7 +1220,15 @@
     }
 
     .field-error {
-        color: #ffc2ca;
+        color: #b23b4d;
+        font-weight: 700;
+    }
+
+    .form-input--error,
+    .form-select--error,
+    .form-textarea--error {
+        border-color: rgba(194, 76, 93, 0.72);
+        box-shadow: 0 0 0 3px rgba(194, 76, 93, 0.12);
     }
 
     .form-input,
@@ -1371,9 +1379,23 @@
         font-weight: 600;
     }
 
-    .alert-success { border-color: rgba(112, 194, 159, 0.32); background: rgba(112, 194, 159, 0.16); color: #d7ffed; }
-    .alert-error { border-color: rgba(222, 127, 138, 0.32); background: rgba(222, 127, 138, 0.16); color: #ffdce2; }
-    .alert-warning { border-color: rgba(224, 182, 111, 0.32); background: rgba(224, 182, 111, 0.16); color: #ffedd0; }
+    .alert-success {
+        border-color: rgba(112, 194, 159, 0.36);
+        background: linear-gradient(180deg, rgba(238, 251, 245, 0.98), rgba(225, 246, 236, 0.96));
+        color: #215940;
+    }
+
+    .alert-error {
+        border-color: rgba(194, 76, 93, 0.34);
+        background: linear-gradient(180deg, rgba(255, 244, 246, 0.99), rgba(255, 231, 235, 0.98));
+        color: #7d1f31;
+    }
+
+    .alert-warning {
+        border-color: rgba(224, 182, 111, 0.34);
+        background: linear-gradient(180deg, rgba(255, 249, 237, 0.98), rgba(255, 240, 214, 0.96));
+        color: #8b5b20;
+    }
 
     .status-chip--success { background: rgba(112, 194, 159, 0.11); border-color: rgba(112, 194, 159, 0.22); color: #c9f7e1; }
     .status-chip--warning { background: linear-gradient(180deg, rgba(255, 244, 225, 0.98), rgba(255, 235, 206, 0.96)); border-color: rgba(224, 182, 111, 0.34); color: #8b5b20; }

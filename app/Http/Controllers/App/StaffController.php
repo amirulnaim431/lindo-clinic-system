@@ -421,9 +421,26 @@ class StaffController extends Controller
                 ->first();
 
             if ($linkedStaff) {
-                throw ValidationException::withMessages([
-                    'email' => 'This work email is already linked to another staff profile.',
-                ]);
+                $linkedStaffEmail = Str::lower(trim((string) ($linkedStaff->email ?? '')));
+                $canReclaimLinkedAccount = $linkedStaffEmail === $staffEmail
+                    && (! $linkedStaff->is_active || ! $linkedStaff->can_login);
+
+                if ($canReclaimLinkedAccount) {
+                    $linkedStaff->update([
+                        'user_id' => null,
+                        'can_login' => false,
+                    ]);
+                } else {
+                    $linkedStaffLabel = $linkedStaff->full_name ?: 'another staff profile';
+
+                    if ($linkedStaff->employee_code) {
+                        $linkedStaffLabel .= ' ('.$linkedStaff->employee_code.')';
+                    }
+
+                    throw ValidationException::withMessages([
+                        'email' => 'This work email is already linked to '.$linkedStaffLabel.'.',
+                    ]);
+                }
             }
         }
 

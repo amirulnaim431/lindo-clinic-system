@@ -33,7 +33,7 @@
         @endif
 
         @if ($errors->any())
-            <div class="alert alert-error">
+            <div class="alert alert-error" role="alert" aria-live="polite">
                 <div>Please fix the following:</div>
                 <ul style="margin:0.6rem 0 0 1rem;">
                     @foreach ($errors->all() as $error)
@@ -115,8 +115,11 @@
 
                                 <div class="col-6 field-block">
                                     <label class="field-label" for="email">Work email</label>
-                                    <input id="email" name="email" type="email" class="form-input" value="{{ old('email', $staff->email) }}" placeholder="Required for login access">
+                                    <input id="email" name="email" type="email" class="form-input @error('email') form-input--error @enderror" value="{{ old('email', $staff->email) }}" placeholder="Required for login access">
                                     <div class="field-note">This becomes the sign-in identity if internal access is enabled.</div>
+                                    @error('email')
+                                        <div class="field-error">{{ $message }}</div>
+                                    @enderror
                                 </div>
                                 <div class="col-6 field-block">
                                     <label class="field-label" for="phone">Phone</label>
