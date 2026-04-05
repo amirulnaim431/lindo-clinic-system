@@ -230,7 +230,7 @@ class StaffController extends Controller
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],
-            'notes' => $data['notes'] ?: null,
+            'notes' => ($data['notes'] ?? null) ?: null,
             'access_permissions' => $data['access_permissions'],
         ]);
 
@@ -269,7 +269,7 @@ class StaffController extends Controller
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],
-            'notes' => $data['notes'] ?: null,
+            'notes' => ($data['notes'] ?? null) ?: null,
             'access_permissions' => $data['access_permissions'],
         ]);
 
