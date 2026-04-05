@@ -1,5 +1,11 @@
 <?php
 
+$mailScheme = env('MAIL_SCHEME');
+
+if ($mailScheme === 'ssl') {
+    $mailScheme = 'smtps';
+}
+
 return [
 
     /*
@@ -39,7 +45,7 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
+            'scheme' => $mailScheme,
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
