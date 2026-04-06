@@ -6,6 +6,7 @@ use App\Http\Controllers\App\CustomerController;
 use App\Http\Controllers\App\CustomerImportController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\HrScheduleController;
+use App\Http\Controllers\App\LogViewerController;
 use App\Http\Controllers\App\ServiceController;
 use App\Http\Controllers\App\StaffController;
 use App\Http\Controllers\BookingController;
@@ -137,6 +138,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])
             ->middleware('app_permission:customers.manage')
             ->name('customers.update');
+
+        Route::get('/logs/laravel', [LogViewerController::class, 'laravel'])
+            ->name('logs.laravel');
     });
 
 require __DIR__.'/auth.php';
