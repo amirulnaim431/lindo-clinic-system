@@ -11,6 +11,7 @@
         $accessStatus = $accessStatus ?? ['label' => 'Not provisioned', 'tone' => 'neutral', 'description' => 'No internal login has been created for this staff member yet.'];
         $linkedUser = $staff->user;
         $accessPreviewLabel = $selectedAccessLevel === 'admin' ? 'Super admin access' : 'Operational staff access';
+        $loginEnabled = old('can_login', $staff->can_login);
     @endphp
 
     <div class="stack">
@@ -189,22 +190,40 @@
                                     </div>
                                     <x-status-pill :label="$linkedUser ? $staff->accessLevelLabel() : $accessPreviewLabel" :tone="$selectedAccessLevel === 'admin' ? 'warning' : 'info'" />
                                 </div>
-                                @if ($linkedUser)
-                                <div class="field-note staff-access-status-card__note">
-                                    @if ($linkedUser)
-                                        Linked account: {{ $linkedUser->email }}{{ $linkedUser->last_password_reset_sent_at ? ' - setup link generated '.$linkedUser->last_password_reset_sent_at->diffForHumans() : '' }}
-                                    @endif
+                                <div class="staff-access-status-card__note">
+                                    <div class="staff-access-facts">
+                                        <div class="staff-access-fact">
+                                            <span class="staff-access-fact__label">Linked account</span>
+                                            <span class="staff-access-fact__value">{{ $linkedUser?->email ?: 'No linked account yet' }}</span>
+                                        </div>
+                                        <div class="staff-access-fact">
+                                            <span class="staff-access-fact__label">Internal login</span>
+                                            <span class="staff-access-fact__value">{{ $loginEnabled ? 'Enabled' : 'Disabled' }}</span>
+                                        </div>
+                                        <div class="staff-access-fact">
+                                            <span class="staff-access-fact__label">Setup link</span>
+                                            <span class="staff-access-fact__value">
+                                                {{ $linkedUser?->last_password_reset_sent_at ? 'Generated '.$linkedUser->last_password_reset_sent_at->diffForHumans() : 'Not generated yet' }}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                @endif
                             </div>
 
-                            <div class="field-block">
-                                <label class="btn-row btn-row--start">
-                                    <input type="hidden" name="can_login" value="0">
-                                    <input type="checkbox" name="can_login" value="1" @checked(old('can_login', $staff->can_login))>
-                                    <span class="helper-text">Allow internal login for this staff member</span>
-                                </label>
-                                <div class="field-note">When enabled, the system provisions a linked account automatically and prepares a secure password setup link.</div>
+                            <div class="staff-access-toggle-card">
+                                <div class="staff-access-toggle-card__row">
+                                    <div>
+                                        <div class="selection-card__title">Allow internal login</div>
+                                        <div class="selection-card__meta">Turn this on only when the work email is correct and this person should sign in to the internal workspace.</div>
+                                    </div>
+                                    <label class="staff-access-toggle" for="staff-can-login">
+                                        <input type="hidden" name="can_login" value="0">
+                                        <input id="staff-can-login" type="checkbox" name="can_login" value="1" @checked($loginEnabled)>
+                                        <span class="staff-access-toggle__switch" aria-hidden="true"></span>
+                                        <span class="staff-access-toggle__text">{{ $loginEnabled ? 'Enabled' : 'Disabled' }}</span>
+                                    </label>
+                                </div>
+                                <div class="staff-access-toggle-card__note">When enabled, the system provisions a linked account automatically and prepares a secure password setup link.</div>
                             </div>
 
                             <div class="stack">

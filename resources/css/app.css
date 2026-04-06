@@ -1558,6 +1558,124 @@
         line-height: 1.65;
     }
 
+    .staff-access-facts {
+        display: grid;
+        gap: 0.7rem;
+    }
+
+    .staff-access-fact {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.9rem;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid rgba(199, 153, 171, 0.18);
+        border-radius: 0.95rem;
+        background: rgba(255, 253, 254, 0.92);
+    }
+
+    .staff-access-fact__label {
+        color: #8b6574;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .staff-access-fact__value {
+        color: var(--app-text-strong);
+        font-size: 0.88rem;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: right;
+        word-break: break-word;
+    }
+
+    .staff-access-toggle-card {
+        border: 1px solid rgba(199, 153, 171, 0.26);
+        border-radius: 1rem;
+        padding: 1rem;
+        background:
+            radial-gradient(circle at top right, rgba(201, 141, 159, 0.1), transparent 34%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(255, 245, 248, 0.96)),
+            rgba(255, 250, 252, 0.98);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            0 12px 28px rgba(155, 111, 128, 0.06);
+    }
+
+    .staff-access-toggle-card__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .staff-access-toggle-card__note {
+        margin-top: 0.8rem;
+        color: #7a5967;
+        font-size: 0.84rem;
+        line-height: 1.6;
+    }
+
+    .staff-access-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        cursor: pointer;
+    }
+
+    .staff-access-toggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .staff-access-toggle__switch {
+        position: relative;
+        width: 3.6rem;
+        height: 2rem;
+        border-radius: 999px;
+        border: 1px solid rgba(199, 153, 171, 0.28);
+        background: linear-gradient(180deg, rgba(235, 223, 228, 0.95), rgba(223, 209, 216, 0.92));
+        box-shadow: inset 0 1px 2px rgba(82, 52, 63, 0.08);
+        transition: 180ms ease;
+    }
+
+    .staff-access-toggle__switch::after {
+        content: '';
+        position: absolute;
+        top: 0.18rem;
+        left: 0.2rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 999px;
+        background: #ffffff;
+        box-shadow: 0 6px 14px rgba(82, 52, 63, 0.16);
+        transition: 180ms ease;
+    }
+
+    .staff-access-toggle__text {
+        color: var(--app-text-strong);
+        font-size: 0.88rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .staff-access-toggle input:checked + .staff-access-toggle__switch {
+        border-color: rgba(184, 115, 136, 0.5);
+        background: linear-gradient(180deg, rgba(201, 141, 159, 0.94), rgba(184, 115, 136, 0.94));
+    }
+
+    .staff-access-toggle input:checked + .staff-access-toggle__switch::after {
+        transform: translateX(1.58rem);
+    }
+
+    .staff-access-toggle input:focus-visible + .staff-access-toggle__switch {
+        box-shadow: var(--app-ring), inset 0 1px 2px rgba(82, 52, 63, 0.08);
+    }
+
     .staff-form-layout {
         display: grid;
         grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
