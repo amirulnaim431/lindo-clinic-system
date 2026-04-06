@@ -272,17 +272,9 @@
 
                             @if ($mode === 'edit' && $linkedUser)
                                 <div class="staff-access-actions">
-                                    <form method="POST" action="{{ route('app.staff.access.invite', $staff) }}">
-                                        @csrf
-                                        <button type="submit" class="btn btn-secondary">Generate setup/reset link</button>
-                                    </form>
+                                    <button type="submit" form="staff-access-invite-form" class="btn btn-secondary">Generate setup/reset link</button>
 
-                                    <form method="POST" action="{{ route('app.staff.access.status', $staff) }}">
-                                        @csrf
-                                        @method('PATCH')
-                                        <input type="hidden" name="can_login" value="{{ $staff->can_login ? '0' : '1' }}">
-                                        <button type="submit" class="btn btn-secondary">{{ $staff->can_login ? 'Suspend login' : 'Enable login' }}</button>
-                                    </form>
+                                    <button type="submit" form="staff-access-status-form" class="btn btn-secondary">{{ $staff->can_login ? 'Suspend login' : 'Enable login' }}</button>
                                 </div>
                             @endif
                         </div>
@@ -295,6 +287,18 @@
                 <button type="submit" class="btn btn-primary">{{ $mode === 'create' ? 'Create staff profile' : 'Save staff changes' }}</button>
             </div>
         </form>
+
+        @if ($mode === 'edit' && $linkedUser)
+            <form id="staff-access-invite-form" method="POST" action="{{ route('app.staff.access.invite', $staff) }}" class="hidden">
+                @csrf
+            </form>
+
+            <form id="staff-access-status-form" method="POST" action="{{ route('app.staff.access.status', $staff) }}" class="hidden">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="can_login" value="{{ $staff->can_login ? '0' : '1' }}">
+            </form>
+        @endif
     </div>
 
     <script>
