@@ -127,7 +127,14 @@ class Staff extends Model
                 }
             }
 
-            $permissions = collect($staff->attributes['access_permissions'] ?? [])
+            $rawPermissions = $staff->attributes['access_permissions'] ?? [];
+
+            if (is_string($rawPermissions)) {
+                $decodedPermissions = json_decode($rawPermissions, true);
+                $rawPermissions = is_array($decodedPermissions) ? $decodedPermissions : [];
+            }
+
+            $permissions = collect($rawPermissions)
                 ->filter(fn ($permission) => is_string($permission) && isset(self::ACCESS_PERMISSION_OPTIONS[$permission]))
                 ->unique()
                 ->values()
