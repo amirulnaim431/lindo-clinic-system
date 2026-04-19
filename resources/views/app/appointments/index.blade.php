@@ -766,14 +766,14 @@
 
                                         <div class="summary-pill summary-pill--stack summary-pill--compact">
                                             <span class="summary-pill__label">Customer</span>
-                                            <span id="selected-customer-summary" class="summary-pill__value">{{ trim($selectedCustomerName.' '.$selectedCustomerPhone) !== '' ? trim($selectedCustomerName.' | '.$selectedCustomerPhone, ' |') : 'Customer details required' }}</span>
+                                            <span id="selected-customer-summary" class="summary-pill__value">{{ trim($selectedCustomerName.' '.$selectedCustomerPhone) !== '' ? trim($selectedCustomerName).(trim($selectedCustomerPhone) !== '' ? '    '.trim($selectedCustomerPhone) : '') : 'Customer details required' }}</span>
                                         </div>
 
                                         <input type="hidden" id="selected_combination_select" value="">
 
                                         <div class="summary-pill summary-pill--stack summary-pill--compact">
                                             <span class="summary-pill__label">Selection</span>
-                                            <span id="selected-booking-summary" class="summary-pill__value">Choose staff for each service.</span>
+                                            <span id="selected-booking-summary" class="summary-pill__value" style="white-space:pre-line;">Choose staff for each service.</span>
                                         </div>
 
                                         <div class="field-block">
@@ -848,6 +848,7 @@
             let activeCategoryKey = defaultCategoryKey;
             let selectedStaffByService = {};
             let activeServiceId = serviceSummaryCards[0]?.dataset.serviceSummary || modalServiceCards[0]?.dataset.serviceId || null;
+            let forceStaffEdit = false;
 
             const restoreScroll = sessionStorage.getItem(scrollStorageKey);
 
@@ -1236,16 +1237,20 @@
             }
 
             function syncActiveServiceCard() {
+                const allSelected = areAllServicesSelected();
+
                 modalServiceCards.forEach((card) => {
                     const isActive = String(card.dataset.serviceId || '') === String(activeServiceId || '');
-                    card.style.display = isActive ? 'grid' : 'none';
+                    const shouldShow = (!allSelected || forceStaffEdit) && isActive;
+
+                    card.style.display = shouldShow ? 'grid' : 'none';
                 });
 
                 serviceSummaryCards.forEach((card) => {
                     const isActive = String(card.dataset.serviceSummary || '') === String(activeServiceId || '');
                     card.style.cursor = 'pointer';
-                    card.style.transform = isActive ? 'translateY(-2px)' : 'none';
-                    card.style.boxShadow = isActive ? '0 14px 28px rgba(111,78,92,.12)' : 'none';
+                    card.style.transform = isActive && (!allSelected || forceStaffEdit) ? 'translateY(-2px)' : 'none';
+                    card.style.boxShadow = isActive && (!allSelected || forceStaffEdit) ? '0 14px 28px rgba(111,78,92,.12)' : 'none';
                     card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                 });
             }
@@ -1323,23 +1328,27 @@
                     .filter((serviceId) => !selectedStaffByService[serviceId])
                     .map((serviceId) => getServiceName(serviceId));
                 const isReady = Boolean(comboInput?.value) && (!requiresSlot || Boolean(selectedSlot));
+                const selectionSummaryLines = selectedLabels.map((line) => line.replace(': ', ' - '));
 
                 if (bookingSummary) {
                     if (!selectedLabels.length) {
                         bookingSummary.textContent = 'Choose staff for each service.';
                     } else if (pendingNames.length) {
-                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | Pending: ${pendingNames.join(', ')}`;
+                        bookingSummary.textContent = `${selectionSummaryLines.join('\n')}\nPending: ${pendingNames.join(', ')}`;
                     } else if (requiresSlot && !selectedSlot) {
-                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | Choose time`;
+                        bookingSummary.textContent = `${selectionSummaryLines.join('\n')}\nChoose time`;
                     } else if (selectedSlot) {
-                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | ${selectedSlot}`;
+                        bookingSummary.textContent = `${selectionSummaryLines.join('\n')}\nTime - ${selectedSlot}`;
                     } else {
-                        bookingSummary.textContent = selectedLabels.join(' | ');
+                        bookingSummary.textContent = selectionSummaryLines.join('\n');
                     }
                 }
 
                 if (slotCard) {
-                    slotCard.classList.remove('hidden');
+                    const shouldShowBookingPanel = selectedArrangementMode === 'custom'
+                        ? areAllServicesSelected()
+                        : Boolean(selectedSlot);
+                    slotCard.classList.toggle('hidden', !shouldShowBookingPanel);
                 }
 
                 if (createAppointmentButton) {
@@ -1364,7 +1373,8 @@
                 }
 
                 const allServicesSelected = areAllServicesSelected();
-                timeSelectionSection?.classList.toggle('hidden', !allServicesSelected);
+                const hasSlot = Boolean(slotInput?.value);
+                timeSelectionSection?.classList.toggle('hidden', !allServicesSelected || forceStaffEdit || hasSlot);
 
                 slotButtons.forEach((button) => {
                     const combinations = parseJson(button.dataset.slotCombinations, []);
@@ -1409,6 +1419,7 @@
 
                 selectedStaffByService[serviceId] = staffId;
                 activeServiceId = serviceId;
+                forceStaffEdit = !areAllServicesSelected();
 
                 staffOptionButtons.forEach((staffButton) => {
                     const sameService = String(staffButton.dataset.serviceId || '') === serviceId;
@@ -1466,6 +1477,8 @@
                     comboSelect.value = matchedCombination.payload || '';
                 }
 
+                forceStaffEdit = false;
+                syncSlotAvailability();
                 updateBookingState();
             }
 
@@ -1486,7 +1499,19 @@
             serviceSummaryCards.forEach((card) => {
                 const activate = () => {
                     activeServiceId = card.dataset.serviceSummary || activeServiceId;
+                    forceStaffEdit = areAllServicesSelected();
+
+                    if (forceStaffEdit) {
+                        resetSlotSelection();
+                        comboInput.value = '';
+                        if (comboSelect) {
+                            comboSelect.value = '';
+                        }
+                    }
+
                     syncServiceCardState();
+                    syncSlotAvailability();
+                    updateBookingState();
                 };
 
                 card.addEventListener('click', activate);
@@ -1541,7 +1566,7 @@
                 }
 
                 customerSummary.textContent = parts.length
-                    ? parts.join(' | ')
+                    ? parts.join('\u2003\u2003')
                     : 'Customer details required';
             }
 
