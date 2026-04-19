@@ -71,11 +71,11 @@ class Staff extends Model
 
     public const PIC_GROUP_LABELS = [
         'management' => 'Management',
-        'aesthetic' => 'Aesthetic',
-        'doctor' => 'Doctor',
-        'nurse' => 'Nurse',
-        'hr' => 'HR',
-        'tea_lady' => 'Tea Lady',
+        'doctor' => 'Doctors',
+        'nurse' => 'Nurses',
+        'aesthetic' => 'Aesthetics',
+        'spa' => 'Spa',
+        'others' => 'The Rest',
     ];
 
     public const APPOINTMENT_GROUP_LABELS = [
@@ -191,28 +191,52 @@ class Staff extends Model
 
     public static function picGroupKeyForStaff(self $staff): string
     {
+        $name = mb_strtolower(trim((string) $staff->full_name));
         $jobTitle = mb_strtolower(trim((string) $staff->job_title));
         $department = mb_strtolower(trim((string) $staff->department));
-        $role = $staff->operational_role ?: $staff->role_key ?: $staff->role;
+        $role = mb_strtolower(trim((string) ($staff->operational_role ?: $staff->role_key ?: $staff->role)));
         $normalizedRole = self::normalizePicGroup($role);
+        $search = implode(' ', array_filter([$department, $jobTitle, $role]));
 
-        if (str_contains($jobTitle, 'chief operating officer') || $jobTitle === 'coo') {
+        if (str_contains($name, 'monica') || str_contains($name, 'van ')) {
+            return 'spa';
+        }
+
+        if (
+            str_contains($jobTitle, 'chief operating officer')
+            || $jobTitle === 'coo'
+            || $role === 'management'
+            || str_contains($jobTitle, 'manager')
+            || str_contains($department, 'management')
+        ) {
             return 'management';
         }
 
-        if (str_contains($department, 'human resources') || str_contains($jobTitle, 'human resources') || preg_match('/\bhr\b/u', $jobTitle)) {
-            return 'hr';
+        if ($role === 'doctor' || str_contains($jobTitle, 'doctor')) {
+            return 'doctor';
         }
 
-        if (str_contains($jobTitle, 'tea lady')) {
-            return 'tea_lady';
+        if ($role === 'nurse' || str_contains($jobTitle, 'nurse')) {
+            return 'nurse';
         }
 
-        if ($normalizedRole === 'others') {
-            return 'management';
+        if (
+            str_contains($search, 'spa')
+            || str_contains($search, 'nail')
+        ) {
+            return 'spa';
         }
 
-        return $normalizedRole;
+        if (
+            $normalizedRole === 'aesthetic'
+            || str_contains($search, 'beauty')
+            || str_contains($search, 'aesthetic')
+            || str_contains($search, 'facial')
+        ) {
+            return 'aesthetic';
+        }
+
+        return 'others';
     }
 
     public static function picGroupLabel(?string $role): string
@@ -227,9 +251,11 @@ class Staff extends Model
     {
         return match (self::normalizePicGroup($role)) {
             'management' => 1,
-            'aesthetic' => 2,
-            'doctor' => 3,
-            default => 4,
+            'doctor' => 2,
+            'nurse' => 3,
+            'aesthetic' => 4,
+            'spa' => 5,
+            default => 6,
         };
     }
 
@@ -240,21 +266,19 @@ class Staff extends Model
             ->sort(function (self $left, self $right) {
                 $leftRank = match (self::picGroupKeyForStaff($left)) {
                     'management' => 1,
-                    'aesthetic' => 2,
-                    'doctor' => 3,
-                    'nurse' => 4,
-                    'hr' => 5,
-                    'tea_lady' => 6,
-                    default => 7,
+                    'doctor' => 2,
+                    'nurse' => 3,
+                    'aesthetic' => 4,
+                    'spa' => 5,
+                    default => 6,
                 };
                 $rightRank = match (self::picGroupKeyForStaff($right)) {
                     'management' => 1,
-                    'aesthetic' => 2,
-                    'doctor' => 3,
-                    'nurse' => 4,
-                    'hr' => 5,
-                    'tea_lady' => 6,
-                    default => 7,
+                    'doctor' => 2,
+                    'nurse' => 3,
+                    'aesthetic' => 4,
+                    'spa' => 5,
+                    default => 6,
                 };
 
                 if ($leftRank === $rightRank) {
