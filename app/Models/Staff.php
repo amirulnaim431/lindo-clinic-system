@@ -79,9 +79,11 @@ class Staff extends Model
     ];
 
     public const APPOINTMENT_GROUP_LABELS = [
+        'management' => 'Management',
         'doctor' => 'Doctors',
         'nurse' => 'Nurses',
-        'aesthetic_spa' => 'Aesthetic & Spa',
+        'aesthetic' => 'Aesthetics',
+        'spa' => 'Spa',
         'others' => 'Others',
     ];
 
@@ -286,7 +288,17 @@ class Staff extends Model
         $search = implode(' ', array_filter([$department, $jobTitle, $role]));
 
         if (str_contains($name, 'monica') || str_contains($name, 'van ')) {
-            return 'aesthetic_spa';
+            return 'spa';
+        }
+
+        if (
+            $role === 'management'
+            || str_contains($jobTitle, 'chief operating officer')
+            || $jobTitle === 'coo'
+            || str_contains($jobTitle, 'manager')
+            || str_contains($department, 'management')
+        ) {
+            return 'management';
         }
 
         if ($role === 'doctor' || str_contains($jobTitle, 'doctor')) {
@@ -298,14 +310,19 @@ class Staff extends Model
         }
 
         if (
+            str_contains($search, 'spa')
+            || str_contains($search, 'nail')
+        ) {
+            return 'spa';
+        }
+
+        if (
             in_array($role, ['aesthetic', 'aestatic', 'beautician'], true)
-            || str_contains($search, 'spa')
             || str_contains($search, 'beauty')
             || str_contains($search, 'aesthetic')
-            || str_contains($search, 'nail')
             || str_contains($search, 'facial')
         ) {
-            return 'aesthetic_spa';
+            return 'aesthetic';
         }
 
         return 'others';
@@ -321,10 +338,12 @@ class Staff extends Model
     public static function appointmentGroupRankForStaff(self $staff): int
     {
         return match (self::appointmentGroupKeyForStaff($staff)) {
-            'doctor' => 1,
-            'nurse' => 2,
-            'aesthetic_spa' => 3,
-            default => 4,
+            'management' => 1,
+            'doctor' => 2,
+            'nurse' => 3,
+            'aesthetic' => 4,
+            'spa' => 5,
+            default => 6,
         };
     }
 

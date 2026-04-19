@@ -135,7 +135,7 @@
                             'full_name' => $staff['full_name'],
                             'role_label' => $staff['role_label'] ?? $staff['role_key'] ?? 'Staff',
                             'group_label' => $staff['appointment_group_label'] ?? 'Others',
-                            'group_rank' => (int) ($staff['appointment_group_rank'] ?? 4),
+                            'group_rank' => (int) ($staff['appointment_group_rank'] ?? 6),
                             'matching_payloads' => $matchingPayloads,
                         ];
                     })
@@ -144,12 +144,14 @@
                         ['full_name', 'asc'],
                     ])
                     ->values();
-                $staffOptionsByRank = $staffOptions->groupBy(fn ($option) => (int) ($option['group_rank'] ?? 4));
+                $staffOptionsByRank = $staffOptions->groupBy(fn ($option) => (int) ($option['group_rank'] ?? 6));
                 $staffGroups = collect([
-                    ['rank' => 1, 'label' => 'Doctors'],
-                    ['rank' => 2, 'label' => 'Nurses'],
-                    ['rank' => 3, 'label' => 'Aesthetic & Spa'],
-                    ['rank' => 4, 'label' => 'Others'],
+                    ['rank' => 1, 'label' => 'Management'],
+                    ['rank' => 2, 'label' => 'Doctors'],
+                    ['rank' => 3, 'label' => 'Nurses'],
+                    ['rank' => 4, 'label' => 'Aesthetics'],
+                    ['rank' => 5, 'label' => 'Spa'],
+                    ['rank' => 6, 'label' => 'Others'],
                 ])->map(function ($group) use ($staffOptionsByRank) {
                     return [
                         'label' => $group['label'],
