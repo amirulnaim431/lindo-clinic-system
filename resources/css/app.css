@@ -1028,18 +1028,18 @@
     }
 
     .availability-modal-card {
-        width: min(1040px, 100%);
+        width: min(1380px, 96vw);
     }
 
     .availability-modal-body {
-        max-height: min(76vh, 820px);
+        max-height: min(82vh, 920px);
         overflow-y: auto;
     }
 
     .availability-modal-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr);
-        gap: 0.85rem;
+        grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.95fr);
+        gap: 1rem;
         align-items: start;
     }
 
@@ -1276,7 +1276,7 @@
     }
 
     .booking-textarea {
-        min-height: 120px;
+        min-height: 92px;
     }
 
     .schedule-card__head {

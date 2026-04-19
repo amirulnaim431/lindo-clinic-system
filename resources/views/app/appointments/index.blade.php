@@ -699,8 +699,11 @@
                                         @endif
                                     </div>
 
+                                </div>
+
+                                <div class="availability-modal-side" style="display:grid;gap:14px;align-content:start;position:sticky;top:0;">
                                     @if ($selectedArrangementMode !== 'custom' && $slotOptions !== [])
-                                        <div id="time-selection-section" class="availability-section hidden" style="margin-top:4px;border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.92);padding:16px 18px;">
+                                        <div id="time-selection-section" class="availability-section hidden" style="border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.92);padding:16px 18px;">
                                             <div class="availability-section__head">
                                                 <div class="ops-kicker">Time</div>
                                                 @if ($selectedSlotRow)
@@ -712,7 +715,7 @@
                                             </div>
 
                                             <div id="slot-selection-hint" class="small-note">Choose staff for each service first.</div>
-                                            <div class="slot-grid slot-grid--availability" style="margin-top:12px;">
+                                            <div class="slot-grid slot-grid--availability" style="margin-top:12px;grid-template-columns:repeat(2,minmax(0,1fr));">
                                                 @foreach ($slotOptions as $slot)
                                                     @php
                                                         $slotData = $slotIndex->get($slot['time']);
@@ -724,7 +727,7 @@
                                                         data-slot-combinations='@json($slotData['combinations'] ?? [])'
                                                         style="appearance:none;border:none;background:none;padding:0;"
                                                     >
-                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ ($slot['is_available'] ?? false) ? '' : 'is-unavailable' }}" style="min-height:68px;border:1px solid rgba(214,180,192,.48);border-radius:16px;background:rgba(255,255,255,.98);display:flex;align-items:center;justify-content:center;padding:12px;">
+                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ ($slot['is_available'] ?? false) ? '' : 'is-unavailable' }}" style="min-height:62px;border:1px solid rgba(214,180,192,.48);border-radius:16px;background:rgba(255,255,255,.98);display:flex;align-items:center;justify-content:center;padding:10px;">
                                                             <div class="slot-card__time">{{ $slot['time'] }}</div>
                                                         </div>
                                                     </button>
@@ -732,9 +735,8 @@
                                             </div>
                                         </div>
                                     @endif
-                                </div>
 
-                                <div id="selected-slot-card" class="booking-panel booking-panel--modal hidden" style="border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.95);padding:18px;">
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal" style="border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.95);padding:18px;">
                                     <div class="ops-kicker">Booking</div>
                                     <div class="booking-panel__title">Front desk notes</div>
 
@@ -781,6 +783,7 @@
                                             <button type="submit" id="create-appointment-button" class="action-btn action-btn--primary" disabled>Create Appointment</button>
                                         </div>
                                     </form>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -1317,10 +1320,7 @@
                 }
 
                 if (slotCard) {
-                    const shouldShowBookingPanel = selectedArrangementMode === 'custom'
-                        ? areAllServicesSelected()
-                        : isReady;
-                    slotCard.classList.toggle('hidden', !shouldShowBookingPanel);
+                    slotCard.classList.remove('hidden');
                 }
 
                 if (createAppointmentButton) {
