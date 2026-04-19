@@ -776,6 +776,11 @@
                                             <span id="selected-booking-summary" class="summary-pill__value" style="white-space:pre-line;">Choose staff for each service.</span>
                                         </div>
 
+                                        <div class="summary-pill summary-pill--stack summary-pill--compact">
+                                            <span class="summary-pill__label">Appointment</span>
+                                            <span id="selected-appointment-datetime" class="summary-pill__value">{{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}{{ $prefilledSlot ? '    '.$prefilledSlot : '' }}</span>
+                                        </div>
+
                                         <div class="field-block">
                                             <label for="notes">Front desk notes</label>
                                             <textarea id="notes" name="notes" class="field-input booking-textarea">{{ old('notes') }}</textarea>
@@ -807,6 +812,7 @@
             const comboInput = document.getElementById('selected-combination-input');
             const comboSelect = document.getElementById('selected_combination_select');
             const bookingSummary = document.getElementById('selected-booking-summary');
+            const appointmentDateTimeSummary = document.getElementById('selected-appointment-datetime');
             const createAppointmentButton = document.getElementById('create-appointment-button');
             const modalServiceCards = Array.from(document.querySelectorAll('[data-service-card]'));
             const serviceProgressSummary = document.getElementById('service-progress-summary');
@@ -824,6 +830,7 @@
             const slotAvailable = @json($quickCreate['slot_is_available']);
             const selectedArrangementMode = @json($selectedArrangementMode);
             const defaultDate = @json($selectedDate);
+            const defaultDateLabel = @json(\Carbon\Carbon::parse($selectedDate)->format('d M Y'));
             const defaultCategoryKey = @json($defaultCategoryKey);
             const customScheduleSeed = @json($customSchedule);
             const combinationCatalog = @json($combinationSource->values()->all());
@@ -1342,6 +1349,12 @@
                     } else {
                         bookingSummary.textContent = selectionSummaryLines.join('\n');
                     }
+                }
+
+                if (appointmentDateTimeSummary) {
+                    appointmentDateTimeSummary.textContent = selectedSlot
+                        ? `${defaultDateLabel}    ${selectedSlot}`
+                        : defaultDateLabel;
                 }
 
                 if (slotCard) {
