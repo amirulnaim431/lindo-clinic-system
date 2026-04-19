@@ -622,6 +622,8 @@
                                                 <div
                                                     data-service-summary="{{ $section['id'] }}"
                                                     data-service-name="{{ $section['name'] }}"
+                                                    tabindex="0"
+                                                    role="button"
                                                     style="border:1px solid rgba(214,180,192,.55);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,248,246,.96));padding:14px 16px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;"
                                                 >
                                                     <div style="font-size:.78rem;font-weight:800;line-height:1.2;color:#4f3340;">{{ $section['name'] }}</div>
@@ -845,6 +847,7 @@
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
             let activeCategoryKey = defaultCategoryKey;
             let selectedStaffByService = {};
+            let activeServiceId = serviceSummaryCards[0]?.dataset.serviceSummary || modalServiceCards[0]?.dataset.serviceId || null;
 
             const restoreScroll = sessionStorage.getItem(scrollStorageKey);
 
@@ -1232,6 +1235,21 @@
                 }
             }
 
+            function syncActiveServiceCard() {
+                modalServiceCards.forEach((card) => {
+                    const isActive = String(card.dataset.serviceId || '') === String(activeServiceId || '');
+                    card.style.display = isActive ? 'grid' : 'none';
+                });
+
+                serviceSummaryCards.forEach((card) => {
+                    const isActive = String(card.dataset.serviceSummary || '') === String(activeServiceId || '');
+                    card.style.cursor = 'pointer';
+                    card.style.transform = isActive ? 'translateY(-2px)' : 'none';
+                    card.style.boxShadow = isActive ? '0 14px 28px rgba(111,78,92,.12)' : 'none';
+                    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+            }
+
             function paintSlotCard(button, state) {
                 const card = button?.querySelector('.slot-card');
 
@@ -1286,6 +1304,7 @@
                     paintServiceSummaryCard(summaryCard, isComplete, isComplete ? selectedName : 'Choose staff');
                 });
 
+                syncActiveServiceCard();
                 renderServiceProgress();
             }
 
@@ -1389,6 +1408,7 @@
                 }
 
                 selectedStaffByService[serviceId] = staffId;
+                activeServiceId = serviceId;
 
                 staffOptionButtons.forEach((staffButton) => {
                     const sameService = String(staffButton.dataset.serviceId || '') === serviceId;
@@ -1460,6 +1480,21 @@
 
                 button.addEventListener('click', function () {
                     selectStaffOption(this);
+                });
+            });
+
+            serviceSummaryCards.forEach((card) => {
+                const activate = () => {
+                    activeServiceId = card.dataset.serviceSummary || activeServiceId;
+                    syncServiceCardState();
+                };
+
+                card.addEventListener('click', activate);
+                card.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        activate();
+                    }
                 });
             });
 
