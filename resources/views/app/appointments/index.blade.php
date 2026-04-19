@@ -93,81 +93,79 @@
         $selectedCustomerPhone = old('customer_phone', $filters['customer_phone'] ?? '');
         $shouldAutoOpenAvailability = ! empty($availability) && (bool) ($filters['open_availability'] ?? false);
         $slotIndex = collect($slotOptions)->keyBy('time');
-        $allSlotTimes = collect($slotOptions)->pluck('time')->values();
         $combinationSource = collect($selectedArrangementMode === 'custom'
             ? ($availability['custom_combinations'] ?? [])
             : collect($slotOptions)->flatMap(fn ($slot) => $slot['combinations'] ?? [])->values()->all()
         )
             ->filter(fn ($combo) => ! empty($combo['payload']))
             ->unique('payload')
-            ->values();
-        $staffPillOptions = collect($availability['selected_services'] ?? [])
-            ->flatMap(function ($serviceSummary) {
-                return collect($serviceSummary['eligible_staff'] ?? [])->map(function ($staff) use ($serviceSummary) {
-                    return [
-                        'id' => (string) $staff['id'],
-                        'full_name' => $staff['full_name'],
-                        'role_label' => $staff['role_label'] ?? $staff['role_key'] ?? 'Staff',
-                        'group_label' => $staff['appointment_group_label'] ?? 'Others',
-                        'group_rank' => (int) ($staff['appointment_group_rank'] ?? 4),
-                        'service_name' => $serviceSummary['name'] ?? 'Service',
-                    ];
-                });
-            })
-            ->groupBy('id')
-            ->map(function ($items, $staffId) use ($combinationSource, $slotOptions) {
-                $first = $items->first();
-                $slotTimes = collect($slotOptions)
-                    ->filter(function ($slot) use ($staffId) {
-                        return collect($slot['combinations'] ?? [])->contains(function ($combo) use ($staffId) {
-                            $decoded = json_decode($combo['payload'] ?? '', true);
+            ->map(function ($combo) {
+                $decoded = json_decode($combo['payload'] ?? '', true);
 
-                            return is_array($decoded)
-                                && in_array((string) $staffId, array_map('strval', array_values($decoded['service_staff_map'] ?? [])), true);
-                        });
-                    })
-                    ->pluck('time')
-                    ->values()
-                    ->all();
-                $matchingPayloads = $combinationSource
-                    ->filter(function ($combo) use ($staffId) {
-                        $decoded = json_decode($combo['payload'] ?? '', true);
+                if (! is_array($decoded) || empty($decoded['service_staff_map'])) {
+                    return null;
+                }
 
-                        return is_array($decoded)
-                            && in_array((string) $staffId, array_map('strval', array_values($decoded['service_staff_map'] ?? [])), true);
-                    })
-                    ->pluck('payload')
-                    ->values()
+                $map = collect($decoded['service_staff_map'])
+                    ->mapWithKeys(fn ($staffId, $serviceId) => [(string) $serviceId => (string) $staffId])
                     ->all();
+                ksort($map);
 
                 return [
-                    'id' => (string) $staffId,
-                    'full_name' => $first['full_name'],
-                    'role_label' => $first['role_label'],
-                    'group_label' => $first['group_label'],
-                    'group_rank' => $first['group_rank'],
-                    'services' => $items->pluck('service_name')->unique()->values()->all(),
-                    'slot_times' => $slotTimes,
-                    'matching_payloads' => $matchingPayloads,
+                    'payload' => $combo['payload'],
+                    'map' => $map,
                 ];
             })
-            ->sortBy([
-                ['group_rank', 'asc'],
-                ['full_name', 'asc'],
-            ])
+            ->filter()
             ->values();
-        $staffOptionsByRank = $staffPillOptions->groupBy(fn ($option) => (int) ($option['group_rank'] ?? 4));
-        $staffOptionGroups = collect([
-            ['rank' => 1, 'label' => 'Doctors'],
-            ['rank' => 2, 'label' => 'Nurses'],
-            ['rank' => 3, 'label' => 'Aesthetic & Spa'],
-            ['rank' => 4, 'label' => 'Others'],
-        ])->map(function ($group) use ($staffOptionsByRank) {
-            return [
-                'label' => $group['label'],
-                'options' => collect($staffOptionsByRank->get($group['rank'], []))->values(),
-            ];
-        })->filter(fn ($group) => $group['options']->isNotEmpty())->values();
+        $serviceSelectionSections = collect($availability['selected_services'] ?? [])
+            ->map(function ($serviceSummary) use ($combinationSource) {
+                $serviceId = (string) ($serviceSummary['id'] ?? '');
+                $staffOptions = collect($serviceSummary['eligible_staff'] ?? [])
+                    ->map(function ($staff) use ($serviceId, $combinationSource) {
+                        $staffId = (string) ($staff['id'] ?? '');
+                        $matchingPayloads = $combinationSource
+                            ->filter(fn ($combo) => (($combo['map'][$serviceId] ?? null) === $staffId))
+                            ->pluck('payload')
+                            ->values()
+                            ->all();
+
+                        return [
+                            'id' => $staffId,
+                            'full_name' => $staff['full_name'],
+                            'role_label' => $staff['role_label'] ?? $staff['role_key'] ?? 'Staff',
+                            'group_label' => $staff['appointment_group_label'] ?? 'Others',
+                            'group_rank' => (int) ($staff['appointment_group_rank'] ?? 4),
+                            'matching_payloads' => $matchingPayloads,
+                        ];
+                    })
+                    ->sortBy([
+                        ['group_rank', 'asc'],
+                        ['full_name', 'asc'],
+                    ])
+                    ->values();
+                $staffOptionsByRank = $staffOptions->groupBy(fn ($option) => (int) ($option['group_rank'] ?? 4));
+                $staffGroups = collect([
+                    ['rank' => 1, 'label' => 'Doctors'],
+                    ['rank' => 2, 'label' => 'Nurses'],
+                    ['rank' => 3, 'label' => 'Aesthetic & Spa'],
+                    ['rank' => 4, 'label' => 'Others'],
+                ])->map(function ($group) use ($staffOptionsByRank) {
+                    return [
+                        'label' => $group['label'],
+                        'options' => collect($staffOptionsByRank->get($group['rank'], []))->values(),
+                    ];
+                })->filter(fn ($group) => $group['options']->isNotEmpty())->values();
+
+                return [
+                    'id' => $serviceId,
+                    'name' => $serviceSummary['name'] ?? 'Service',
+                    'scheduled_date' => $serviceSummary['scheduled_date'] ?? null,
+                    'scheduled_time' => $serviceSummary['scheduled_time'] ?? null,
+                    'staff_groups' => $staffGroups,
+                ];
+            })
+            ->values();
     @endphp
 
 
@@ -614,39 +612,46 @@
                                 <div class="availability-modal-main">
                                     <div class="availability-section">
                                         <div class="ops-kicker">Selected services</div>
-                                        <div class="service-summary-strip">
-                                            @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
-                                                <div class="service-summary-pill">
-                                                    <span>{{ $serviceSummary['name'] ?? 'Service' }}</span>
-                                                    @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
-                                                        <span class="service-summary-pill__meta">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M') }} {{ $serviceSummary['scheduled_time'] }}</span>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
+                                        <div id="service-progress-summary" class="service-progress-summary">Choose staff for each service.</div>
                                     </div>
 
                                     <div class="availability-section">
                                         <div class="availability-section__head">
                                             <div class="ops-kicker">Staff</div>
                                         </div>
-                                        @if ($staffOptionGroups->isEmpty())
+                                        @if ($serviceSelectionSections->isEmpty())
                                             <div class="empty-card">
                                                 <div class="empty-card__title">No staff options available</div>
                                             </div>
                                         @else
-                                            <div class="staff-option-groups">
-                                                @foreach ($staffOptionGroups as $group)
-                                                    <div class="availability-group">
-                                                        <div class="availability-group__label">{{ $group['label'] }}</div>
-                                                        <div class="staff-pill-row">
-                                                            @foreach ($group['options'] as $option)
+                                            <div class="service-selection-stack">
+                                                @foreach ($serviceSelectionSections as $section)
+                                                    <section class="service-selection-card" data-service-card data-service-id="{{ $section['id'] }}" data-service-name="{{ $section['name'] }}">
+                                                        <div class="service-selection-card__head">
+                                                            <div>
+                                                                <div class="service-selection-card__title">{{ $section['name'] }}</div>
+                                                                @if (! empty($section['scheduled_date']) && ! empty($section['scheduled_time']))
+                                                                    <div class="service-selection-card__meta">{{ \Carbon\Carbon::parse($section['scheduled_date'])->format('d M') }} {{ $section['scheduled_time'] }}</div>
+                                                                @endif
+                                                            </div>
+                                                            <div class="service-selection-card__status" data-service-status="{{ $section['id'] }}">Choose staff</div>
+                                                        </div>
+
+                                                        <div class="service-selection-groups">
+                                                            @foreach ($section['staff_groups'] as $group)
+                                                                <div class="availability-group">
+                                                                    <div class="availability-group__label">{{ $group['label'] }}</div>
+                                                                    <div class="staff-pill-row">
+                                                                        @foreach ($group['options'] as $option)
                                                                 <button
                                                                     type="button"
                                                                     class="staff-pill-button"
                                                                     data-staff-option
+                                                                    data-service-id="{{ $section['id'] }}"
+                                                                    data-service-name="{{ $section['name'] }}"
                                                                     data-staff-id="{{ $option['id'] }}"
-                                                                    data-slot-times='@json($option['slot_times'])'
+                                                                    data-staff-name="{{ $option['full_name'] }}"
+                                                                    data-role-label="{{ $option['role_label'] }}"
                                                                     data-matching-payloads='@json($option['matching_payloads'])'
                                                                 >
                                                                     <div class="staff-pill">
@@ -654,16 +659,19 @@
                                                                         <span class="staff-pill__meta">{{ implode(' • ', $option['services']) }}</span>
                                                                     </div>
                                                                 </button>
+                                                                        @endforeach
+                                                                    </div>
+                                                                </div>
                                                             @endforeach
                                                         </div>
-                                                    </div>
+                                                    </section>
                                                 @endforeach
                                             </div>
                                         @endif
                                     </div>
 
-                                    @if ($selectedArrangementMode !== 'custom' && $allSlotTimes->isNotEmpty())
-                                        <div class="availability-section">
+                                    @if ($selectedArrangementMode !== 'custom' && $slotOptions !== [])
+                                        <div id="time-selection-section" class="availability-section hidden">
                                             <div class="availability-section__head">
                                                 <div class="ops-kicker">Time</div>
                                                 @if ($selectedSlotRow)
@@ -674,25 +682,20 @@
                                                 @endif
                                             </div>
 
-                                            <div id="slot-selection-hint" class="small-note">Select staff to view time slots.</div>
+                                            <div id="slot-selection-hint" class="small-note">Choose staff for each service first.</div>
                                             <div class="slot-grid slot-grid--availability" style="margin-top:12px;">
-                                                @foreach ($allSlotTimes as $slotTime)
+                                                @foreach ($slotOptions as $slot)
                                                     @php
-                                                        $slotData = $slotIndex->get($slotTime);
-                                                        $availableOptionKeys = $staffPillOptions
-                                                            ->filter(fn ($option) => in_array($slotTime, $option['slot_times'], true))
-                                                            ->pluck('id')
-                                                            ->values()
-                                                            ->all();
+                                                        $slotData = $slotIndex->get($slot['time']);
                                                     @endphp
                                                     <button
                                                         type="button"
                                                         class="slot-button slot-select-button"
-                                                        data-slot-time="{{ $slotTime }}"
+                                                        data-slot-time="{{ $slot['time'] }}"
                                                         data-slot-combinations='@json($slotData['combinations'] ?? [])'
                                                     >
-                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ empty($availableOptionKeys) ? 'is-unavailable' : '' }}">
-                                                            <div class="slot-card__time">{{ $slotTime }}</div>
+                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ ($slot['is_available'] ?? false) ? '' : 'is-unavailable' }}">
+                                                            <div class="slot-card__time">{{ $slot['time'] }}</div>
                                                         </div>
                                                     </button>
                                                 @endforeach
@@ -701,7 +704,7 @@
                                     @endif
                                 </div>
 
-                                <div id="selected-slot-card" class="booking-panel booking-panel--modal {{ $selectedArrangementMode === 'custom' && $staffPillOptions->isNotEmpty() ? '' : 'hidden' }}">
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal hidden">
                                     <div class="ops-kicker">Booking</div>
                                     <div class="booking-panel__title">Front desk notes</div>
 
@@ -736,7 +739,7 @@
 
                                         <div class="summary-pill summary-pill--stack summary-pill--compact">
                                             <span class="summary-pill__label">Selection</span>
-                                            <span id="selected-booking-summary" class="summary-pill__value">Choose staff and time.</span>
+                                            <span id="selected-booking-summary" class="summary-pill__value">Choose staff for each service.</span>
                                         </div>
 
                                         <div class="field-block">
@@ -770,6 +773,9 @@
             const comboSelect = document.getElementById('selected_combination_select');
             const bookingSummary = document.getElementById('selected-booking-summary');
             const createAppointmentButton = document.getElementById('create-appointment-button');
+            const modalServiceCards = Array.from(document.querySelectorAll('[data-service-card]'));
+            const serviceProgressSummary = document.getElementById('service-progress-summary');
+            const timeSelectionSection = document.getElementById('time-selection-section');
             const workflowList = document.getElementById('workflow-list');
             const workflowPanel = document.getElementById('workflow-panel');
             const customSchedulePanel = document.getElementById('custom-schedule-panel');
@@ -784,6 +790,7 @@
             const defaultDate = @json($selectedDate);
             const defaultCategoryKey = @json($defaultCategoryKey);
             const customScheduleSeed = @json($customSchedule);
+            const combinationCatalog = @json($combinationSource->values()->all());
             const customerIdInput = document.getElementById('builder_customer_id');
             const customerNameInput = document.getElementById('builder_customer_full_name');
             const customerPhoneInput = document.getElementById('builder_customer_phone');
@@ -803,7 +810,7 @@
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
             let activeCategoryKey = defaultCategoryKey;
-            let selectedStaffId = null;
+            let selectedStaffByService = {};
 
             const restoreScroll = sessionStorage.getItem(scrollStorageKey);
 
@@ -1071,25 +1078,155 @@
                 syncServiceOrderUi();
             });
 
+            function parseJson(value, fallback) {
+                try {
+                    return JSON.parse(value || JSON.stringify(fallback));
+                } catch (error) {
+                    return fallback;
+                }
+            }
+
+            function normalizeServiceStaffMap(map) {
+                const normalized = {};
+
+                if (!map || typeof map !== 'object') {
+                    return normalized;
+                }
+
+                Object.keys(map).sort().forEach((serviceId) => {
+                    normalized[String(serviceId)] = String(map[serviceId]);
+                });
+
+                return normalized;
+            }
+
+            function getRequiredServiceIds() {
+                return modalServiceCards
+                    .map((card) => String(card.dataset.serviceId || ''))
+                    .filter(Boolean);
+            }
+
+            function getServiceName(serviceId) {
+                return modalServiceCards.find((card) => String(card.dataset.serviceId || '') === String(serviceId))?.dataset.serviceName || 'Service';
+            }
+
+            function getSelectedStaffButton(serviceId) {
+                return staffOptionButtons.find((button) => {
+                    return String(button.dataset.serviceId || '') === String(serviceId)
+                        && String(button.dataset.staffId || '') === String(selectedStaffByService[serviceId] || '');
+                }) || null;
+            }
+
+            function getChosenServiceIds() {
+                return getRequiredServiceIds().filter((serviceId) => Boolean(selectedStaffByService[serviceId]));
+            }
+
+            function areAllServicesSelected() {
+                const requiredServiceIds = getRequiredServiceIds();
+
+                return requiredServiceIds.length > 0
+                    && requiredServiceIds.every((serviceId) => Boolean(selectedStaffByService[serviceId]));
+            }
+
+            function mapsMatchSelection(serviceStaffMap) {
+                const normalizedMap = normalizeServiceStaffMap(serviceStaffMap);
+                const requiredServiceIds = getRequiredServiceIds();
+
+                if (Object.keys(normalizedMap).length !== requiredServiceIds.length) {
+                    return false;
+                }
+
+                return requiredServiceIds.every((serviceId) => {
+                    return String(normalizedMap[serviceId] || '') === String(selectedStaffByService[serviceId] || '');
+                });
+            }
+
+            function getMatchingCombinationPayload(combinations) {
+                return combinations.find((combo) => {
+                    return mapsMatchSelection(parseJson(combo.payload, {}).service_staff_map || {});
+                }) || null;
+            }
+
+            function getMatchingCustomCombination() {
+                return combinationCatalog.find((combo) => mapsMatchSelection(combo.map || {})) || null;
+            }
+
+            function renderServiceProgress() {
+                if (!serviceProgressSummary) {
+                    return;
+                }
+
+                const requiredServiceIds = getRequiredServiceIds();
+                const chosenServiceIds = getChosenServiceIds();
+                const pendingNames = requiredServiceIds
+                    .filter((serviceId) => !selectedStaffByService[serviceId])
+                    .map((serviceId) => getServiceName(serviceId));
+
+                if (!requiredServiceIds.length) {
+                    serviceProgressSummary.textContent = 'No services selected.';
+                } else if (!pendingNames.length) {
+                    serviceProgressSummary.textContent = selectedArrangementMode === 'custom'
+                        ? `${chosenServiceIds.length} of ${requiredServiceIds.length} services ready. Add notes and submit.`
+                        : `${chosenServiceIds.length} of ${requiredServiceIds.length} services ready. Choose a time.`;
+                } else {
+                    serviceProgressSummary.textContent = `${chosenServiceIds.length} of ${requiredServiceIds.length} services selected. Pending: ${pendingNames.join(', ')}.`;
+                }
+            }
+
+            function syncServiceCardState() {
+                modalServiceCards.forEach((card) => {
+                    const serviceId = String(card.dataset.serviceId || '');
+                    const selectedButton = getSelectedStaffButton(serviceId);
+                    const selectedName = selectedButton?.dataset.staffName || '';
+                    const status = card.querySelector('[data-service-status]');
+                    const isComplete = Boolean(selectedName);
+
+                    card.classList.toggle('is-complete', isComplete);
+
+                    if (status) {
+                        status.textContent = isComplete ? `Chosen: ${selectedName}` : 'Choose staff';
+                        status.classList.toggle('is-complete', isComplete);
+                    }
+                });
+
+                renderServiceProgress();
+            }
+
             function updateBookingState() {
-                const staffButton = selectedStaffId
-                    ? staffOptionButtons.find((button) => button.dataset.staffId === selectedStaffId)
-                    : null;
                 const selectedSlot = slotInput?.value || '';
-                const staffLabel = staffButton?.querySelector('.staff-pill__name')?.textContent?.trim() || '';
                 const requiresSlot = selectedArrangementMode !== 'custom';
-                const isReady = comboInput?.value && (!requiresSlot || selectedSlot);
+                const selectedLabels = getRequiredServiceIds()
+                    .map((serviceId) => {
+                        const button = getSelectedStaffButton(serviceId);
+                        const staffName = button?.dataset.staffName || '';
+
+                        return staffName ? `${getServiceName(serviceId)}: ${staffName}` : null;
+                    })
+                    .filter(Boolean);
+                const pendingNames = getRequiredServiceIds()
+                    .filter((serviceId) => !selectedStaffByService[serviceId])
+                    .map((serviceId) => getServiceName(serviceId));
+                const isReady = Boolean(comboInput?.value) && (!requiresSlot || Boolean(selectedSlot));
 
                 if (bookingSummary) {
-                    if (selectedArrangementMode === 'custom') {
-                        bookingSummary.textContent = staffLabel || 'Choose staff.';
-                    } else if (staffLabel && selectedSlot) {
-                        bookingSummary.textContent = `${staffLabel} | ${selectedSlot}`;
-                    } else if (staffLabel) {
-                        bookingSummary.textContent = `${staffLabel} | Choose time`;
+                    if (!selectedLabels.length) {
+                        bookingSummary.textContent = 'Choose staff for each service.';
+                    } else if (pendingNames.length) {
+                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | Pending: ${pendingNames.join(', ')}`;
+                    } else if (requiresSlot && !selectedSlot) {
+                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | Choose time`;
+                    } else if (selectedSlot) {
+                        bookingSummary.textContent = `${selectedLabels.join(' | ')} | ${selectedSlot}`;
                     } else {
-                        bookingSummary.textContent = 'Choose staff and time.';
+                        bookingSummary.textContent = selectedLabels.join(' | ');
                     }
+                }
+
+                if (slotCard) {
+                    const shouldShowBookingPanel = selectedArrangementMode === 'custom'
+                        ? areAllServicesSelected()
+                        : isReady;
+                    slotCard.classList.toggle('hidden', !shouldShowBookingPanel);
                 }
 
                 if (createAppointmentButton) {
@@ -1108,31 +1245,37 @@
             }
 
             function syncSlotAvailability() {
+                if (selectedArrangementMode === 'custom') {
+                    return;
+                }
+
+                const allServicesSelected = areAllServicesSelected();
+                timeSelectionSection?.classList.toggle('hidden', !allServicesSelected);
+
                 slotButtons.forEach((button) => {
-                    let combinations = [];
+                    const combinations = parseJson(button.dataset.slotCombinations, []);
+                    const matchedCombination = allServicesSelected ? getMatchingCombinationPayload(combinations) : null;
+                    const isAvailable = Boolean(matchedCombination);
 
-                    try {
-                        combinations = JSON.parse(button.dataset.slotCombinations || '[]');
-                    } catch (error) {
-                        combinations = [];
-                    }
-
-                    const isAvailable = selectedStaffId && combinations.some((combo) => {
-                        const decoded = JSON.parse(combo.payload || '{}');
-                        const staffIds = Object.values(decoded.service_staff_map || {}).map(String);
-
-                        return staffIds.includes(String(selectedStaffId));
-                    });
-
-                    button.disabled = !selectedStaffId || !isAvailable;
+                    button.disabled = !allServicesSelected || !isAvailable;
                     button.querySelector('.slot-card')?.classList.toggle('is-unavailable', !isAvailable);
                 });
 
                 if (slotHint) {
-                    if (!selectedStaffId) {
-                        slotHint.textContent = 'Select staff to view time slots.';
-                    } else {
-                        slotHint.textContent = 'Choose a time.';
+                    slotHint.textContent = allServicesSelected
+                        ? 'Choose a time.'
+                        : 'Choose staff for each service first.';
+                }
+
+                if (slotInput?.value) {
+                    const selectedButton = slotButtons.find((button) => button.dataset.slotTime === slotInput.value);
+
+                    if (!selectedButton || selectedButton.disabled) {
+                        resetSlotSelection();
+                        comboInput.value = '';
+                        if (comboSelect) {
+                            comboSelect.value = '';
+                        }
                     }
                 }
             }
@@ -1142,33 +1285,38 @@
                     return;
                 }
 
-                selectedStaffId = button.dataset.staffId || null;
-                const matchingPayloads = JSON.parse(button.dataset.matchingPayloads || '[]');
+                const serviceId = String(button.dataset.serviceId || '');
+                const staffId = String(button.dataset.staffId || '');
 
-                if (selectedArrangementMode === 'custom') {
-                    comboInput.value = matchingPayloads[0] || '';
-                    if (comboSelect) {
-                        comboSelect.value = matchingPayloads[0] || '';
-                    }
-                } else {
-                    comboInput.value = '';
-                    if (comboSelect) {
-                        comboSelect.value = '';
-                    }
+                if (!serviceId || !staffId) {
+                    return;
                 }
 
+                selectedStaffByService[serviceId] = staffId;
+
                 staffOptionButtons.forEach((staffButton) => {
-                    staffButton.querySelector('.staff-pill')?.classList.toggle('is-selected', staffButton === button);
+                    const sameService = String(staffButton.dataset.serviceId || '') === serviceId;
+
+                    if (sameService) {
+                        staffButton.querySelector('.staff-pill')?.classList.toggle('is-selected', staffButton === button);
+                    }
                 });
 
+                syncServiceCardState();
                 syncSlotAvailability();
 
                 if (!preserveSlot) {
                     resetSlotSelection();
                 }
 
-                if (slotCard) {
-                    slotCard.classList.remove('hidden');
+                const matchingCombination = selectedArrangementMode === 'custom' && areAllServicesSelected()
+                    ? getMatchingCustomCombination()
+                    : null;
+                comboInput.value = selectedArrangementMode === 'custom'
+                    ? (matchingCombination?.payload || '')
+                    : '';
+                if (comboSelect) {
+                    comboSelect.value = comboInput.value;
                 }
 
                 updateBookingState();
@@ -1179,20 +1327,8 @@
                     return;
                 }
 
-                let combinations = [];
-
-                try {
-                    combinations = JSON.parse(button.dataset.slotCombinations || '[]');
-                } catch (error) {
-                    combinations = [];
-                }
-
-                const matchedCombination = combinations.find((combo) => {
-                    const decoded = JSON.parse(combo.payload || '{}');
-                    const staffIds = Object.values(decoded.service_staff_map || {}).map(String);
-
-                    return staffIds.includes(String(selectedStaffId));
-                });
+                const combinations = parseJson(button.dataset.slotCombinations, []);
+                const matchedCombination = getMatchingCombinationPayload(combinations);
 
                 if (!matchedCombination) {
                     return;
@@ -1211,14 +1347,16 @@
                     comboSelect.value = matchedCombination.payload || '';
                 }
 
-                if (slotCard) {
-                    slotCard.classList.remove('hidden');
-                }
-
                 updateBookingState();
             }
 
             staffOptionButtons.forEach((button) => {
+                const meta = button.querySelector('.staff-pill__meta');
+
+                if (meta && button.dataset.roleLabel) {
+                    meta.textContent = button.dataset.roleLabel;
+                }
+
                 button.addEventListener('click', function () {
                     selectStaffOption(this);
                 });
@@ -1410,6 +1548,7 @@
             updateArrangementCards();
             applyCategoryTabState(defaultCategoryKey);
             syncCustomerBookingState();
+            syncServiceCardState();
             syncSlotAvailability();
             updateBookingState();
 
@@ -1424,24 +1563,22 @@
                 const matchedButton = slotButtons.find((button) => button.dataset.slotTime === prefilledSlot);
 
                 if (matchedButton) {
-                    const matchingStaffButton = staffOptionButtons.find((button) => {
-                        try {
-                            const slotCombinations = JSON.parse(matchedButton.dataset.slotCombinations || '[]');
-                            const staffId = String(button.dataset.staffId || '');
+                    const slotCombinations = parseJson(matchedButton.dataset.slotCombinations, []);
+                    const matchedCombination = slotCombinations[0] || null;
+                    const selectedMap = normalizeServiceStaffMap(parseJson(matchedCombination?.payload, {}).service_staff_map || {});
 
-                            return slotCombinations.some((combo) => {
-                                const decoded = JSON.parse(combo.payload || '{}');
-                                const staffIds = Object.values(decoded.service_staff_map || {}).map(String);
+                    Object.entries(selectedMap).forEach(([serviceId, staffId]) => {
+                        const matchingStaffButton = staffOptionButtons.find((button) => {
+                            return String(button.dataset.serviceId || '') === String(serviceId)
+                                && String(button.dataset.staffId || '') === String(staffId);
+                        });
 
-                                return staffIds.includes(staffId);
-                            });
-                        } catch (error) {
-                            return false;
+                        if (matchingStaffButton) {
+                            selectStaffOption(matchingStaffButton, true);
                         }
                     });
 
-                    if (matchingStaffButton) {
-                        selectStaffOption(matchingStaffButton, true);
+                    if (Object.keys(selectedMap).length) {
                         selectSlot(matchedButton);
                     }
                 }

@@ -1096,6 +1096,81 @@
         font-weight: 600;
     }
 
+    .service-progress-summary {
+        border: 1px solid rgba(201, 146, 115, 0.18);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(255, 248, 246, 0.98), rgba(255, 252, 251, 0.94));
+        color: var(--app-muted-strong);
+        padding: 0.8rem 0.95rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+
+    .service-selection-stack {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .service-selection-card {
+        display: grid;
+        gap: 0.9rem;
+        border: 1px solid rgba(214, 180, 192, 0.58);
+        border-radius: var(--radius-xl);
+        background: linear-gradient(180deg, rgba(255, 253, 252, 0.98), rgba(255, 248, 246, 0.94));
+        padding: 0.95rem 1rem;
+        box-shadow: 0 10px 24px rgba(88, 54, 70, 0.05);
+    }
+
+    .service-selection-card.is-complete {
+        border-color: rgba(201, 146, 115, 0.34);
+        box-shadow: 0 14px 28px rgba(111, 78, 92, 0.08);
+    }
+
+    .service-selection-card__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .service-selection-card__title {
+        color: var(--app-text-strong);
+        font-size: 0.96rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .service-selection-card__meta {
+        margin-top: 0.24rem;
+        color: var(--app-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .service-selection-card__status {
+        flex-shrink: 0;
+        border: 1px solid rgba(214, 180, 192, 0.65);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--app-muted-strong);
+        padding: 0.38rem 0.72rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .service-selection-card__status.is-complete {
+        border-color: rgba(201, 146, 115, 0.36);
+        background: rgba(255, 244, 240, 0.98);
+        color: var(--app-text-strong);
+    }
+
+    .service-selection-groups {
+        display: grid;
+        gap: 0.8rem;
+    }
+
     .staff-option-groups {
         display: grid;
         gap: 0.9rem;
@@ -1114,16 +1189,21 @@
         padding: 0;
         text-align: left;
         cursor: pointer;
+        width: 100%;
+        max-width: 280px;
     }
 
     .staff-pill {
+        position: relative;
         display: grid;
-        gap: 0.18rem;
+        gap: 0.24rem;
         border: 1px solid var(--app-border);
-        border-radius: 999px;
+        border-radius: var(--radius-lg);
         background: rgba(255, 251, 252, 0.98);
-        padding: 0.72rem 0.95rem;
+        padding: 0.8rem 0.95rem;
         transition: 180ms ease;
+        min-height: 74px;
+        align-content: center;
     }
 
     .staff-pill-button:hover .staff-pill,
@@ -1136,16 +1216,38 @@
         transform: translateY(-1px);
     }
 
+    .staff-pill.is-selected::after {
+        content: 'Chosen';
+        position: absolute;
+        top: 0.65rem;
+        right: 0.7rem;
+        border-radius: 999px;
+        background: rgba(120, 81, 30, 0.08);
+        color: #8a5a46;
+        padding: 0.16rem 0.46rem;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
     .staff-pill__name {
         color: var(--app-text-strong);
         font-size: 0.84rem;
         font-weight: 800;
         line-height: 1.1;
+        max-width: calc(100% - 4.8rem);
+    }
+
+    .staff-pill.is-selected .staff-pill__name {
+        text-decoration: line-through;
+        text-decoration-thickness: 1.5px;
     }
 
     .staff-pill__meta {
         color: var(--app-muted);
-        font-size: 0.68rem;
+        font-size: 0.7rem;
+        font-weight: 600;
         line-height: 1.2;
     }
 
@@ -3323,6 +3425,19 @@
 
     .booking-panel--modal {
         position: static;
+    }
+
+    .service-selection-card__head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .service-selection-card__status {
+        width: fit-content;
+    }
+
+    .staff-pill-button {
+        max-width: none;
     }
 }
 
