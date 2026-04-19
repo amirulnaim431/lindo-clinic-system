@@ -656,7 +656,7 @@
                                                                 >
                                                                     <div class="staff-pill">
                                                                         <span class="staff-pill__name">{{ $option['full_name'] }}</span>
-                                                                        <span class="staff-pill__meta">{{ implode(' • ', $option['services']) }}</span>
+                                                                        <span class="staff-pill__meta">{{ $option['role_label'] }}</span>
                                                                     </div>
                                                                 </button>
                                                                         @endforeach
