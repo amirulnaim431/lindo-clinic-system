@@ -29,6 +29,7 @@ class AppointmentController extends Controller
             'service_order' => $request->input('service_order', []),
             'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
             'custom_schedule' => $request->input('custom_schedule', []),
+            'open_availability' => $request->boolean('open_availability'),
             'customer_id' => $request->input('customer_id'),
             'customer_full_name' => trim((string) $request->input('customer_full_name', '')),
             'customer_phone' => trim((string) $request->input('customer_phone', '')),
