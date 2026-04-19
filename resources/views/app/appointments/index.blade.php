@@ -613,54 +613,81 @@
                             <div class="availability-modal-layout">
                                 <div class="availability-modal-main">
                                     <div class="availability-section">
-                                        <div class="ops-kicker">Selected services</div>
-                                        <div id="service-progress-summary" class="service-progress-summary">Choose staff for each service.</div>
+                                        <div
+                                            id="service-progress-summary"
+                                            class="service-progress-summary"
+                                            style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;"
+                                        >
+                                            @foreach ($serviceSelectionSections as $section)
+                                                <div
+                                                    data-service-summary="{{ $section['id'] }}"
+                                                    data-service-name="{{ $section['name'] }}"
+                                                    style="border:1px solid rgba(214,180,192,.55);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,248,246,.96));padding:14px 16px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;"
+                                                >
+                                                    <div style="font-size:.78rem;font-weight:800;line-height:1.2;color:#4f3340;">{{ $section['name'] }}</div>
+                                                    <div data-service-summary-state style="margin-top:10px;font-size:.75rem;font-weight:700;color:#9a6d79;">Choose staff</div>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
 
                                     <div class="availability-section">
-                                        <div class="availability-section__head">
-                                            <div class="ops-kicker">Staff</div>
-                                        </div>
                                         @if ($serviceSelectionSections->isEmpty())
                                             <div class="empty-card">
                                                 <div class="empty-card__title">No staff options available</div>
                                             </div>
                                         @else
-                                            <div class="service-selection-stack">
+                                            <div class="service-selection-stack" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
                                                 @foreach ($serviceSelectionSections as $section)
-                                                    <section class="service-selection-card" data-service-card data-service-id="{{ $section['id'] }}" data-service-name="{{ $section['name'] }}">
-                                                        <div class="service-selection-card__head">
+                                                    <section
+                                                        class="service-selection-card"
+                                                        data-service-card
+                                                        data-service-id="{{ $section['id'] }}"
+                                                        data-service-name="{{ $section['name'] }}"
+                                                        style="border:1px solid rgba(214,180,192,.58);border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,248,246,.95));padding:18px;box-shadow:0 12px 28px rgba(88,54,70,.06);display:grid;gap:14px;align-content:start;"
+                                                    >
+                                                        <div class="service-selection-card__head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                                                             <div>
-                                                                <div class="service-selection-card__title">{{ $section['name'] }}</div>
+                                                                <div class="service-selection-card__title" style="font-size:1.02rem;font-weight:800;color:#4f3340;line-height:1.2;">{{ $section['name'] }}</div>
                                                                 @if (! empty($section['scheduled_date']) && ! empty($section['scheduled_time']))
-                                                                    <div class="service-selection-card__meta">{{ \Carbon\Carbon::parse($section['scheduled_date'])->format('d M') }} {{ $section['scheduled_time'] }}</div>
+                                                                    <div class="service-selection-card__meta" style="margin-top:4px;font-size:.74rem;font-weight:600;color:#8f7680;">{{ \Carbon\Carbon::parse($section['scheduled_date'])->format('d M') }} {{ $section['scheduled_time'] }}</div>
                                                                 @endif
                                                             </div>
-                                                            <div class="service-selection-card__status" data-service-status="{{ $section['id'] }}">Choose staff</div>
+                                                            <div
+                                                                class="service-selection-card__status"
+                                                                data-service-status="{{ $section['id'] }}"
+                                                                style="flex-shrink:0;border:1px solid rgba(214,180,192,.65);border-radius:999px;background:rgba(255,255,255,.9);padding:7px 12px;font-size:.72rem;font-weight:800;color:#8f6a75;line-height:1.1;"
+                                                            >
+                                                                Choose staff
+                                                            </div>
                                                         </div>
 
-                                                        <div class="service-selection-groups">
+                                                        <div class="service-selection-groups" style="display:grid;gap:12px;">
                                                             @foreach ($section['staff_groups'] as $group)
-                                                                <div class="availability-group">
-                                                                    <div class="availability-group__label">{{ $group['label'] }}</div>
-                                                                    <div class="staff-pill-row">
+                                                                <div class="availability-group" style="display:grid;gap:8px;">
+                                                                    <div class="availability-group__label" style="font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#9a6d79;">{{ $group['label'] }}</div>
+                                                                    <div class="staff-pill-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
                                                                         @foreach ($group['options'] as $option)
-                                                                <button
-                                                                    type="button"
-                                                                    class="staff-pill-button"
-                                                                    data-staff-option
-                                                                    data-service-id="{{ $section['id'] }}"
-                                                                    data-service-name="{{ $section['name'] }}"
-                                                                    data-staff-id="{{ $option['id'] }}"
-                                                                    data-staff-name="{{ $option['full_name'] }}"
-                                                                    data-role-label="{{ $option['role_label'] }}"
-                                                                    data-matching-payloads='@json($option['matching_payloads'])'
-                                                                >
-                                                                    <div class="staff-pill">
-                                                                        <span class="staff-pill__name">{{ $option['full_name'] }}</span>
-                                                                        <span class="staff-pill__meta">{{ $option['role_label'] }}</span>
-                                                                    </div>
-                                                                </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                class="staff-pill-button"
+                                                                                data-staff-option
+                                                                                data-service-id="{{ $section['id'] }}"
+                                                                                data-service-name="{{ $section['name'] }}"
+                                                                                data-staff-id="{{ $option['id'] }}"
+                                                                                data-staff-name="{{ $option['full_name'] }}"
+                                                                                data-role-label="{{ $option['role_label'] }}"
+                                                                                data-matching-payloads='@json($option['matching_payloads'])'
+                                                                                style="appearance:none;border:none;background:none;padding:0;width:100%;text-align:left;cursor:pointer;"
+                                                                            >
+                                                                                <div
+                                                                                    class="staff-pill"
+                                                                                    style="position:relative;display:grid;gap:4px;min-height:86px;border:1px solid rgba(214,180,192,.55);border-radius:18px;background:rgba(255,255,255,.98);padding:14px 16px;align-content:center;transition:180ms ease;"
+                                                                                >
+                                                                                    <span class="staff-pill__name" style="font-size:.88rem;font-weight:800;color:#4f3340;line-height:1.2;">{{ $option['full_name'] }}</span>
+                                                                                    <span class="staff-pill__meta" style="font-size:.72rem;font-weight:600;color:#8f7680;line-height:1.2;">{{ $option['role_label'] }}</span>
+                                                                                </div>
+                                                                            </button>
                                                                         @endforeach
                                                                     </div>
                                                                 </div>
@@ -673,7 +700,7 @@
                                     </div>
 
                                     @if ($selectedArrangementMode !== 'custom' && $slotOptions !== [])
-                                        <div id="time-selection-section" class="availability-section hidden">
+                                        <div id="time-selection-section" class="availability-section hidden" style="margin-top:4px;border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.92);padding:16px 18px;">
                                             <div class="availability-section__head">
                                                 <div class="ops-kicker">Time</div>
                                                 @if ($selectedSlotRow)
@@ -695,8 +722,9 @@
                                                         class="slot-button slot-select-button"
                                                         data-slot-time="{{ $slot['time'] }}"
                                                         data-slot-combinations='@json($slotData['combinations'] ?? [])'
+                                                        style="appearance:none;border:none;background:none;padding:0;"
                                                     >
-                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ ($slot['is_available'] ?? false) ? '' : 'is-unavailable' }}">
+                                                        <div class="slot-card {{ ($slotData['is_prefilled'] ?? false) ? 'is-selected' : '' }} {{ ($slot['is_available'] ?? false) ? '' : 'is-unavailable' }}" style="min-height:68px;border:1px solid rgba(214,180,192,.48);border-radius:16px;background:rgba(255,255,255,.98);display:flex;align-items:center;justify-content:center;padding:12px;">
                                                             <div class="slot-card__time">{{ $slot['time'] }}</div>
                                                         </div>
                                                     </button>
@@ -706,7 +734,7 @@
                                     @endif
                                 </div>
 
-                                <div id="selected-slot-card" class="booking-panel booking-panel--modal hidden">
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal hidden" style="border:1px solid rgba(214,180,192,.48);border-radius:22px;background:rgba(255,255,255,.95);padding:18px;">
                                     <div class="ops-kicker">Booking</div>
                                     <div class="booking-panel__title">Front desk notes</div>
 
@@ -777,6 +805,7 @@
             const createAppointmentButton = document.getElementById('create-appointment-button');
             const modalServiceCards = Array.from(document.querySelectorAll('[data-service-card]'));
             const serviceProgressSummary = document.getElementById('service-progress-summary');
+            const serviceSummaryCards = Array.from(document.querySelectorAll('[data-service-summary]'));
             const timeSelectionSection = document.getElementById('time-selection-section');
             const workflowList = document.getElementById('workflow-list');
             const workflowPanel = document.getElementById('workflow-panel');
@@ -1153,26 +1182,81 @@
                 return combinationCatalog.find((combo) => mapsMatchSelection(combo.map || {})) || null;
             }
 
+            function paintStaffPill(button, isSelected) {
+                const pill = button?.querySelector('.staff-pill');
+                const name = button?.querySelector('.staff-pill__name');
+                const meta = button?.querySelector('.staff-pill__meta');
+
+                if (!pill) {
+                    return;
+                }
+
+                pill.style.borderColor = isSelected ? 'rgba(201,146,115,.75)' : 'rgba(214,180,192,.55)';
+                pill.style.background = isSelected
+                    ? 'linear-gradient(180deg,rgba(255,243,238,.98),rgba(255,248,246,.98))'
+                    : 'rgba(255,255,255,.98)';
+                pill.style.boxShadow = isSelected ? '0 14px 28px rgba(111,78,92,.12)' : 'none';
+                pill.style.transform = isSelected ? 'translateY(-1px)' : 'none';
+
+                if (name) {
+                    name.style.textDecoration = isSelected ? 'line-through' : 'none';
+                    name.style.textDecorationThickness = isSelected ? '1.5px' : '';
+                }
+
+                if (meta) {
+                    meta.textContent = isSelected
+                        ? `${button.dataset.roleLabel || 'Staff'} • Selected`
+                        : (button.dataset.roleLabel || 'Staff');
+                }
+            }
+
+            function paintServiceSummaryCard(card, isComplete, detail) {
+                if (!card) {
+                    return;
+                }
+
+                const state = card.querySelector('[data-service-summary-state]');
+
+                card.style.borderColor = isComplete ? 'rgba(201,146,115,.62)' : 'rgba(214,180,192,.55)';
+                card.style.background = isComplete
+                    ? 'linear-gradient(180deg,rgba(255,244,240,.98),rgba(255,250,248,.96))'
+                    : 'linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,248,246,.96))';
+                card.style.boxShadow = isComplete ? '0 14px 28px rgba(111,78,92,.1)' : 'none';
+
+                if (state) {
+                    state.textContent = detail;
+                    state.style.color = isComplete ? '#6f4e5c' : '#9a6d79';
+                }
+            }
+
+            function paintSlotCard(button, state) {
+                const card = button?.querySelector('.slot-card');
+
+                if (!card) {
+                    return;
+                }
+
+                const isUnavailable = state === 'unavailable';
+                const isSelected = state === 'selected';
+
+                card.style.borderColor = isSelected ? 'rgba(201,146,115,.72)' : 'rgba(214,180,192,.48)';
+                card.style.background = isUnavailable
+                    ? 'linear-gradient(180deg,rgba(241,245,249,.96),rgba(226,232,240,.92))'
+                    : isSelected
+                        ? 'linear-gradient(180deg,rgba(255,244,240,.98),rgba(255,250,248,.96))'
+                        : 'rgba(255,255,255,.98)';
+                card.style.color = isUnavailable ? '#64748b' : '#4f3340';
+                card.style.opacity = isUnavailable ? '0.78' : '1';
+                card.style.boxShadow = isSelected ? '0 12px 24px rgba(111,78,92,.1)' : 'none';
+            }
+
             function renderServiceProgress() {
                 if (!serviceProgressSummary) {
                     return;
                 }
 
                 const requiredServiceIds = getRequiredServiceIds();
-                const chosenServiceIds = getChosenServiceIds();
-                const pendingNames = requiredServiceIds
-                    .filter((serviceId) => !selectedStaffByService[serviceId])
-                    .map((serviceId) => getServiceName(serviceId));
-
-                if (!requiredServiceIds.length) {
-                    serviceProgressSummary.textContent = 'No services selected.';
-                } else if (!pendingNames.length) {
-                    serviceProgressSummary.textContent = selectedArrangementMode === 'custom'
-                        ? `${chosenServiceIds.length} of ${requiredServiceIds.length} services ready. Add notes and submit.`
-                        : `${chosenServiceIds.length} of ${requiredServiceIds.length} services ready. Choose a time.`;
-                } else {
-                    serviceProgressSummary.textContent = `${chosenServiceIds.length} of ${requiredServiceIds.length} services selected. Pending: ${pendingNames.join(', ')}.`;
-                }
+                serviceProgressSummary.style.display = requiredServiceIds.length ? 'grid' : 'none';
             }
 
             function syncServiceCardState() {
@@ -1182,13 +1266,21 @@
                     const selectedName = selectedButton?.dataset.staffName || '';
                     const status = card.querySelector('[data-service-status]');
                     const isComplete = Boolean(selectedName);
+                    const summaryCard = serviceSummaryCards.find((item) => String(item.dataset.serviceSummary || '') === serviceId);
 
                     card.classList.toggle('is-complete', isComplete);
+                    card.style.borderColor = isComplete ? 'rgba(201,146,115,.72)' : 'rgba(214,180,192,.58)';
+                    card.style.boxShadow = isComplete ? '0 14px 28px rgba(111,78,92,.1)' : '0 12px 28px rgba(88,54,70,.06)';
 
                     if (status) {
-                        status.textContent = isComplete ? `Chosen: ${selectedName}` : 'Choose staff';
+                        status.textContent = isComplete ? 'Ready' : 'Choose staff';
                         status.classList.toggle('is-complete', isComplete);
+                        status.style.borderColor = isComplete ? 'rgba(201,146,115,.62)' : 'rgba(214,180,192,.65)';
+                        status.style.background = isComplete ? 'rgba(255,244,240,.98)' : 'rgba(255,255,255,.9)';
+                        status.style.color = isComplete ? '#6f4e5c' : '#8f6a75';
                     }
+
+                    paintServiceSummaryCard(summaryCard, isComplete, isComplete ? selectedName : 'Choose staff');
                 });
 
                 renderServiceProgress();
@@ -1239,6 +1331,7 @@
             function resetSlotSelection() {
                 slotButtons.forEach((button) => {
                     button.querySelector('.slot-card')?.classList.remove('is-selected');
+                    paintSlotCard(button, button.disabled ? 'unavailable' : 'default');
                 });
 
                 if (slotInput) {
@@ -1261,6 +1354,7 @@
 
                     button.disabled = !allServicesSelected || !isAvailable;
                     button.querySelector('.slot-card')?.classList.toggle('is-unavailable', !isAvailable);
+                    paintSlotCard(button, !isAvailable ? 'unavailable' : (slotInput?.value === button.dataset.slotTime ? 'selected' : 'default'));
                 });
 
                 if (slotHint) {
@@ -1300,7 +1394,9 @@
                     const sameService = String(staffButton.dataset.serviceId || '') === serviceId;
 
                     if (sameService) {
-                        staffButton.querySelector('.staff-pill')?.classList.toggle('is-selected', staffButton === button);
+                        const isSelected = staffButton === button;
+                        staffButton.querySelector('.staff-pill')?.classList.toggle('is-selected', isSelected);
+                        paintStaffPill(staffButton, isSelected);
                     }
                 });
 
@@ -1338,6 +1434,7 @@
 
                 slotButtons.forEach((slotButton) => {
                     slotButton.querySelector('.slot-card')?.classList.toggle('is-selected', slotButton === button);
+                    paintSlotCard(slotButton, slotButton === button ? 'selected' : (slotButton.disabled ? 'unavailable' : 'default'));
                 });
 
                 if (slotInput) {
@@ -1359,12 +1456,16 @@
                     meta.textContent = button.dataset.roleLabel;
                 }
 
+                paintStaffPill(button, false);
+
                 button.addEventListener('click', function () {
                     selectStaffOption(this);
                 });
             });
 
             slotButtons.forEach((button) => {
+                paintSlotCard(button, button.disabled ? 'unavailable' : 'default');
+
                 button.addEventListener('click', function () {
                     selectSlot(this);
                 });
