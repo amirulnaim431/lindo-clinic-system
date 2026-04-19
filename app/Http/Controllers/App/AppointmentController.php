@@ -414,7 +414,7 @@ class AppointmentController extends Controller
         });
 
         return redirect()
-            ->to(route('app.appointments.index', ['date' => $validated['date']]))
+            ->to(route('app.calendar', ['date' => $validated['date']]))
             ->with('success', 'Appointment created.');
     }
 
