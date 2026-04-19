@@ -25,78 +25,18 @@
             'no_show' => ['bg' => '#fff1f2', 'border' => '#fecdd3', 'text' => '#be123c', 'label' => 'Reschedule'],
         ];
         $slotOptions = [];
-        if (! empty($availability['viable_slots'])) {
-            foreach ($availability['viable_slots'] as $slotTime) {
-                $slotData = $availability['slots'][$slotTime] ?? [];
+        if (! empty($availability['slots'])) {
+            foreach ($availability['slots'] as $slotTime => $slotData) {
                 $slotOptions[] = [
                     'time' => $slotTime,
                     'combinations' => $slotData['combinations'] ?? [],
                     'count' => count($slotData['combinations'] ?? []),
+                    'is_available' => ! empty($slotData['combinations']),
                     'is_prefilled' => $prefilledSlot === $slotTime,
                 ];
             }
         }
         $selectedSlotRow = $prefilledSlot ? ($availability['slots'][$prefilledSlot] ?? null) : null;
-        $dailyStatusCounts = [
-            'total' => $appointmentGroups->count(),
-            'checked_in' => 0,
-            'completed' => 0,
-            'reschedule' => 0,
-        ];
-        foreach ($appointmentGroups as $group) {
-            $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-            if ($statusValue === 'checked_in') {
-                $dailyStatusCounts['checked_in']++;
-            } elseif ($statusValue === 'completed') {
-                $dailyStatusCounts['completed']++;
-            } elseif (in_array($statusValue, ['cancelled', 'no_show'], true)) {
-                $dailyStatusCounts['reschedule']++;
-            }
-        }
-        $summaryCards = [
-            [
-                'key' => 'total',
-                'label' => 'Total',
-                'value' => $dailyStatusCounts['total'],
-                'status' => null,
-            ],
-            [
-                'key' => 'checked_in',
-                'label' => 'Checked In',
-                'value' => $dailyStatusCounts['checked_in'],
-                'status' => 'checked_in',
-            ],
-            [
-                'key' => 'completed',
-                'label' => 'Completed',
-                'value' => $dailyStatusCounts['completed'],
-                'status' => 'completed',
-            ],
-            [
-                'key' => 'reschedule',
-                'label' => 'Reschedule',
-                'value' => $dailyStatusCounts['reschedule'],
-                'status' => 'reschedule',
-            ],
-        ];
-        $appointmentGroupBuckets = [
-            'total' => $appointmentGroups->values(),
-            'checked_in' => $appointmentGroups->filter(function ($group) {
-                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-
-                return $statusValue === 'checked_in';
-            })->values(),
-            'completed' => $appointmentGroups->filter(function ($group) {
-                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-
-                return $statusValue === 'completed';
-            })->values(),
-            'reschedule' => $appointmentGroups->filter(function ($group) {
-                $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-
-                return in_array($statusValue, ['cancelled', 'no_show'], true);
-            })->values(),
-        ];
         $selectedServiceLabels = $services->whereIn('id', $selectedServiceIds)->pluck('name')->values()->all();
         $selectedServiceOrderIds = collect($filters['service_order'] ?? [])
             ->map(fn ($id) => (string) $id)
@@ -148,6 +88,9 @@
             return $raw;
         };
         $customSchedule = $customSchedule ?? [];
+        $selectedCustomerId = old('customer_id', $filters['customer_id'] ?? '');
+        $selectedCustomerName = old('customer_full_name', $filters['customer_full_name'] ?? '');
+        $selectedCustomerPhone = old('customer_phone', $filters['customer_phone'] ?? '');
     @endphp
 
 
@@ -193,19 +136,16 @@
             <div class="ops-card__body">
                 <div class="ops-kicker">{{ $isCheckInMode ? 'Status' : 'Appointments' }}</div>
                 <h2 class="ops-title">{{ $isCheckInMode ? 'Status' : "Book and manage today's appointments" }}</h2>
-
-                <div class="metrics-grid" style="margin-top:22px;">
+                <div class="booking-hero-summary" style="margin-top:22px;">
                     <div class="metric-card">
                         <div class="metric-card__label">Date</div>
                         <div class="metric-card__value" style="font-size:22px;">{{ \Carbon\Carbon::parse($selectedDate)->format('d M') }}</div>
                         <div class="metric-card__meta">{{ \Carbon\Carbon::parse($selectedDate)->format('l') }}</div>
                     </div>
-                    @foreach ($summaryCards as $card)
-                        <button type="button" class="metric-card metric-card--action" data-open-summary="{{ $card['key'] }}">
-                            <div class="metric-card__label">{{ $card['label'] }}</div>
-                            <div class="metric-card__value">{{ $card['value'] }}</div>
-                        </button>
-                    @endforeach
+                    <div class="summary-pill booking-hero-note">
+                        <span class="summary-pill__label">Front desk flow</span>
+                        <span class="summary-pill__value">Enter customer details, choose services, then review live slot availability in a popup.</span>
+                    </div>
                 </div>
             </div>
         </section>
@@ -319,10 +259,41 @@
                             <input type="hidden" name="mode" value="{{ $mode }}">
                             <input type="hidden" name="date" value="{{ $selectedDate }}">
                             <input type="hidden" name="slot" value="{{ $prefilledSlot }}">
+                            <input type="hidden" name="customer_id" id="builder_customer_id" value="{{ $selectedCustomerId }}">
                             <div id="service-order-inputs">
                                 @foreach ($selectedServiceOrderIds as $serviceOrderId)
                                     <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
                                 @endforeach
+                            </div>
+
+                            <div class="booking-form-grid booking-form-grid--customer">
+                                <div class="field-block customer-picker">
+                                    <label for="builder_customer_full_name" class="field-label">Customer name</label>
+                                    <input
+                                        id="builder_customer_full_name"
+                                        type="text"
+                                        name="customer_full_name"
+                                        value="{{ $selectedCustomerName }}"
+                                        class="field-input"
+                                        autocomplete="off"
+                                        placeholder="Start typing member name or phone"
+                                        required
+                                    >
+                                    <div id="customer_suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
+                                    <div id="customer_selected_hint" class="customer-picked {{ $selectedCustomerId ? '' : 'hidden' }}"></div>
+                                </div>
+                                <div class="field-block">
+                                    <label for="builder_customer_phone" class="field-label">Customer phone</label>
+                                    <input
+                                        id="builder_customer_phone"
+                                        type="text"
+                                        name="customer_phone"
+                                        value="{{ $selectedCustomerPhone }}"
+                                        class="field-input"
+                                        placeholder="Customer contact number"
+                                        required
+                                    >
+                                </div>
                             </div>
 
                             <div>
@@ -434,150 +405,6 @@
             </section>
         @endif
 
-        @if (! $isCheckInMode && ! empty($availability))
-            <section class="ops-card">
-                <div class="ops-card__header">
-                    <div class="ops-kicker">Availability</div>
-                    <h3 class="panel-title-display" style="font-size:24px;">{{ $selectedArrangementMode === 'custom' ? 'Available staff for selected custom schedule' : 'Available staff and times' }}</h3>
-                </div>
-
-                <div class="ops-card__body">
-
-                    <div class="availability-grid">
-                        @if (! empty($availability['services_without_eligible_staff']))
-                            <div class="flash flash--error">No active eligible staff assigned for: <strong>{{ implode(', ', $availability['services_without_eligible_staff']) }}</strong></div>
-                        @endif
-
-                        @if (! empty($availability['fully_booked_message']))
-                            <div class="flash flash--warn">{{ $availability['fully_booked_message'] }}</div>
-                        @endif
-
-                        @if (! empty($availability['custom_missing_message']))
-                            <div class="flash flash--warn">{{ $availability['custom_missing_message'] }}</div>
-                        @endif
-
-                        <div class="eligibility-grid">
-                            @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
-                                <div class="eligibility-card">
-                                    <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
-                                    @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
-                                        <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
-                                    @endif
-                                    @if (empty($serviceSummary['eligible_staff']))
-                                        <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
-                                    @else
-                                        <div class="staff-chip-wrap">
-                                            @foreach ($serviceSummary['eligible_staff'] as $staff)
-                                                <span class="staff-chip">{{ $staff['full_name'] }} ({{ $staff['role_key'] }})</span>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-
-                        @if ($selectedArrangementMode !== 'custom' && count($slotOptions))
-                            <div>
-                                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                                    <div>
-                                        <div class="ops-kicker">Choose a viable time</div>
-                                        <h4 class="panel-title-display" style="font-size:18px;">Available booking windows</h4>
-                                    </div>
-                                    @if ($selectedSlotRow)
-                                        <div class="summary-pill" style="padding:10px 12px;">
-                                            <span class="summary-pill__label">Selected slot duration</span>
-                                            <span class="summary-pill__value">{{ $selectedSlotRow['duration_minutes'] ?? ($availability['duration_minutes'] ?? 0) }} mins</span>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                <div class="slot-grid" style="margin-top:16px;">
-                                    @foreach ($slotOptions as $slot)
-                                        <button type="button" class="slot-button slot-select-button" data-slot-time="{{ $slot['time'] }}" data-combinations='@json($slot['combinations'])'>
-                                            <div class="slot-card {{ $slot['is_prefilled'] ? 'is-selected' : '' }}">
-                                                <div>
-                                                    <div class="slot-card__time">{{ $slot['time'] }}</div>
-                                                    <div class="slot-card__meta">{{ $slot['count'] }} valid combo{{ $slot['count'] === 1 ? '' : 's' }}</div>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        <div id="selected-slot-card" class="booking-panel {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
-                            <div class="ops-kicker">Confirm booking</div>
-                            <div class="booking-panel__title">
-                                @if ($selectedArrangementMode === 'custom')
-                                    Create custom appointment
-                                @else
-                                    Create appointment at <span id="selected-slot-time-label">-</span>
-                                @endif
-                            </div>
-
-                            <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form" data-preserve-scroll-form>
-                                @csrf
-                                <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
-                                <input type="hidden" name="date" value="{{ $selectedDate }}">
-                                <input type="hidden" name="slot" id="selected-slot-input" value="">
-                                <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
-                                <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
-                                @foreach ($selectedServiceIds as $serviceId)
-                                    <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
-                                @endforeach
-                                <div id="booking-service-order-inputs">
-                                    @foreach ($selectedServiceOrderIds as $serviceOrderId)
-                                        <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
-                                    @endforeach
-                                </div>
-                                @foreach ($selectedServiceOrderIds as $serviceOrderId)
-                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][date]" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
-                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][start_time]" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
-                                @endforeach
-
-                                <div class="field-block">
-                                    <label for="selected_combination_select">Staff combination</label>
-                                    <select id="selected_combination_select" class="field-input select-input" required></select>
-                                </div>
-
-                                <div class="booking-form-grid">
-                                    <div class="field-block customer-picker">
-                                        <label for="customer_full_name">Customer name</label>
-                                        <input
-                                            id="customer_full_name"
-                                            type="text"
-                                            name="customer_full_name"
-                                            value="{{ old('customer_full_name') }}"
-                                            class="field-input"
-                                            autocomplete="off"
-                                            placeholder="Start typing member name or phone"
-                                            required
-                                        >
-                                        <div id="customer_suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
-                                        <div id="customer_selected_hint" class="customer-picked hidden"></div>
-                                    </div>
-                                    <div class="field-block">
-                                        <label for="customer_phone">Customer phone</label>
-                                        <input id="customer_phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}" class="field-input" required>
-                                    </div>
-                                </div>
-
-                                <div class="field-block">
-                                    <label for="notes">Front desk notes</label>
-                                    <textarea id="notes" name="notes" class="field-input booking-textarea">{{ old('notes') }}</textarea>
-                                </div>
-
-                                <div style="display:flex;justify-content:flex-end;">
-                                    <button type="submit" class="action-btn action-btn--primary">Create Appointment</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        @endif
-
         @if (false)
         <section class="ops-grid">
             <div class="ops-card">
@@ -676,80 +503,180 @@
         @endif
     </div>
 
-    @if (! $isCheckInMode)
-        <div id="appointment-summary-modal" class="modal-shell hidden" aria-hidden="true">
-            <div class="modal-backdrop" data-close-summary-modal></div>
+    @if (! $isCheckInMode && ! empty($availability))
+        <div id="availability-modal" class="modal-shell hidden" aria-hidden="true">
+            <div class="modal-backdrop" data-close-availability-modal></div>
             <div class="modal-stage">
-                <div class="modal-card" style="width:min(920px, 100%);">
+                <div class="modal-card availability-modal-card">
                     <div class="modal-header">
                         <div class="modal-header__row">
                             <div>
-                                <div class="modal-kicker">Appointments</div>
-                                <h3 id="appointment-summary-title" class="modal-title">Appointments</h3>
-                                <p class="modal-subtitle">For {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</p>
+                                <div class="modal-kicker">Availability</div>
+                                <h3 class="modal-title">{{ $selectedArrangementMode === 'custom' ? 'Available staff for custom schedule' : 'Choose a slot and staff' }}</h3>
+                                <p class="modal-subtitle">Review live availability for {{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }} without adding clutter to the booking page.</p>
                             </div>
                             <div class="btn-row">
-                                <button type="button" class="btn btn-secondary" id="appointment-summary-export">Extract doc</button>
-                                <button type="button" class="btn btn-secondary" id="appointment-summary-print">Print list</button>
-                                <button type="button" class="btn btn-secondary" data-close-summary-modal>Close</button>
+                                <button type="button" class="btn btn-secondary" data-close-availability-modal>Close</button>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-body">
-                        @foreach ($summaryCards as $card)
-                            <div class="appointment-summary-panel hidden" data-summary-panel="{{ $card['key'] }}">
-                                <div class="schedule-list" style="max-height:60vh; overflow-y:auto; padding-right:0.2rem;">
-                                    @forelse ($appointmentGroupBuckets[$card['key']] as $group)
-                                        @php
-                                            $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (is_string($group->status) ? $group->status : '');
-                                            $statusStyle = $statusPalette[$statusValue] ?? ['bg' => '#f8fafc', 'border' => '#cbd5e1', 'text' => '#475569', 'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $statusValue))];
-                                            $statusLabel = in_array($statusValue, ['cancelled', 'no_show'], true)
-                                                ? 'Reschedule'
-                                                : ($group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : $statusStyle['label']);
-                                            $membershipLabel = $group->customer?->membership_type ?: 'No membership';
-                                            $membershipCode = $group->customer?->membership_code ?: null;
-                                            $membershipBalance = $formatMembershipBalance($group->customer?->current_package);
-                                        @endphp
-                                        <article class="schedule-card">
-                                            <div class="schedule-card__head">
-                                                <div>
-                                                    <div class="schedule-card__time">{{ optional($group->starts_at)->format('h:i A') ?? '-' }} @if(optional($group->ends_at)) - {{ optional($group->ends_at)->format('h:i A') }} @endif</div>
-                                                    <div class="schedule-card__name">{{ $group->customer?->full_name ?? 'Customer' }}</div>
-                                                    <div class="schedule-card__phone">{{ $group->customer?->phone ?? 'No phone recorded' }}</div>
-                                                    <div class="schedule-card__meta-stack">
-                                                        <div class="schedule-card__membership">{{ $membershipLabel }}@if ($membershipCode) • {{ $membershipCode }} @endif</div>
-                                                        <div class="schedule-card__balance">Membership balance: {{ $membershipBalance }}</div>
-                                                    </div>
+                    <div class="modal-body availability-modal-body">
+                        <div class="availability-grid">
+                            @if (! empty($availability['services_without_eligible_staff']))
+                                <div class="flash flash--error">No active eligible staff assigned for: <strong>{{ implode(', ', $availability['services_without_eligible_staff']) }}</strong></div>
+                            @endif
+
+                            @if (! empty($availability['fully_booked_message']))
+                                <div class="flash flash--warn">{{ $availability['fully_booked_message'] }}</div>
+                            @endif
+
+                            @if (! empty($availability['custom_missing_message']))
+                                <div class="flash flash--warn">{{ $availability['custom_missing_message'] }}</div>
+                            @endif
+
+                            <div class="availability-modal-layout">
+                                <div class="availability-modal-main">
+                                    <div class="availability-section">
+                                        <div class="ops-kicker">Selected services</div>
+                                        <h4 class="panel-title-display" style="font-size:18px;">Eligible staff by service</h4>
+                                        <div class="eligibility-grid" style="margin-top:16px;">
+                                            @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
+                                                @php
+                                                    $staffGroups = collect($serviceSummary['eligible_staff'] ?? [])
+                                                        ->groupBy('appointment_group_label')
+                                                        ->sortBy(function ($group, $label) {
+                                                            return match ($label) {
+                                                                'Doctors' => 1,
+                                                                'Nurses' => 2,
+                                                                'Aesthetic & Spa' => 3,
+                                                                default => 4,
+                                                            };
+                                                        });
+                                                @endphp
+                                                <div class="eligibility-card">
+                                                    <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
+                                                    @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
+                                                        <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
+                                                    @endif
+                                                    @if ($staffGroups->isEmpty())
+                                                        <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
+                                                    @else
+                                                        <div class="availability-group-list">
+                                                            @foreach ($staffGroups as $groupLabel => $groupStaff)
+                                                                <div class="availability-group">
+                                                                    <div class="availability-group__label">{{ $groupLabel }}</div>
+                                                                    <div class="staff-chip-wrap">
+                                                                        @foreach ($groupStaff as $staff)
+                                                                            <span class="staff-chip">{{ $staff['full_name'] }} ({{ $staff['role_label'] }})</span>
+                                                                        @endforeach
+                                                                    </div>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
                                                 </div>
-                                                <span class="status-chip" style="background: {{ $statusStyle['bg'] }}; border-color: {{ $statusStyle['border'] }}; color: {{ $statusStyle['text'] }};">
-                                                    <span class="status-dot"></span>
-                                                    {{ $statusLabel }}
-                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    @if ($selectedArrangementMode !== 'custom' && count($slotOptions))
+                                        <div class="availability-section">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                                                <div>
+                                                    <div class="ops-kicker">Slot selection</div>
+                                                    <h4 class="panel-title-display" style="font-size:18px;">Available and unavailable slots</h4>
+                                                </div>
+                                                @if ($selectedSlotRow)
+                                                    <div class="summary-pill" style="padding:10px 12px;">
+                                                        <span class="summary-pill__label">Selected slot duration</span>
+                                                        <span class="summary-pill__value">{{ $selectedSlotRow['duration_minutes'] ?? ($availability['duration_minutes'] ?? 0) }} mins</span>
+                                                    </div>
+                                                @endif
                                             </div>
 
-                                            <div style="display:grid;gap:10px;margin-top:16px;">
-                                                @foreach ($group->items as $item)
-                                                    <div class="service-line">
-                                                        <div>
-                                                            <div class="service-line__name">{{ $item->service?->name ?? 'Service' }}</div>
-                                                            @if ($item->starts_at && $item->ends_at)
-                                                                <div class="service-card__meta">{{ $item->starts_at->format('d M Y h:i A') }} - {{ $item->ends_at->format('h:i A') }}</div>
-                                                            @endif
+                                            <div class="slot-grid slot-grid--availability" style="margin-top:16px;">
+                                                @foreach ($slotOptions as $slot)
+                                                    <button
+                                                        type="button"
+                                                        class="slot-button slot-select-button"
+                                                        data-slot-time="{{ $slot['time'] }}"
+                                                        data-combinations='@json($slot['combinations'])'
+                                                        {{ $slot['is_available'] ? '' : 'disabled' }}
+                                                    >
+                                                        <div class="slot-card {{ $slot['is_prefilled'] ? 'is-selected' : '' }} {{ $slot['is_available'] ? '' : 'is-unavailable' }}">
+                                                            <div>
+                                                                <div class="slot-card__time">{{ $slot['time'] }}</div>
+                                                                <div class="slot-card__meta">
+                                                                    @if ($slot['is_available'])
+                                                                        {{ $slot['count'] }} valid combo{{ $slot['count'] === 1 ? '' : 's' }}
+                                                                    @else
+                                                                        Unavailable
+                                                                    @endif
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div class="service-line__staff">{{ $item->staff?->full_name ?? 'Unassigned' }}@if($item->staff?->role_key) ({{ $item->staff->role_key }}) @endif</div>
-                                                    </div>
+                                                    </button>
                                                 @endforeach
                                             </div>
-                                        </article>
-                                    @empty
-                                        <div class="empty-card">
-                                            <div class="empty-card__title">No appointments found</div>
-                                            <div class="empty-card__body">There are no {{ strtolower($card['label']) }} appointments for this date.</div>
                                         </div>
-                                    @endforelse
+                                    @endif
+                                </div>
+
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
+                                    <div class="ops-kicker">Confirm booking</div>
+                                    <div class="booking-panel__title">
+                                        @if ($selectedArrangementMode === 'custom')
+                                            Create custom appointment
+                                        @else
+                                            Create appointment at <span id="selected-slot-time-label">-</span>
+                                        @endif
+                                    </div>
+                                    <div class="booking-panel__subtitle">Customer details stay visible here so front desk can confirm everything before saving.</div>
+
+                                    <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form" data-preserve-scroll-form>
+                                        @csrf
+                                        <input type="hidden" name="customer_id" id="customer_id" value="{{ $selectedCustomerId }}">
+                                        <input type="hidden" name="customer_full_name" id="selected_customer_full_name" value="{{ $selectedCustomerName }}">
+                                        <input type="hidden" name="customer_phone" id="selected_customer_phone" value="{{ $selectedCustomerPhone }}">
+                                        <input type="hidden" name="date" value="{{ $selectedDate }}">
+                                        <input type="hidden" name="slot" id="selected-slot-input" value="">
+                                        <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
+                                        <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
+                                        @foreach ($selectedServiceIds as $serviceId)
+                                            <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
+                                        @endforeach
+                                        <div id="booking-service-order-inputs">
+                                            @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                                <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
+                                            @endforeach
+                                        </div>
+                                        @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                            <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][date]" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
+                                            <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][start_time]" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
+                                        @endforeach
+
+                                        <div class="summary-pill summary-pill--stack">
+                                            <span class="summary-pill__label">Customer</span>
+                                            <span id="selected-customer-summary" class="summary-pill__value">{{ trim($selectedCustomerName.' '.$selectedCustomerPhone) !== '' ? trim($selectedCustomerName.' | '.$selectedCustomerPhone, ' |') : 'Enter customer details above before confirming.' }}</span>
+                                        </div>
+
+                                        <div class="field-block">
+                                            <label for="selected_combination_select">Staff combination</label>
+                                            <select id="selected_combination_select" class="field-input select-input" required></select>
+                                        </div>
+
+                                        <div class="field-block">
+                                            <label for="notes">Front desk notes</label>
+                                            <textarea id="notes" name="notes" class="field-input booking-textarea">{{ old('notes') }}</textarea>
+                                        </div>
+
+                                        <div style="display:flex;justify-content:flex-end;">
+                                            <button type="submit" class="action-btn action-btn--primary">Create Appointment</button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
-                        @endforeach
+                        </div>
                     </div>
                 </div>
             </div>
@@ -781,22 +708,21 @@
             const defaultDate = @json($selectedDate);
             const defaultCategoryKey = @json($defaultCategoryKey);
             const customScheduleSeed = @json($customSchedule);
-            const customerIdInput = document.getElementById('customer_id');
-            const customerNameInput = document.getElementById('customer_full_name');
-            const customerPhoneInput = document.getElementById('customer_phone');
+            const customerIdInput = document.getElementById('builder_customer_id');
+            const customerNameInput = document.getElementById('builder_customer_full_name');
+            const customerPhoneInput = document.getElementById('builder_customer_phone');
             const customerSuggestions = document.getElementById('customer_suggestions');
             const customerSelectedHint = document.getElementById('customer_selected_hint');
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const selectedServicesSeed = @json($selectedServiceOrderIds);
             const serviceCatalog = @json($serviceCatalog);
             const scrollStorageKey = 'lindo-appointments-scroll';
-            const summaryModal = document.getElementById('appointment-summary-modal');
-            const summaryTitle = document.getElementById('appointment-summary-title');
-            const summaryPanels = Array.from(document.querySelectorAll('[data-summary-panel]'));
-            const summaryButtons = Array.from(document.querySelectorAll('[data-open-summary]'));
-            const summaryCloseButtons = Array.from(document.querySelectorAll('[data-close-summary-modal]'));
-            const summaryExportButton = document.getElementById('appointment-summary-export');
-            const summaryPrintButton = document.getElementById('appointment-summary-print');
+            const modalCustomerIdInput = document.getElementById('customer_id');
+            const modalCustomerNameInput = document.getElementById('selected_customer_full_name');
+            const modalCustomerPhoneInput = document.getElementById('selected_customer_phone');
+            const customerSummary = document.getElementById('selected-customer-summary');
+            const availabilityModal = document.getElementById('availability-modal');
+            const availabilityCloseButtons = Array.from(document.querySelectorAll('[data-close-availability-modal]'));
             let activeCustomerRequest = null;
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
             let activeCategoryKey = defaultCategoryKey;
@@ -828,93 +754,33 @@
                 });
             });
 
-            function openSummaryModal(summaryKey, summaryLabel) {
-                if (!summaryModal) {
+            function openAvailabilityModal() {
+                if (!availabilityModal) {
                     return;
                 }
 
-                summaryPanels.forEach((panel) => {
-                    panel.classList.toggle('hidden', panel.dataset.summaryPanel !== summaryKey);
-                });
-
-                if (summaryTitle) {
-                    summaryTitle.textContent = summaryLabel;
-                }
-
-                summaryModal.classList.remove('hidden');
-                summaryModal.setAttribute('aria-hidden', 'false');
+                availabilityModal.classList.remove('hidden');
+                availabilityModal.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
             }
 
-            function closeSummaryModal() {
-                if (!summaryModal) {
+            function closeAvailabilityModal() {
+                if (!availabilityModal) {
                     return;
                 }
 
-                summaryModal.classList.add('hidden');
-                summaryModal.setAttribute('aria-hidden', 'true');
+                availabilityModal.classList.add('hidden');
+                availabilityModal.setAttribute('aria-hidden', 'true');
                 document.body.style.overflow = '';
             }
 
-            summaryButtons.forEach((button) => {
-                button.addEventListener('click', function () {
-                    openSummaryModal(
-                        this.dataset.openSummary || 'total',
-                        this.querySelector('.metric-card__label')?.textContent?.trim() || 'Appointments'
-                    );
-                });
-            });
-
-            summaryCloseButtons.forEach((button) => {
-                button.addEventListener('click', closeSummaryModal);
-            });
-
-            summaryPrintButton?.addEventListener('click', function () {
-                window.print();
-            });
-
-            summaryExportButton?.addEventListener('click', function () {
-                const activePanel = summaryPanels.find((panel) => !panel.classList.contains('hidden'));
-
-                if (!activePanel) {
-                    return;
-                }
-
-                const escapeHtml = (value) => String(value)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
-
-                const title = summaryTitle?.textContent?.trim() || 'Appointments';
-                const dateLabel = @json(\Carbon\Carbon::parse($selectedDate)->format('d M Y'));
-                const bodyText = activePanel.innerText.trim();
-                const documentHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>${escapeHtml(title)} - ${escapeHtml(dateLabel)}</title>
-</head>
-<body>
-    <h1>${escapeHtml(title)}</h1>
-    <p>For ${escapeHtml(dateLabel)}</p>
-    <pre style="font-family: Georgia, serif; white-space: pre-wrap;">${escapeHtml(bodyText)}</pre>
-</body>
-</html>`;
-
-                const blob = new Blob(['\ufeff', documentHtml], { type: 'application/msword' });
-                const link = document.createElement('a');
-                const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'appointments';
-                link.href = URL.createObjectURL(blob);
-                link.download = `${safeTitle}-${dateLabel.replace(/\s+/g, '-')}.doc`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.setTimeout(() => URL.revokeObjectURL(link.href), 500);
+            availabilityCloseButtons.forEach((button) => {
+                button.addEventListener('click', closeAvailabilityModal);
             });
 
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') {
-                    closeSummaryModal();
+                    closeAvailabilityModal();
                 }
             });
 
@@ -1193,6 +1059,38 @@
                 }
             }
 
+            function syncCustomerBookingState() {
+                if (modalCustomerIdInput) {
+                    modalCustomerIdInput.value = customerIdInput?.value || '';
+                }
+
+                if (modalCustomerNameInput) {
+                    modalCustomerNameInput.value = customerNameInput?.value || '';
+                }
+
+                if (modalCustomerPhoneInput) {
+                    modalCustomerPhoneInput.value = customerPhoneInput?.value || '';
+                }
+
+                if (!customerSummary) {
+                    return;
+                }
+
+                const parts = [];
+
+                if (customerNameInput?.value?.trim()) {
+                    parts.push(customerNameInput.value.trim());
+                }
+
+                if (customerPhoneInput?.value?.trim()) {
+                    parts.push(customerPhoneInput.value.trim());
+                }
+
+                customerSummary.textContent = parts.length
+                    ? parts.join(' | ')
+                    : 'Enter customer details above before confirming.';
+            }
+
             function renderSelectedCustomer(customer) {
                 if (!customerSelectedHint) {
                     return;
@@ -1233,6 +1131,7 @@
 
                 renderSelectedCustomer(customer);
                 hideCustomerSuggestions();
+                syncCustomerBookingState();
             }
 
             function clearSelectedCustomer() {
@@ -1241,6 +1140,7 @@
                 }
 
                 renderSelectedCustomer(null);
+                syncCustomerBookingState();
             }
 
             async function searchCustomers(query) {
@@ -1304,6 +1204,7 @@
                 customerNameInput.addEventListener('input', function () {
                     const query = this.value.trim();
                     clearSelectedCustomer();
+                    syncCustomerBookingState();
 
                     if (query.length < 2) {
                         hideCustomerSuggestions();
@@ -1322,12 +1223,22 @@
                 if (customerIdInput?.value) {
                     clearSelectedCustomer();
                 }
+
+                syncCustomerBookingState();
             });
 
             syncServiceOrderFromSelection();
             syncServiceOrderUi();
             updateArrangementCards();
             applyCategoryTabState(defaultCategoryKey);
+            syncCustomerBookingState();
+
+            if (customerIdInput?.value && customerNameInput?.value) {
+                renderSelectedCustomer({
+                    full_name: customerNameInput.value,
+                    phone: customerPhoneInput?.value || '',
+                });
+            }
 
             if (selectedArrangementMode === 'custom' && customCombinations.length) {
                 setCombinations(customCombinations);
@@ -1335,6 +1246,10 @@
                 if (slotCard) {
                     slotCard.classList.remove('hidden');
                 }
+            }
+
+            if (availabilityModal) {
+                openAvailabilityModal();
             }
         });
     </script>

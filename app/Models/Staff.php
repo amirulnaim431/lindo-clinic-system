@@ -78,6 +78,13 @@ class Staff extends Model
         'tea_lady' => 'Tea Lady',
     ];
 
+    public const APPOINTMENT_GROUP_LABELS = [
+        'doctor' => 'Doctors',
+        'nurse' => 'Nurses',
+        'aesthetic_spa' => 'Aesthetic & Spa',
+        'others' => 'Others',
+    ];
+
     protected $table = 'staff';
 
     public $incrementing = false;
@@ -268,6 +275,57 @@ class Staff extends Model
                 'staff' => $group->values(),
             ])
             ->values();
+    }
+
+    public static function appointmentGroupKeyForStaff(self $staff): string
+    {
+        $name = mb_strtolower(trim((string) $staff->full_name));
+        $department = mb_strtolower(trim((string) $staff->department));
+        $jobTitle = mb_strtolower(trim((string) $staff->job_title));
+        $role = mb_strtolower(trim((string) ($staff->operational_role ?: $staff->role_key ?: $staff->role)));
+        $search = implode(' ', array_filter([$department, $jobTitle, $role]));
+
+        if (str_contains($name, 'monica') || str_contains($name, 'van ')) {
+            return 'aesthetic_spa';
+        }
+
+        if ($role === 'doctor' || str_contains($jobTitle, 'doctor')) {
+            return 'doctor';
+        }
+
+        if ($role === 'nurse' || str_contains($jobTitle, 'nurse')) {
+            return 'nurse';
+        }
+
+        if (
+            in_array($role, ['aesthetic', 'aestatic', 'beautician'], true)
+            || str_contains($search, 'spa')
+            || str_contains($search, 'beauty')
+            || str_contains($search, 'aesthetic')
+            || str_contains($search, 'nail')
+            || str_contains($search, 'facial')
+        ) {
+            return 'aesthetic_spa';
+        }
+
+        return 'others';
+    }
+
+    public static function appointmentGroupLabelForStaff(self $staff): string
+    {
+        $group = self::appointmentGroupKeyForStaff($staff);
+
+        return self::APPOINTMENT_GROUP_LABELS[$group] ?? 'Others';
+    }
+
+    public static function appointmentGroupRankForStaff(self $staff): int
+    {
+        return match (self::appointmentGroupKeyForStaff($staff)) {
+            'doctor' => 1,
+            'nurse' => 2,
+            'aesthetic_spa' => 3,
+            default => 4,
+        };
     }
 
     public function getOperationalRoleAttribute($value): ?string

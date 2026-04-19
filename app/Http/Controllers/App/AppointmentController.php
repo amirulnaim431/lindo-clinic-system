@@ -29,6 +29,9 @@ class AppointmentController extends Controller
             'service_order' => $request->input('service_order', []),
             'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
             'custom_schedule' => $request->input('custom_schedule', []),
+            'customer_id' => $request->input('customer_id'),
+            'customer_full_name' => trim((string) $request->input('customer_full_name', '')),
+            'customer_phone' => trim((string) $request->input('customer_phone', '')),
             'staff_id' => $request->input('staff_id'),
             'status' => $this->normalizeStatusFilter($request->input('status')),
             'slot' => $this->sanitizeSlot($request->input('slot')),
@@ -850,15 +853,9 @@ class AppointmentController extends Controller
                 'name' => $service->name,
                 'category_key' => $service->category_key,
                 'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
-                'eligible_staff' => $service->staff
-                    ->where('is_active', true)
-                    ->map(fn ($staff) => [
-                        'id' => (string) $staff->id,
-                        'full_name' => $staff->full_name,
-                        'role_key' => $staff->role_key,
-                    ])
-                    ->values()
-                    ->all(),
+                'eligible_staff' => $this->mapStaffForAppointmentFlow(
+                    $service->staff->where('is_active', true)
+                ),
             ];
         })->values()->all();
 
@@ -898,18 +895,18 @@ class AppointmentController extends Controller
                             ->where('ends_at', '>', $serviceSchedule['start']);
                     })
                     ->orderBy('staff.full_name')
-                    ->get(['staff.id', 'staff.full_name', 'staff.role_key'])
-                    ->map(fn ($staff) => [
-                        'id' => (string) $staff->id,
-                        'full_name' => $staff->full_name,
-                        'role_key' => $staff->role_key,
-                    ])
-                    ->values()
-                    ->all();
+                    ->get([
+                        'staff.id',
+                        'staff.full_name',
+                        'staff.role_key',
+                        'staff.operational_role',
+                        'staff.job_title',
+                        'staff.department',
+                    ]);
 
                 $availableStaffByService[$serviceId] = [
                     'service_name' => $service->name,
-                    'staff' => $availableStaff,
+                    'staff' => $this->mapStaffForAppointmentFlow($availableStaff),
                 ];
 
                 $serviceDebug[] = [
@@ -973,15 +970,9 @@ class AppointmentController extends Controller
                 'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
                 'scheduled_date' => $schedule['date'] ?? null,
                 'scheduled_time' => $schedule['start_time'] ?? null,
-                'eligible_staff' => $service->staff
-                    ->where('is_active', true)
-                    ->map(fn ($staff) => [
-                        'id' => (string) $staff->id,
-                        'full_name' => $staff->full_name,
-                        'role_key' => $staff->role_key,
-                    ])
-                    ->values()
-                    ->all(),
+                'eligible_staff' => $this->mapStaffForAppointmentFlow(
+                    $service->staff->where('is_active', true)
+                ),
             ];
         })->values()->all();
 
@@ -1016,21 +1007,21 @@ class AppointmentController extends Controller
 
             $availableStaffByService[$serviceId] = [
                 'service_name' => $service->name,
-                'staff' => $service->staff()
+                'staff' => $this->mapStaffForAppointmentFlow($service->staff()
                     ->where('staff.is_active', true)
                     ->whereDoesntHave('appointmentItems', function ($query) use ($serviceSchedule) {
                         $query->where('starts_at', '<', $serviceSchedule['end'])
                             ->where('ends_at', '>', $serviceSchedule['start']);
                     })
                     ->orderBy('staff.full_name')
-                    ->get(['staff.id', 'staff.full_name', 'staff.role_key'])
-                    ->map(fn ($staff) => [
-                        'id' => (string) $staff->id,
-                        'full_name' => $staff->full_name,
-                        'role_key' => $staff->role_key,
-                    ])
-                    ->values()
-                    ->all(),
+                    ->get([
+                        'staff.id',
+                        'staff.full_name',
+                        'staff.role_key',
+                        'staff.operational_role',
+                        'staff.job_title',
+                        'staff.department',
+                    ])),
             ];
         }
 
@@ -1109,6 +1100,37 @@ class AppointmentController extends Controller
         $walk(0, [], [], []);
 
         return $results;
+    }
+
+    private function mapStaffForAppointmentFlow(Collection $staffMembers): array
+    {
+        return $staffMembers
+            ->sort(function (Staff $left, Staff $right) {
+                $leftRank = Staff::appointmentGroupRankForStaff($left);
+                $rightRank = Staff::appointmentGroupRankForStaff($right);
+
+                if ($leftRank === $rightRank) {
+                    return strcasecmp($left->full_name, $right->full_name);
+                }
+
+                return $leftRank <=> $rightRank;
+            })
+            ->map(function (Staff $staff) {
+                return [
+                    'id' => (string) $staff->id,
+                    'full_name' => $staff->full_name,
+                    'role_key' => $staff->role_key,
+                    'role_label' => str((string) ($staff->job_title ?: $staff->role_key ?: $staff->operational_role ?: 'Staff'))
+                        ->replace('_', ' ')
+                        ->title()
+                        ->toString(),
+                    'appointment_group_key' => Staff::appointmentGroupKeyForStaff($staff),
+                    'appointment_group_label' => Staff::appointmentGroupLabelForStaff($staff),
+                    'appointment_group_rank' => Staff::appointmentGroupRankForStaff($staff),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function reorderServices(Collection $selectedServices, array $serviceOrderIds): Collection

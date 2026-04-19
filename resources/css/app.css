@@ -666,6 +666,13 @@
         gap: 0.8rem;
     }
 
+    .booking-hero-summary {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 0.8rem;
+        align-items: stretch;
+    }
+
     .metric-card,
     .metric-chip {
         border: 1px solid var(--app-border);
@@ -835,6 +842,12 @@
         border-radius: var(--radius-lg);
     }
 
+    .summary-pill--stack,
+    .booking-hero-note {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
     .summary-pill__label {
         color: var(--app-muted-strong);
         font-size: 0.84rem;
@@ -963,6 +976,10 @@
         cursor: pointer;
     }
 
+    .slot-button[disabled] {
+        cursor: not-allowed;
+    }
+
     .slot-card {
         min-height: 74px;
         border: 1px solid var(--app-border);
@@ -974,6 +991,68 @@
         text-align: center;
         padding: 0.8rem;
         transition: 180ms ease;
+    }
+
+    .slot-card.is-unavailable {
+        border-color: rgba(148, 163, 184, 0.3);
+        background: linear-gradient(180deg, rgba(241, 245, 249, 0.9), rgba(226, 232, 240, 0.86));
+        color: #64748b;
+        box-shadow: none;
+        opacity: 0.78;
+    }
+
+    .slot-card.is-unavailable .slot-card__time,
+    .slot-card.is-unavailable .slot-card__meta {
+        color: #64748b;
+    }
+
+    .availability-modal-card {
+        width: min(1120px, 100%);
+    }
+
+    .availability-modal-body {
+        max-height: min(82vh, 920px);
+        overflow-y: auto;
+    }
+
+    .availability-modal-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .availability-modal-main,
+    .availability-group-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .availability-section,
+    .availability-group {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .availability-group__label {
+        color: var(--app-muted-strong);
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .slot-grid--availability {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .booking-form-grid--customer {
+        align-items: start;
+    }
+
+    .booking-panel--modal {
+        position: sticky;
+        top: 0;
     }
 
     .schedule-card__head {
@@ -3079,6 +3158,14 @@
         justify-content: flex-start;
     }
 
+    .booking-hero-summary,
+    .availability-modal-layout,
+    .service-grid,
+    .arrangement-grid,
+    .eligibility-grid,
+    .booking-form-grid,
+    .slot-grid,
+    .slot-grid--availability,
     .form-grid,
     .modal-meta-grid,
     .selection-grid,
@@ -3106,6 +3193,14 @@
     .col-12, .col-8, .col-6, .col-4, .col-3, .col-2, .col-1,
     .modal-panel--wide {
         grid-column: span 1;
+    }
+
+    .availability-modal-body {
+        max-height: 86vh;
+    }
+
+    .booking-panel--modal {
+        position: static;
     }
 }
 
