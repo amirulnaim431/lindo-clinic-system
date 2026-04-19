@@ -1101,13 +1101,13 @@
         gap: 0.9rem;
     }
 
-    .staff-option-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.7rem;
+    .staff-pill-row {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
     }
 
-    .staff-option-button {
+    .staff-pill-button {
         appearance: none;
         border: none;
         background: none;
@@ -1116,55 +1116,37 @@
         cursor: pointer;
     }
 
-    .staff-option-card {
+    .staff-pill {
         display: grid;
-        gap: 0.55rem;
-        min-height: 100%;
+        gap: 0.18rem;
         border: 1px solid var(--app-border);
-        border-radius: var(--radius-lg);
-        background: rgba(255, 255, 255, 0.03);
-        padding: 0.85rem 0.9rem;
+        border-radius: 999px;
+        background: rgba(255, 251, 252, 0.98);
+        padding: 0.72rem 0.95rem;
         transition: 180ms ease;
     }
 
-    .staff-option-button:hover .staff-option-card,
-    .staff-option-card.is-selected {
+    .staff-pill-button:hover .staff-pill,
+    .staff-pill.is-selected {
         border-color: rgba(201, 146, 115, 0.36);
         background:
-            radial-gradient(circle at top right, rgba(201, 146, 115, 0.14), transparent 34%),
-            rgba(255, 255, 255, 0.04);
+            radial-gradient(circle at top right, rgba(201, 146, 115, 0.12), transparent 34%),
+            rgba(255, 248, 246, 0.98);
         box-shadow: var(--app-shadow-md);
         transform: translateY(-1px);
     }
 
-    .staff-option-card__title {
+    .staff-pill__name {
         color: var(--app-text-strong);
-        font-size: 0.92rem;
+        font-size: 0.84rem;
         font-weight: 800;
+        line-height: 1.1;
     }
 
-    .staff-option-card__details {
-        display: grid;
-        gap: 0.35rem;
-    }
-
-    .staff-option-card__detail-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.8rem;
+    .staff-pill__meta {
         color: var(--app-muted);
-        font-size: 0.78rem;
-        line-height: 1.4;
-    }
-
-    .staff-option-card__service {
-        font-weight: 700;
-        color: var(--app-muted-strong);
-    }
-
-    .staff-option-card__staff {
-        text-align: right;
+        font-size: 0.68rem;
+        line-height: 1.2;
     }
 
     .slot-grid--availability {
@@ -3300,7 +3282,6 @@
 
     .booking-hero-summary,
     .availability-modal-layout,
-    .staff-option-grid,
     .service-grid,
     .arrangement-grid,
     .eligibility-grid,
