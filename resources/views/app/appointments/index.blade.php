@@ -549,8 +549,8 @@
         @if (! $isCheckInMode && ! empty($availability))
             <div id="availability-modal" class="modal-shell hidden" aria-hidden="true">
                 <div class="modal-backdrop" data-close-availability-modal></div>
-                <div class="modal-stage">
-                    <div class="modal-card availability-modal-card">
+                <div class="modal-stage" style="padding: clamp(12px, 2vw, 24px);">
+                    <div class="modal-card availability-modal-card" style="width:min(1480px, 96vw); max-height:calc(100vh - 2rem);">
                         <div class="modal-header">
                             <div class="modal-header__row">
                                 <div>
@@ -560,167 +560,171 @@
                                 <button type="button" class="btn btn-secondary" data-close-availability-modal>Close</button>
                             </div>
                         </div>
-                        <div class="modal-body">
-                            <div class="availability-grid">
-                        @if (! empty($availability['services_without_eligible_staff']))
-                            <div class="flash flash--error">No active eligible staff assigned for: <strong>{{ implode(', ', $availability['services_without_eligible_staff']) }}</strong></div>
-                        @endif
-
-                        @if (! empty($availability['fully_booked_message']))
-                            <div class="flash flash--warn">{{ $availability['fully_booked_message'] }}</div>
-                        @endif
-
-                        @if (! empty($availability['custom_missing_message']))
-                            <div class="flash flash--warn">{{ $availability['custom_missing_message'] }}</div>
-                        @endif
-
-                        <div class="eligibility-grid">
-                            @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
-                                <div class="eligibility-card">
-                                    <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
-                                    @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
-                                        <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
+                        <div class="modal-body availability-modal-body" style="max-height:calc(100vh - 10.5rem);">
+                            <div class="availability-modal-layout" style="grid-template-columns:minmax(0, 1.8fr) minmax(360px, 1fr);">
+                                <div class="availability-modal-main">
+                                    @if (! empty($availability['services_without_eligible_staff']))
+                                        <div class="flash flash--error">No active eligible staff assigned for: <strong>{{ implode(', ', $availability['services_without_eligible_staff']) }}</strong></div>
                                     @endif
-                                    @if (empty($serviceSummary['eligible_staff']))
-                                        <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
-                                    @else
-                                        @php
-                                            $groupedServiceStaff = collect($serviceSummary['eligible_staff'])
-                                                ->groupBy(fn ($staff) => $staffGroupKey($staff))
-                                                ->sortBy(fn ($group, $key) => $staffGroupConfig[$key]['rank'] ?? 99);
-                                        @endphp
-                                        <div class="staff-group-list">
-                                            @foreach ($groupedServiceStaff as $groupKey => $staffMembers)
-                                                <div class="staff-group-item">
-                                                    <div class="staff-group-item__label">{{ $staffGroupConfig[$groupKey]['label'] ?? 'Remaining Staff' }}</div>
-                                                    <div class="staff-chip-wrap">
-                                                        @foreach ($staffMembers as $staff)
-                                                            <span class="staff-chip">{{ $staff['full_name'] }} ({{ $staff['role_key'] }})</span>
+
+                                    @if (! empty($availability['fully_booked_message']))
+                                        <div class="flash flash--warn">{{ $availability['fully_booked_message'] }}</div>
+                                    @endif
+
+                                    @if (! empty($availability['custom_missing_message']))
+                                        <div class="flash flash--warn">{{ $availability['custom_missing_message'] }}</div>
+                                    @endif
+
+                                    <div class="eligibility-grid">
+                                        @foreach (($availability['selected_services'] ?? []) as $serviceSummary)
+                                            <div class="eligibility-card">
+                                                <div class="eligibility-card__title">{{ $serviceSummary['name'] ?? 'Service' }}</div>
+                                                @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
+                                                    <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
+                                                @endif
+                                                @if (empty($serviceSummary['eligible_staff']))
+                                                    <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
+                                                @else
+                                                    @php
+                                                        $groupedServiceStaff = collect($serviceSummary['eligible_staff'])
+                                                            ->groupBy(fn ($staff) => $staffGroupKey($staff))
+                                                            ->sortBy(fn ($group, $key) => $staffGroupConfig[$key]['rank'] ?? 99);
+                                                    @endphp
+                                                    <div class="staff-group-list">
+                                                        @foreach ($groupedServiceStaff as $groupKey => $staffMembers)
+                                                            <div class="staff-group-item">
+                                                                <div class="staff-group-item__label">{{ $staffGroupConfig[$groupKey]['label'] ?? 'Remaining Staff' }}</div>
+                                                                <div class="staff-chip-wrap">
+                                                                    @foreach ($staffMembers as $staff)
+                                                                        <span class="staff-chip">{{ $staff['full_name'] }} ({{ $staff['role_key'] }})</span>
+                                                                    @endforeach
+                                                                </div>
+                                                            </div>
                                                         @endforeach
                                                     </div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    @if ($selectedArrangementMode !== 'custom' && count($slotOptions))
+                                        <div class="availability-section">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                                                <div>
+                                                    <div class="ops-kicker">Choose a viable time</div>
+                                                    <h4 class="panel-title-display" style="font-size:18px;">Available booking windows</h4>
                                                 </div>
+                                                @if ($selectedSlotRow)
+                                                    <div class="summary-pill" style="padding:10px 12px;">
+                                                        <span class="summary-pill__label">Selected slot duration</span>
+                                                        <span class="summary-pill__value">{{ $selectedSlotRow['duration_minutes'] ?? ($availability['duration_minutes'] ?? 0) }} mins</span>
+                                                    </div>
+                                                @endif
+                                            </div>
+
+                                            <div class="slot-grid" style="margin-top:16px;">
+                                                @foreach ($slotOptions as $slot)
+                                                    <button
+                                                        type="button"
+                                                        class="slot-button slot-select-button {{ $slot['is_available'] ? '' : 'is-disabled' }}"
+                                                        data-slot-time="{{ $slot['time'] }}"
+                                                        data-combinations='@json($slot['combinations'])'
+                                                        {{ $slot['is_available'] ? '' : 'disabled aria-disabled=true' }}
+                                                    >
+                                                        <div class="slot-card {{ $slot['is_prefilled'] ? 'is-selected' : '' }} {{ $slot['is_available'] ? '' : 'is-unavailable' }}">
+                                                            <div>
+                                                                <div class="slot-card__time">{{ $slot['time'] }}</div>
+                                                                <div class="slot-card__meta">
+                                                                    {{ $slot['is_available'] ? $slot['count'].' valid combo'.($slot['count'] === 1 ? '' : 's') : 'Unavailable' }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
+                                    <div class="ops-kicker">Confirm booking</div>
+                                    <div class="booking-panel__title">
+                                        @if ($selectedArrangementMode === 'custom')
+                                            Create custom appointment
+                                        @else
+                                            Create appointment at <span id="selected-slot-time-label">-</span>
+                                        @endif
+                                    </div>
+
+                                    <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form" data-preserve-scroll-form>
+                                        @csrf
+                                        <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
+                                        <input type="hidden" name="date" value="{{ $selectedDate }}">
+                                        <input type="hidden" name="slot" id="selected-slot-input" value="">
+                                        <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
+                                        <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
+                                        @foreach ($selectedServiceIds as $serviceId)
+                                            <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
+                                        @endforeach
+                                        <div id="booking-service-order-inputs">
+                                            @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                                <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
                                             @endforeach
                                         </div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-
-                        @if ($selectedArrangementMode !== 'custom' && count($slotOptions))
-                            <div>
-                                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                                    <div>
-                                        <div class="ops-kicker">Choose a viable time</div>
-                                        <h4 class="panel-title-display" style="font-size:18px;">Available booking windows</h4>
-                                    </div>
-                                    @if ($selectedSlotRow)
-                                        <div class="summary-pill" style="padding:10px 12px;">
-                                            <span class="summary-pill__label">Selected slot duration</span>
-                                            <span class="summary-pill__value">{{ $selectedSlotRow['duration_minutes'] ?? ($availability['duration_minutes'] ?? 0) }} mins</span>
+                                        <div id="booking-selected-option-inputs">
+                                            @foreach ($selectedOptions as $serviceId => $groupSelections)
+                                                @foreach ($groupSelections as $groupId => $valueId)
+                                                    <input type="hidden" name="selected_options[{{ $serviceId }}][{{ $groupId }}]" value="{{ $valueId }}">
+                                                @endforeach
+                                            @endforeach
                                         </div>
-                                    @endif
-                                </div>
-
-                                <div class="slot-grid" style="margin-top:16px;">
-                                    @foreach ($slotOptions as $slot)
-                                        <button
-                                            type="button"
-                                            class="slot-button slot-select-button {{ $slot['is_available'] ? '' : 'is-disabled' }}"
-                                            data-slot-time="{{ $slot['time'] }}"
-                                            data-combinations='@json($slot['combinations'])'
-                                            {{ $slot['is_available'] ? '' : 'disabled aria-disabled=true' }}
-                                        >
-                                            <div class="slot-card {{ $slot['is_prefilled'] ? 'is-selected' : '' }} {{ $slot['is_available'] ? '' : 'is-unavailable' }}">
-                                                <div>
-                                                    <div class="slot-card__time">{{ $slot['time'] }}</div>
-                                                    <div class="slot-card__meta">
-                                                        {{ $slot['is_available'] ? $slot['count'].' valid combo'.($slot['count'] === 1 ? '' : 's') : 'Unavailable' }}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        <div id="selected-slot-card" class="booking-panel {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
-                            <div class="ops-kicker">Confirm booking</div>
-                            <div class="booking-panel__title">
-                                @if ($selectedArrangementMode === 'custom')
-                                    Create custom appointment
-                                @else
-                                    Create appointment at <span id="selected-slot-time-label">-</span>
-                                @endif
-                            </div>
-
-                            <form method="POST" action="{{ route('app.appointments.store') }}" class="booking-form" data-preserve-scroll-form>
-                                @csrf
-                                <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id') }}">
-                                <input type="hidden" name="date" value="{{ $selectedDate }}">
-                                <input type="hidden" name="slot" id="selected-slot-input" value="">
-                                <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
-                                <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
-                                @foreach ($selectedServiceIds as $serviceId)
-                                    <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
-                                @endforeach
-                                <div id="booking-service-order-inputs">
-                                    @foreach ($selectedServiceOrderIds as $serviceOrderId)
-                                        <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
-                                    @endforeach
-                                </div>
-                                <div id="booking-selected-option-inputs">
-                                    @foreach ($selectedOptions as $serviceId => $groupSelections)
-                                        @foreach ($groupSelections as $groupId => $valueId)
-                                            <input type="hidden" name="selected_options[{{ $serviceId }}][{{ $groupId }}]" value="{{ $valueId }}">
+                                        @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                            <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][date]" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
+                                            <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][start_time]" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
                                         @endforeach
-                                    @endforeach
-                                </div>
-                                @foreach ($selectedServiceOrderIds as $serviceOrderId)
-                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][date]" value="{{ $customSchedule[$serviceOrderId]['date'] ?? $selectedDate }}">
-                                    <input type="hidden" name="custom_schedule[{{ $serviceOrderId }}][start_time]" value="{{ $customSchedule[$serviceOrderId]['start_time'] ?? '' }}">
-                                @endforeach
 
-                                <div class="booking-form-grid">
-                                    <div class="field-block">
-                                        <label for="booking_date_display">Date</label>
-                                        <input id="booking_date_display" type="text" class="field-input" value="{{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}" readonly>
-                                    </div>
-                                    <div class="field-block customer-picker">
-                                        <label for="customer_full_name">Customer name</label>
-                                        <input
-                                            id="customer_full_name"
-                                            type="text"
-                                            name="customer_full_name"
-                                            value="{{ old('customer_full_name') }}"
-                                            class="field-input"
-                                            autocomplete="off"
-                                            placeholder="Start typing member name or phone"
-                                            required
-                                        >
-                                        <div id="customer_suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
-                                        <div id="customer_selected_hint" class="customer-picked hidden"></div>
-                                    </div>
-                                    <div class="field-block">
-                                        <label for="customer_phone">Customer phone</label>
-                                        <input id="customer_phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}" class="field-input" required>
-                                    </div>
-                                </div>
+                                        <div class="booking-form-grid">
+                                            <div class="field-block">
+                                                <label for="booking_date_display">Date</label>
+                                                <input id="booking_date_display" type="text" class="field-input" value="{{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}" readonly>
+                                            </div>
+                                            <div class="field-block customer-picker">
+                                                <label for="customer_full_name">Customer name</label>
+                                                <input
+                                                    id="customer_full_name"
+                                                    type="text"
+                                                    name="customer_full_name"
+                                                    value="{{ old('customer_full_name') }}"
+                                                    class="field-input"
+                                                    autocomplete="off"
+                                                    placeholder="Start typing member name or phone"
+                                                    required
+                                                >
+                                                <div id="customer_suggestions" class="customer-suggestions hidden" role="listbox" aria-label="Customer suggestions"></div>
+                                                <div id="customer_selected_hint" class="customer-picked hidden"></div>
+                                            </div>
+                                            <div class="field-block">
+                                                <label for="customer_phone">Customer phone</label>
+                                                <input id="customer_phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}" class="field-input" required>
+                                            </div>
+                                        </div>
 
-                                <div class="field-block">
-                                    <label for="selected_combination_select">Staff combination</label>
-                                    <select id="selected_combination_select" class="field-input select-input" required></select>
-                                </div>
+                                        <div class="field-block">
+                                            <label for="selected_combination_select">Staff combination</label>
+                                            <select id="selected_combination_select" class="field-input select-input" required></select>
+                                        </div>
 
-                                <div class="field-block">
-                                    <label for="notes">Front desk notes</label>
-                                    <textarea id="notes" name="notes" class="field-input booking-textarea">{{ old('notes') }}</textarea>
-                                </div>
+                                        <div class="field-block">
+                                            <label for="notes">Front desk notes</label>
+                                            <textarea id="notes" name="notes" class="field-input booking-textarea">{{ old('notes') }}</textarea>
+                                        </div>
 
-                                <div style="display:flex;justify-content:flex-end;">
-                                    <button type="submit" class="action-btn action-btn--primary">Create Appointment</button>
+                                        <div class="booking-panel__footer">
+                                            <button type="submit" class="action-btn action-btn--primary">Create Appointment</button>
+                                        </div>
+                                    </form>
                                 </div>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </div>
