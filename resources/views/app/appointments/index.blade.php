@@ -170,6 +170,7 @@
             return $raw;
         };
         $customSchedule = $customSchedule ?? [];
+        $shouldAutoOpenAvailability = ! empty($availability) && (bool) ($filters['open_availability'] ?? false);
         $staffGroupConfig = [
             'doctor' => ['label' => 'Doctors', 'rank' => 1],
             'nurse' => ['label' => 'Nurses', 'rank' => 2],
@@ -372,6 +373,7 @@
                             <input type="hidden" name="mode" value="{{ $mode }}">
                             <input type="hidden" name="date" value="{{ $selectedDate }}">
                             <input type="hidden" name="slot" value="{{ $prefilledSlot }}">
+                            <input type="hidden" name="open_availability" value="1">
                             <div id="service-order-inputs">
                                 @foreach ($selectedServiceOrderIds as $serviceOrderId)
                                     <input type="hidden" name="service_order[]" value="{{ $serviceOrderId }}">
@@ -1472,7 +1474,7 @@
                 }
             }
 
-            if (availabilityModal) {
+            if (availabilityModal && shouldAutoOpenAvailability) {
                 openAvailabilityModal();
             }
         });
