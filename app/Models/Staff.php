@@ -19,6 +19,7 @@ class Staff extends Model
         'doctor' => 'Doctor',
         'nurse' => 'Nurse',
         'beautician' => 'Beautician',
+        'manicurist' => 'Manicurist',
         'admin' => 'Administration',
         'operations' => 'Operations',
         'marketing' => 'Sales & Marketing',
@@ -169,9 +170,10 @@ class Staff extends Model
 
         return match ($normalized) {
             'management' => 'management',
-            'aesthetic', 'aestatic', 'beautician' => 'aesthetic',
             'doctor' => 'doctor',
             'nurse' => 'nurse',
+            'aesthetic', 'aestatic', 'beautician' => 'aesthetic',
+            'manicurist', 'spa', 'spa_beauty' => 'spa',
             default => 'others',
         };
     }
@@ -198,7 +200,7 @@ class Staff extends Model
         $normalizedRole = self::normalizePicGroup($role);
         $search = implode(' ', array_filter([$department, $jobTitle, $role]));
 
-        if (str_contains($name, 'monica') || str_contains($name, 'van ')) {
+        if (str_contains($name, 'monica') || preg_match('/\bvan\b/u', $name)) {
             return 'spa';
         }
 

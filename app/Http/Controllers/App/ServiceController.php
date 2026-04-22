@@ -4,6 +4,9 @@ namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
 use App\Models\Service;
+use App\Models\ServiceOptionGroup;
+use App\Models\Staff;
+use Illuminate\Support\Str;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -22,6 +25,7 @@ class ServiceController extends Controller
 
         if ($catalogReady) {
             $services = Service::query()
+                ->with('optionGroups')
                 ->when($search !== '', function ($query) use ($search) {
                     $like = '%'.$search.'%';
                     $query->where(function ($builder) use ($like) {
@@ -55,6 +59,7 @@ class ServiceController extends Controller
                 'status' => in_array($status, ['active', 'inactive', 'all'], true) ? $status : 'active',
             ],
             'categoryOptions' => Service::categoryOptions(),
+            'roleOptions' => Staff::operationalRoleOptions(),
         ]);
     }
 
@@ -79,7 +84,9 @@ class ServiceController extends Controller
                 ->with('error', 'Run the latest migration before adding services.');
         }
 
-        $service = Service::query()->create($this->validatedData($request));
+        $data = $this->validatedData($request);
+        $service = Service::query()->create(collect($data)->except('option_group_ids')->all());
+        $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
 
         return redirect()
             ->route('app.services.edit', $service)
@@ -101,7 +108,9 @@ class ServiceController extends Controller
                 ->with('error', 'Run the latest migration before updating services.');
         }
 
-        $service->update($this->validatedData($request, $service));
+        $data = $this->validatedData($request, $service);
+        $service->update(collect($data)->except('option_group_ids')->all());
+        $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
 
         return redirect()
             ->route('app.services.edit', $service)
@@ -114,6 +123,16 @@ class ServiceController extends Controller
             'mode' => $mode,
             'service' => $service,
             'categoryOptions' => Service::categoryOptions(),
+            'roleOptions' => Staff::operationalRoleOptions(),
+            'optionGroups' => ServiceOptionGroup::query()
+                ->with('values')
+                ->where('is_active', true)
+                ->orderBy('display_order')
+                ->orderBy('name')
+                ->get(),
+            'selectedOptionGroupIds' => $service->exists
+                ? $service->optionGroups()->pluck('service_option_groups.id')->map(fn ($id) => (string) $id)->all()
+                : [],
         ]);
     }
 
@@ -127,6 +146,7 @@ class ServiceController extends Controller
                 Rule::unique('services', 'name')->ignore($service?->id),
             ],
             'category_key' => ['required', 'string', Rule::in(array_keys(Service::categoryOptions()))],
+            'default_staff_role' => ['nullable', 'string', Rule::in(array_keys(Staff::operationalRoleOptions()))],
             'description' => ['nullable', 'string', 'max:4000'],
             'duration_minutes' => ['required', 'integer', 'min:15', 'max:480'],
             'price' => ['nullable', 'integer', 'min:0'],
@@ -134,6 +154,8 @@ class ServiceController extends Controller
             'display_order' => ['nullable', 'integer', 'min:0', 'max:999'],
             'is_active' => ['nullable'],
             'is_promo' => ['nullable'],
+            'option_group_ids' => ['nullable', 'array'],
+            'option_group_ids.*' => ['string', Rule::exists('service_option_groups', 'id')],
         ]);
 
         $data['is_active'] = $request->boolean('is_active');
@@ -145,5 +167,19 @@ class ServiceController extends Controller
         }
 
         return $data;
+    }
+
+    private function optionGroupSyncPayload(array $optionGroupIds): array
+    {
+        return collect($optionGroupIds)
+            ->values()
+            ->mapWithKeys(fn ($id, $index) => [(string) $id => [
+                'id' => (string) Str::ulid(),
+                'is_required' => true,
+                'display_order' => $index + 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]])
+            ->all();
     }
 }

@@ -127,8 +127,23 @@
                                         <div class="stack mt-3">
                                             @forelse($group->items as $item)
                                                 <div class="summary-card">
-                                                    <div class="selection-card__title">{{ $item->service->name ?? 'Service' }}</div>
-                                                    <div class="small-note">{{ $item->staff->full_name ?? 'Unassigned staff' }}</div>
+                                                    <div class="filter-bar__head" style="align-items:flex-start;">
+                                                        <div>
+                                                            <div class="micro-label">{{ $item->displayCategoryLabel() }}</div>
+                                                            <div class="selection-card__title mt-2">{{ $item->displayServiceName() }}</div>
+                                                        </div>
+                                                        @if($item->displayStaffRole())
+                                                            <span class="chip">{{ \Illuminate\Support\Str::headline($item->displayStaffRole()) }}</span>
+                                                        @endif
+                                                    </div>
+                                                    @if($item->optionSelections->isNotEmpty())
+                                                        <div class="inline-chip-row mt-3">
+                                                            @foreach($item->optionSelections as $selection)
+                                                                <span class="status-chip status-chip--info">{{ $selection->option_group_name }}: {{ $selection->option_value_label }}</span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                    <div class="small-note mt-3">Staff: {{ $item->displayStaffName() }}</div>
                                                 </div>
                                             @empty
                                                 <div class="small-note">No appointment item details available.</div>
@@ -165,8 +180,23 @@
                                         <div class="stack mt-3">
                                             @forelse($group->items as $item)
                                                 <div class="summary-card">
-                                                    <div class="selection-card__title">{{ $item->service->name ?? 'Service' }}</div>
-                                                    <div class="small-note">{{ $item->staff->full_name ?? 'Unassigned staff' }}</div>
+                                                    <div class="filter-bar__head" style="align-items:flex-start;">
+                                                        <div>
+                                                            <div class="micro-label">{{ $item->displayCategoryLabel() }}</div>
+                                                            <div class="selection-card__title mt-2">{{ $item->displayServiceName() }}</div>
+                                                        </div>
+                                                        @if($item->displayStaffRole())
+                                                            <span class="chip">{{ \Illuminate\Support\Str::headline($item->displayStaffRole()) }}</span>
+                                                        @endif
+                                                    </div>
+                                                    @if($item->optionSelections->isNotEmpty())
+                                                        <div class="inline-chip-row mt-3">
+                                                            @foreach($item->optionSelections as $selection)
+                                                                <span class="status-chip status-chip--info">{{ $selection->option_group_name }}: {{ $selection->option_value_label }}</span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                    <div class="small-note mt-3">Staff: {{ $item->displayStaffName() }}</div>
                                                 </div>
                                             @empty
                                                 <div class="small-note">No appointment item details available.</div>

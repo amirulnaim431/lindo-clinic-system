@@ -70,6 +70,7 @@ class CustomerController extends Controller
         $customer->loadMissing([
             'appointmentGroups.items.service',
             'appointmentGroups.items.staff',
+            'appointmentGroups.items.optionSelections',
         ]);
 
         [$upcomingAppointments, $appointmentHistory] = $this->resolveAppointmentBuckets($customer);

@@ -27,6 +27,7 @@ class StaffController extends Controller
             'Executive Office' => 'Executive Office',
             'Medical' => 'Medical',
             'Beauty & Aesthetic' => 'Beauty & Aesthetic',
+            'Spa' => 'Spa',
             'Administration' => 'Administration',
             'Finance & Accounts' => 'Finance & Accounts',
             'Human Resources' => 'Human Resources',
@@ -68,6 +69,7 @@ class StaffController extends Controller
         }
 
         return $query
+            ->with('optionGroups')
             ->orderBy('name')
             ->get();
     }
@@ -224,9 +226,9 @@ class StaffController extends Controller
             'full_name' => $data['full_name'],
             'employee_code' => $data['employee_code'] ?: $this->generateNextEmployeeCode(),
             'job_title' => $data['job_title'],
-            'department' => $data['department'] ?: null,
-            'phone' => $data['phone'] ?: null,
-            'email' => $data['email'] ?: null,
+            'department' => ($data['department'] ?? null) ?: null,
+            'phone' => ($data['phone'] ?? null) ?: null,
+            'email' => ($data['email'] ?? null) ?: null,
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],
@@ -263,9 +265,9 @@ class StaffController extends Controller
             'full_name' => $data['full_name'],
             'employee_code' => $data['employee_code'] ?: ($staff->employee_code ?: $this->generateNextEmployeeCode()),
             'job_title' => $data['job_title'],
-            'department' => $data['department'] ?: null,
-            'phone' => $data['phone'] ?: null,
-            'email' => $data['email'] ?: null,
+            'department' => ($data['department'] ?? null) ?: null,
+            'phone' => ($data['phone'] ?? null) ?: null,
+            'email' => ($data['email'] ?? null) ?: null,
             'operational_role' => $data['operational_role'],
             'is_active' => $data['is_active'],
             'can_login' => $data['can_login'],

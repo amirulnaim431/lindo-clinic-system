@@ -27,6 +27,7 @@ class AppointmentController extends Controller
             'date' => $request->input('date') ?: now()->format('Y-m-d'),
             'service_ids' => $request->input('service_ids', []),
             'service_order' => $request->input('service_order', []),
+            'selected_options' => $this->normalizeSelectedOptionsInput($request->input('selected_options', [])),
             'arrangement_mode' => $this->normalizeArrangementMode($request->input('arrangement_mode')),
             'custom_schedule' => $request->input('custom_schedule', []),
             'open_availability' => $request->boolean('open_availability'),
@@ -59,6 +60,7 @@ class AppointmentController extends Controller
             ->all();
 
         $servicesQuery = Service::query()
+            ->with('optionGroups.values')
             ->where('is_active', true);
 
         if (Service::supportsCatalogFields()) {
@@ -93,7 +95,7 @@ class AppointmentController extends Controller
         $selectedDayEnd = Carbon::parse($filters['date'])->endOfDay();
 
         $appointmentGroupsQuery = AppointmentGroup::query()
-            ->with(['customer', 'items.staff', 'items.service'])
+            ->with(['customer', 'items.staff', 'items.service', 'items.optionSelections'])
             ->where('starts_at', '<=', $selectedDayEnd)
             ->where('ends_at', '>=', $selectedDayStart)
             ->orderBy('starts_at');
@@ -119,6 +121,7 @@ class AppointmentController extends Controller
 
         if (! empty($filters['service_ids'])) {
             $selectedServicesQuery = Service::query()
+                ->with('optionGroups.values')
                 ->with(['staff' => function ($query) {
                     $query->where('is_active', true)->orderBy('full_name');
                 }])
@@ -135,6 +138,7 @@ class AppointmentController extends Controller
 
             if ($selectedServices->isNotEmpty()) {
                 $selectedServices = $this->reorderServices($selectedServices, $filters['service_order']);
+                $filters['selected_options'] = $this->normalizeSelectedOptionsForServices($filters['selected_options'], $selectedServices);
                 $customSchedule = $this->normalizeCustomScheduleInput(
                     $filters['custom_schedule'],
                     $selectedServices,
@@ -204,12 +208,14 @@ class AppointmentController extends Controller
             'custom_schedule.*.date' => ['nullable', 'date_format:Y-m-d'],
             'custom_schedule.*.start_time' => ['nullable', 'date_format:H:i'],
             'selected_combination' => ['required', 'string'],
+            'selected_options' => ['nullable', 'array'],
             'customer_full_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $selectedServicesQuery = Service::query()
+            ->with('optionGroups.values')
             ->with(['staff' => function ($query) {
                 $query->where('is_active', true)->orderBy('full_name');
             }])
@@ -231,6 +237,10 @@ class AppointmentController extends Controller
         }
 
         $selectedServices = $this->reorderServices($selectedServices, $validated['service_order'] ?? []);
+        $selectedOptionSelections = $this->resolveSelectedOptions(
+            $selectedServices,
+            $this->normalizeSelectedOptionsInput($validated['selected_options'] ?? [])
+        );
         $arrangementMode = $this->normalizeArrangementMode($validated['arrangement_mode']);
         $serviceOrderIds = $selectedServices->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
 
@@ -363,7 +373,7 @@ class AppointmentController extends Controller
             $resolvedAssignments[$serviceId] = $staff;
         }
 
-        DB::transaction(function () use ($validated, $visitStart, $visitEnd, $selectedServices, $resolvedAssignments, $serviceSchedules) {
+        DB::transaction(function () use ($validated, $visitStart, $visitEnd, $selectedServices, $resolvedAssignments, $serviceSchedules, $selectedOptionSelections) {
             $phone = trim($validated['customer_phone']);
             $customer = null;
 
@@ -402,14 +412,32 @@ class AppointmentController extends Controller
                 $assignedStaff = $resolvedAssignments[$serviceId];
                 $schedule = $serviceSchedules[$serviceId];
 
-                AppointmentItem::query()->create([
+                $appointmentItem = AppointmentItem::query()->create([
                     'appointment_group_id' => $group->id,
                     'service_id' => $service->id,
+                    'service_name_snapshot' => $service->name,
+                    'service_category_key_snapshot' => $service->category_key,
+                    'service_category_label_snapshot' => $service->category_label,
                     'staff_id' => $assignedStaff->id,
+                    'staff_name_snapshot' => $assignedStaff->full_name,
+                    'staff_role_snapshot' => $assignedStaff->role_key,
                     'required_role' => $assignedStaff->role_key,
                     'starts_at' => $schedule['start'],
                     'ends_at' => $schedule['end'],
                 ]);
+
+                $appointmentItem->optionSelections()->createMany(
+                    collect($selectedOptionSelections[$serviceId] ?? [])
+                        ->map(fn (array $selection) => [
+                            'service_option_group_id' => $selection['group_id'],
+                            'service_option_value_id' => $selection['value_id'],
+                            'option_group_name' => $selection['group_name'],
+                            'option_value_label' => $selection['value_label'],
+                            'display_order' => $selection['display_order'],
+                        ])
+                        ->values()
+                        ->all()
+                );
             }
         });
 
@@ -651,7 +679,12 @@ class AppointmentController extends Controller
             foreach ($preparedItems as $preparedItem) {
                 $preparedItem['item']->update([
                     'service_id' => $preparedItem['service']->id,
+                    'service_name_snapshot' => $preparedItem['service']->name,
+                    'service_category_key_snapshot' => $preparedItem['service']->category_key,
+                    'service_category_label_snapshot' => $preparedItem['service']->category_label,
                     'staff_id' => $preparedItem['staff_id'],
+                    'staff_name_snapshot' => $preparedItem['staff']?->full_name,
+                    'staff_role_snapshot' => $preparedItem['staff']?->role_key,
                     'required_role' => $preparedItem['staff']?->role_key,
                     'starts_at' => $preparedItem['start'],
                     'ends_at' => $preparedItem['end'],
@@ -853,6 +886,7 @@ class AppointmentController extends Controller
                 'id' => (string) $service->id,
                 'name' => $service->name,
                 'category_key' => $service->category_key,
+                'category_label' => $service->category_label,
                 'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
                 'eligible_staff' => $this->mapStaffForAppointmentFlow(
                     $service->staff->where('is_active', true)
@@ -968,6 +1002,7 @@ class AppointmentController extends Controller
                 'id' => $serviceId,
                 'name' => $service->name,
                 'category_key' => $service->category_key,
+                'category_label' => $service->category_label,
                 'duration_minutes' => max(30, (int) ($service->duration_minutes ?: 60)),
                 'scheduled_date' => $schedule['date'] ?? null,
                 'scheduled_time' => $schedule['start_time'] ?? null,
@@ -1262,6 +1297,90 @@ class AppointmentController extends Controller
         }
 
         return $normalized === 'reschedule' ? 'reschedule' : $normalized;
+    }
+
+    private function normalizeSelectedOptionsInput(mixed $input): array
+    {
+        if (! is_array($input)) {
+            return [];
+        }
+
+        return collect($input)
+            ->mapWithKeys(function ($groupSelections, $serviceId) {
+                if (! is_array($groupSelections)) {
+                    return [];
+                }
+
+                return [(string) $serviceId => collect($groupSelections)
+                    ->filter(fn ($value) => is_scalar($value) && trim((string) $value) !== '')
+                    ->mapWithKeys(fn ($value, $groupId) => [(string) $groupId => (string) $value])
+                    ->all()];
+            })
+            ->all();
+    }
+
+    private function normalizeSelectedOptionsForServices(array $selectedOptions, Collection $selectedServices): array
+    {
+        return $selectedServices
+            ->mapWithKeys(function (Service $service) use ($selectedOptions) {
+                $serviceId = (string) $service->id;
+                $serviceSelections = $selectedOptions[$serviceId] ?? [];
+                $allowedGroupIds = $service->optionGroups->pluck('id')->map(fn ($id) => (string) $id);
+
+                return [$serviceId => collect($serviceSelections)
+                    ->filter(fn ($value, $groupId) => $allowedGroupIds->contains((string) $groupId))
+                    ->mapWithKeys(fn ($value, $groupId) => [(string) $groupId => (string) $value])
+                    ->all()];
+            })
+            ->all();
+    }
+
+    private function resolveSelectedOptions(Collection $selectedServices, array $selectedOptions): array
+    {
+        $resolved = [];
+        $errors = [];
+
+        foreach ($selectedServices as $service) {
+            $serviceId = (string) $service->id;
+            $serviceSelections = $selectedOptions[$serviceId] ?? [];
+
+            foreach ($service->optionGroups as $group) {
+                $groupId = (string) $group->id;
+                $valueId = $serviceSelections[$groupId] ?? null;
+                $isRequired = (bool) ($group->pivot?->is_required ?? true);
+
+                if (! $valueId) {
+                    if ($isRequired) {
+                        $errors[] = 'Choose a '.$group->name.' option for '.$service->name.'.';
+                    }
+
+                    continue;
+                }
+
+                $value = $group->values->firstWhere('id', $valueId);
+
+                if (! $value) {
+                    $errors[] = 'Selected option is invalid for '.$service->name.'.';
+                    continue;
+                }
+
+                $resolved[$serviceId][] = [
+                    'group_id' => $group->id,
+                    'group_name' => $group->name,
+                    'value_id' => $value->id,
+                    'value_label' => $value->label,
+                    'display_order' => (int) ($group->pivot?->display_order ?? 0),
+                ];
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages([
+                'selected_options' => $errors,
+            ]);
+        }
+
+        return $resolved;
     }
 
     private function syncAppointmentGroupWindow(?AppointmentGroup $group): void

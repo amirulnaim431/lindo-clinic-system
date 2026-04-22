@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Throwable;
 use Illuminate\Support\Facades\Schema;
@@ -14,10 +15,10 @@ class Service extends Model
     use SoftDeletes;
 
     public const CATEGORY_OPTIONS = [
-        'consultations' => 'Consultations',
+        'consultations' => 'Consultation',
         'wellness' => 'Wellness',
-        'aesthetics' => 'Aesthetics',
-        'spa' => 'Spa',
+        'aesthetics' => 'Aesthetic',
+        'spa' => 'Beauty Spa',
     ];
 
     public $incrementing = false;
@@ -25,8 +26,10 @@ class Service extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
+        'service_code',
         'name',
         'category_key',
+        'default_staff_role',
         'description',
         'duration_minutes',
         'price',
@@ -58,6 +61,8 @@ class Service extends Model
             try {
                 $supportsCatalogFields =
                     Schema::hasColumn('services', 'category_key')
+                    && Schema::hasColumn('services', 'service_code')
+                    && Schema::hasColumn('services', 'default_staff_role')
                     && Schema::hasColumn('services', 'description')
                     && Schema::hasColumn('services', 'promo_price')
                     && Schema::hasColumn('services', 'is_promo')
@@ -115,6 +120,16 @@ class Service extends Model
     public function appointments()
     {
         return $this->hasMany(Appointment::class);
+    }
+
+    public function optionGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(ServiceOptionGroup::class, 'service_option_group_service')
+            ->withPivot(['id', 'is_required', 'display_order'])
+            ->withTimestamps()
+            ->orderByPivot('display_order')
+            ->orderBy('service_option_groups.display_order')
+            ->orderBy('service_option_groups.name');
     }
 
     public function staff()

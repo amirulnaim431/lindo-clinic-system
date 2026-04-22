@@ -40,6 +40,16 @@
                         </div>
 
                         <div class="col-3 field-block">
+                            <label class="field-label" for="default_staff_role">Default staff role</label>
+                            <select id="default_staff_role" name="default_staff_role" class="form-select">
+                                <option value="">No default role</option>
+                                @foreach ($roleOptions as $key => $label)
+                                    <option value="{{ $key }}" @selected(old('default_staff_role', $service->default_staff_role) === $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-3 field-block">
                             <label class="field-label" for="duration_minutes">Duration (mins)</label>
                             <input id="duration_minutes" name="duration_minutes" type="number" min="15" max="480" class="form-input" value="{{ old('duration_minutes', $service->duration_minutes ?? 60) }}" required>
                         </div>
@@ -67,6 +77,27 @@
                             <textarea id="description" name="description" class="form-input booking-textarea">{{ old('description', $service->description) }}</textarea>
                         </div>
 
+                        <div class="col-12 field-block">
+                            <label class="field-label">Reusable option groups</label>
+                            <div class="selection-grid">
+                                @foreach ($optionGroups as $group)
+                                    @php
+                                        $selected = in_array((string) $group->id, old('option_group_ids', $selectedOptionGroupIds ?? []), true);
+                                    @endphp
+                                    <label class="selection-card {{ $selected ? 'is-selected' : '' }}">
+                                        <input type="checkbox" name="option_group_ids[]" value="{{ $group->id }}" class="selection-input service-option-checkbox" {{ $selected ? 'checked' : '' }}>
+                                        <div class="selection-card__head">
+                                            <div>
+                                                <div class="selection-card__title">{{ $group->name }}</div>
+                                                <div class="selection-card__meta">{{ $group->values->pluck('label')->implode(' | ') }}</div>
+                                            </div>
+                                            <span class="selection-card__badge">{{ $selected ? 'Assigned' : $group->values->count().' options' }}</span>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+
                         <div class="col-12">
                             <label class="checkbox-inline">
                                 <input type="checkbox" name="is_active" value="1" {{ old('is_active', $service->is_active ?? true) ? 'checked' : '' }}>
@@ -83,4 +114,24 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.service-option-checkbox').forEach(function (checkbox) {
+                const syncCard = function () {
+                    const card = checkbox.closest('.selection-card');
+                    const badge = card ? card.querySelector('.selection-card__badge') : null;
+
+                    card?.classList.toggle('is-selected', checkbox.checked);
+
+                    if (badge) {
+                        badge.textContent = checkbox.checked ? 'Assigned' : 'Optional';
+                    }
+                };
+
+                syncCard();
+                checkbox.addEventListener('change', syncCard);
+            });
+        });
+    </script>
 </x-internal-layout>
