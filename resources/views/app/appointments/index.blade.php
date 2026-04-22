@@ -954,17 +954,23 @@
             function applyCategoryTabState(categoryKey) {
                 activeCategoryKey = categoryKey || defaultCategoryKey;
                 const searchQuery = (serviceSearchInput?.value || '').trim().toLowerCase();
+                const matchingCards = serviceCards.filter((card) => {
+                    return searchQuery === '' || (card.dataset.serviceSearch || '').includes(searchQuery);
+                });
+                const effectiveCategoryKey = searchQuery !== '' && matchingCards.length
+                    ? (matchingCards[0].dataset.serviceCategory || activeCategoryKey)
+                    : activeCategoryKey;
 
                 serviceCategoryTabs.forEach((button) => {
-                    const isActive = button.dataset.categoryTab === activeCategoryKey;
+                    const isActive = button.dataset.categoryTab === effectiveCategoryKey;
                     button.classList.toggle('btn-primary', isActive);
                     button.classList.toggle('btn-secondary', !isActive);
                 });
 
                 serviceCards.forEach((card) => {
-                    const matchesCategory = card.dataset.serviceCategory === activeCategoryKey;
                     const matchesSearch = searchQuery === '' || (card.dataset.serviceSearch || '').includes(searchQuery);
-                    card.classList.toggle('hidden', !matchesCategory || !matchesSearch);
+                    const matchesCategory = card.dataset.serviceCategory === effectiveCategoryKey;
+                    card.classList.toggle('hidden', !matchesSearch || !matchesCategory);
                 });
             }
 
