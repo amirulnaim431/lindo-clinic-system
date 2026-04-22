@@ -860,6 +860,7 @@
             const selectedArrangementMode = @json($selectedArrangementMode);
             const defaultDate = @json($selectedDate);
             const defaultCategoryKey = @json($defaultCategoryKey);
+            const shouldAutoOpenAvailability = @json($shouldAutoOpenAvailability);
             const customScheduleSeed = @json($customSchedule);
             const customerIdInput = document.getElementById('customer_id');
             const customerNameInput = document.getElementById('customer_full_name');
