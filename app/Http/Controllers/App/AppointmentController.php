@@ -978,7 +978,21 @@ class AppointmentController extends Controller
         $fullyBookedMessage = null;
 
         if (empty($viableSlots) && empty($servicesWithoutEligibleStaff)) {
-            $fullyBookedMessage = 'All eligible staff are fully booked for the selected services and arrangement on this date.';
+            $insufficientSameSlotCoverage = false;
+
+            if ($arrangementMode === 'same_slot') {
+                $distinctEligibleStaffCount = collect($servicesSummary)
+                    ->flatMap(fn ($service) => collect($service['eligible_staff'] ?? [])->pluck('id'))
+                    ->filter()
+                    ->unique()
+                    ->count();
+
+                $insufficientSameSlotCoverage = $distinctEligibleStaffCount < count($servicesSummary);
+            }
+
+            $fullyBookedMessage = $insufficientSameSlotCoverage
+                ? 'No same-slot staff combination is possible for these selected services with the current staff assignments. Try Back-to-back or Custom.'
+                : 'All eligible staff are fully booked for the selected services and arrangement on this date.';
         }
 
         return [
