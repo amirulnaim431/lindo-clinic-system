@@ -1412,8 +1412,12 @@
             dateInput?.addEventListener('input', persistDraft);
 
             bookingForm.addEventListener('submit', function (event) {
-                if (!allowBuilderSubmit) {
+                const submitter = event.submitter || document.activeElement;
+                const isCreateSubmit = submitter === createAppointmentSubmit;
+
+                if (!allowBuilderSubmit || !isCreateSubmit) {
                     event.preventDefault();
+                    allowBuilderSubmit = false;
                     persistDraft();
                     return;
                 }
@@ -1458,6 +1462,18 @@
 
                 if (!shouldAllowEnter) {
                     event.preventDefault();
+                }
+            });
+
+            bookingForm.addEventListener('click', function (event) {
+                const button = event.target.closest('button');
+
+                if (!button) {
+                    return;
+                }
+
+                if (button !== createAppointmentSubmit && button.type !== 'submit') {
+                    allowBuilderSubmit = false;
                 }
             });
 
