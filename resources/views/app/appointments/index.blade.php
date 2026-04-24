@@ -236,7 +236,7 @@
                 </div>
                 <div class="modal-body">
                     <div id="service-option-modal-body" class="stack"></div>
-                    <div class="btn-row">
+                    <div class="btn-row service-option-actions">
                         <button type="button" class="btn btn-primary" id="service-option-confirm">Confirm service</button>
                         <button type="button" class="btn btn-secondary" id="service-option-cancel">Cancel</button>
                     </div>
@@ -484,6 +484,11 @@
             padding: 1rem 1.1rem;
             color: rgba(26, 19, 23, 0.78);
             line-height: 1.65;
+        }
+
+        .service-option-actions {
+            margin-top: 1.5rem;
+            gap: 1rem;
         }
 
         .confirm-remove-modal .btn-row {
