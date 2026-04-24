@@ -55,6 +55,17 @@ class LindoClinicCatalogSeeder extends Seeder
     private function syncOptionGroups(array $groups): array
     {
         $result = [];
+        $activeCodes = collect($groups)
+            ->pluck('code')
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($activeCodes !== []) {
+            ServiceOptionGroup::query()
+                ->whereNotIn('code', $activeCodes)
+                ->update(['is_active' => false]);
+        }
 
         foreach ($groups as $groupIndex => $group) {
             $optionGroup = ServiceOptionGroup::query()->updateOrCreate(
@@ -79,6 +90,18 @@ class LindoClinicCatalogSeeder extends Seeder
                     ]
                 );
             }
+
+            $allowedValueCodes = collect($group['values'] ?? [])
+                ->map(fn ($label) => Str::slug((string) $label, '_'))
+                ->values()
+                ->all();
+
+            ServiceOptionValue::query()
+                ->where('service_option_group_id', $optionGroup->id)
+                ->when($allowedValueCodes !== [], function ($query) use ($allowedValueCodes) {
+                    $query->whereNotIn('value_code', $allowedValueCodes);
+                })
+                ->delete();
 
             $result[$group['code']] = $optionGroup->fresh('values');
         }

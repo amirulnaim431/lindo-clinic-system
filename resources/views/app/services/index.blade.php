@@ -109,12 +109,8 @@
                                         <td>{{ $service->price !== null ? 'RM '.number_format($service->price, 0) : '-' }}</td>
                                         <td>{{ $service->is_promo ? ($service->promo_price !== null ? 'RM '.number_format($service->promo_price, 0) : 'Yes') : '-' }}</td>
                                         <td>{{ $service->is_active ? 'Active' : 'Inactive' }}</td>
-                                        <td>
-                                            @if ($catalogReady ?? false)
-                                                <a href="{{ route('app.services.edit', $service) }}" class="btn btn-secondary">Edit</a>
-                                            @else
-                                                <button type="button" class="btn btn-secondary" disabled>Edit</button>
-                                            @endif
+                                        <td style="white-space:nowrap;">
+                                            <a href="{{ route('app.services.edit', $service) }}" class="btn btn-secondary">Edit</a>
                                         </td>
                                     </tr>
                                 @empty

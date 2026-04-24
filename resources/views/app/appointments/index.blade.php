@@ -189,7 +189,6 @@
                     </div>
                 </div>
                 <div class="panel-body stack">
-                    <div class="small-note">Click a selected service once to make it active, then click an empty box in the board below. Double click a service card to remove it.</div>
                     <div id="selected-service-list" class="selected-service-list"></div>
                 </div>
             </section>
@@ -202,7 +201,6 @@
                     </div>
                 </div>
                 <div class="panel-body stack">
-                    <div class="small-note">Only eligible staff with free boxes are shown. Double click your assigned box to remove it and send the service back to the selected list.</div>
                     <div id="planner-board" class="planner-board"></div>
                 </div>
             </section>
@@ -465,6 +463,12 @@
             padding: 1rem 1.1rem;
             color: rgba(26, 19, 23, 0.78);
             line-height: 1.65;
+        }
+
+        .confirm-remove-modal .btn-row {
+            gap: 1rem;
+            margin-top: 1.25rem;
+            justify-content: flex-start;
         }
 
         .customer-suggestion-list {
@@ -756,12 +760,19 @@
                 modalSubtitle.textContent = service.display_category_path || service.category_label || '';
                 modalBody.innerHTML = '';
 
-                (service.option_groups || []).forEach((group) => {
+                const orderedGroups = [
+                    ...(service.option_groups || []).filter((group) => group.name === 'Dosage'),
+                    ...(service.option_groups || []).filter((group) => group.name === 'Session'),
+                    ...(service.option_groups || []).filter((group) => group.name === 'Maintenance'),
+                    ...(service.option_groups || []).filter((group) => !['Dosage', 'Session', 'Maintenance'].includes(group.name)),
+                ];
+
+                orderedGroups.forEach((group) => {
                     const block = document.createElement('div');
                     block.className = 'field-block';
                     block.innerHTML = `
                         <div class="field-label">${group.name}</div>
-                        <div class="btn-row" style="margin-top:0.75rem;flex-wrap:wrap;">
+                        <div class="btn-row" style="margin-top:0.75rem;flex-wrap:wrap;row-gap:0.85rem;column-gap:0.85rem;">
                             ${(group.values || []).map((value) => `
                                 <button type="button" class="btn btn-secondary option-choice" data-group-id="${group.id}" data-value-id="${value.id}">${value.label}</button>
                             `).join('')}
@@ -828,9 +839,8 @@
                     card.className = `selected-service-card${service.instance_id === activeInstanceId ? ' is-active' : ''}${assignment ? ' is-assigned' : ''}`;
                     card.innerHTML = `
                         <div class="selected-service-card__title">${service.display_label}</div>
-                        <div class="selected-service-card__meta">${service.category_label}${service.consultation_category_key ? ` / ${serviceCatalog[service.service_id]?.consultation_category_label || ''}` : ''}</div>
                         ${service.selected_option_labels.length ? `<div class="selected-service-card__meta">${service.selected_option_labels.join(' | ')}</div>` : ''}
-                        <div class="selected-service-card__hint">${assignment ? `Assigned to ${assignment.staff_name} at ${assignment.start_time}` : 'Click this card, then click an empty staff box below.'}</div>
+                        ${assignment ? `<div class="selected-service-card__hint">${assignment.staff_name} • ${assignment.start_time}</div>` : ''}
                     `;
                     card.addEventListener('click', () => {
                         activeInstanceId = service.instance_id;
