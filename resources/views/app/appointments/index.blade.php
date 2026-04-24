@@ -112,8 +112,8 @@
 
             <section class="panel">
                 <div class="panel-body">
-                    <div class="form-grid">
-                        <div class="col-3 field-block">
+                    <div class="appointment-top-grid">
+                        <div class="field-block appointment-top-grid__date">
                             <label class="field-label" for="date">Appointment date</label>
                             <input id="date" name="date" type="date" value="{{ old('date', $selectedDate) }}" class="form-input" required>
                             <div class="btn-row" style="margin-top:0.85rem;">
@@ -122,7 +122,7 @@
                             </div>
                         </div>
 
-                        <div class="col-5 field-block customer-picker" style="position:relative;">
+                        <div class="field-block customer-picker appointment-top-grid__name" style="position:relative;">
                             <label class="field-label" for="customer_full_name">Customer name</label>
                             <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', $filters['customer_id'] ?? '') }}">
                             <input id="customer_full_name" name="customer_full_name" type="text" value="{{ old('customer_full_name', $filters['customer_full_name'] ?? '') }}" class="form-input" placeholder="Start typing member name or phone" autocomplete="off" required>
@@ -130,7 +130,7 @@
                             <div id="customer_suggestions" class="customer-suggestion-list hidden"></div>
                         </div>
 
-                        <div class="col-4 field-block">
+                        <div class="field-block appointment-top-grid__phone">
                             <label class="field-label" for="customer_phone">Customer phone</label>
                             <input id="customer_phone" name="customer_phone" type="text" value="{{ old('customer_phone', $filters['customer_phone'] ?? '') }}" class="form-input" placeholder="Phone number" required>
                         </div>
@@ -247,7 +247,50 @@
         </div>
     </div>
 
+    <div id="confirm-remove-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card confirm-remove-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Confirm change</div>
+                        <h3 class="modal-title" id="confirm-remove-title">Remove service?</h3>
+                        <p class="modal-subtitle" id="confirm-remove-subtitle">This will return the service to the booking builder.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="confirm-remove-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirm-remove-copy" id="confirm-remove-copy"></div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="confirm-remove-approve">Remove service</button>
+                        <button type="button" class="btn btn-secondary" id="confirm-remove-cancel">Keep it</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
+        .appointment-top-grid {
+            display: grid;
+            grid-template-columns: minmax(250px, 320px) minmax(360px, 1.25fr) minmax(280px, 1fr);
+            gap: 1.25rem 1.75rem;
+            align-items: start;
+        }
+
+        .appointment-top-grid__date {
+            padding-right: 0.5rem;
+        }
+
+        .appointment-top-grid__name {
+            min-width: 0;
+            padding-left: 0.35rem;
+        }
+
+        .appointment-top-grid__phone {
+            min-width: 0;
+        }
+
         .service-filter-tab.is-active,
         .consultation-subtab.is-active {
             background: var(--app-accent, #c68b9a);
@@ -406,6 +449,24 @@
             max-height: calc(100vh - 48px);
         }
 
+        .confirm-remove-modal {
+            width: min(560px, calc(100vw - 32px));
+            background:
+                radial-gradient(circle at top right, rgba(198, 139, 154, 0.16), transparent 42%),
+                linear-gradient(180deg, #fffdfd 0%, #fff7fa 100%);
+            border: 1px solid rgba(198, 139, 154, 0.2);
+            box-shadow: 0 28px 70px rgba(92, 58, 69, 0.16);
+        }
+
+        .confirm-remove-copy {
+            border: 1px solid rgba(198, 139, 154, 0.14);
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 22px;
+            padding: 1rem 1.1rem;
+            color: rgba(26, 19, 23, 0.78);
+            line-height: 1.65;
+        }
+
         .customer-suggestion-list {
             position: absolute;
             inset: auto 0 auto 0;
@@ -446,6 +507,17 @@
         }
 
         @media (max-width: 960px) {
+            .appointment-top-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .appointment-top-grid__date,
+            .appointment-top-grid__name {
+                padding-left: 0;
+                padding-right: 0;
+            }
+
             .planner-slot-row {
                 grid-template-columns: 1fr;
             }
@@ -487,6 +559,13 @@
             const modalClose = document.getElementById('service-option-modal-close');
             const modalCancel = document.getElementById('service-option-cancel');
             const modalConfirm = document.getElementById('service-option-confirm');
+            const confirmRemoveModal = document.getElementById('confirm-remove-modal');
+            const confirmRemoveTitle = document.getElementById('confirm-remove-title');
+            const confirmRemoveSubtitle = document.getElementById('confirm-remove-subtitle');
+            const confirmRemoveCopy = document.getElementById('confirm-remove-copy');
+            const confirmRemoveClose = document.getElementById('confirm-remove-close');
+            const confirmRemoveCancel = document.getElementById('confirm-remove-cancel');
+            const confirmRemoveApprove = document.getElementById('confirm-remove-approve');
 
             let activeCategoryKey = serviceCategories[0]?.key || 'consultations';
             let activeConsultationDepartment = serviceCategories.find((group) => group.key === 'consultations')?.consultation_groups?.[0]?.key || 'wellness';
@@ -496,6 +575,7 @@
             let activeCustomerRequest = null;
             let pendingModalService = null;
             let pendingModalSelections = {};
+            let pendingRemovalAction = null;
 
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
@@ -703,6 +783,24 @@
                 document.body.classList.remove('overflow-hidden');
             }
 
+            function openConfirmRemoveModal(config) {
+                pendingRemovalAction = typeof config?.onApprove === 'function' ? config.onApprove : null;
+                confirmRemoveTitle.textContent = config?.title || 'Remove service?';
+                confirmRemoveSubtitle.textContent = config?.subtitle || 'This will remove the current assignment.';
+                confirmRemoveCopy.textContent = config?.copy || 'Confirm this change to continue.';
+                confirmRemoveApprove.textContent = config?.approveLabel || 'Remove service';
+                confirmRemoveModal.classList.remove('hidden');
+                confirmRemoveModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeConfirmRemoveModal() {
+                pendingRemovalAction = null;
+                confirmRemoveModal.classList.add('hidden');
+                confirmRemoveModal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            }
+
             function handleServicePick(service) {
                 if (Array.isArray(service.option_groups) && service.option_groups.length > 0) {
                     openOptionModal(service);
@@ -739,19 +837,23 @@
                         renderSelectedServices();
                     });
                     card.addEventListener('dblclick', () => {
-                        if (!window.confirm(`Remove ${service.display_label} from this booking?`)) {
-                            return;
-                        }
+                        openConfirmRemoveModal({
+                            title: 'Remove selected service?',
+                            subtitle: service.display_label,
+                            copy: `This will remove ${service.display_label} from the current booking draft.`,
+                            approveLabel: 'Remove service',
+                            onApprove: () => {
+                                delete assignments[service.instance_id];
+                                selectedServices = selectedServices.filter((row) => row.instance_id !== service.instance_id);
 
-                        delete assignments[service.instance_id];
-                        selectedServices = selectedServices.filter((row) => row.instance_id !== service.instance_id);
+                                if (activeInstanceId === service.instance_id) {
+                                    activeInstanceId = selectedServices.find((row) => !assignments[row.instance_id])?.instance_id || selectedServices[0]?.instance_id || null;
+                                }
 
-                        if (activeInstanceId === service.instance_id) {
-                            activeInstanceId = selectedServices.find((row) => !assignments[row.instance_id])?.instance_id || selectedServices[0]?.instance_id || null;
-                        }
-
-                        renderSelectedServices();
-                        renderPlannerBoard();
+                                renderSelectedServices();
+                                renderPlannerBoard();
+                            },
+                        });
                     });
                     selectedServiceList.appendChild(card);
                 });
@@ -905,14 +1007,18 @@
                                     renderSelectedServices();
                                 });
                                 boxButton.addEventListener('dblclick', () => {
-                                    if (!window.confirm(`Remove ${box.service?.display_label || 'this service'} from ${staff.full_name} at ${slot.label}?`)) {
-                                        return;
-                                    }
-
-                                    delete assignments[box.assignment.instance_id];
-                                    activeInstanceId = box.assignment.instance_id;
-                                    renderSelectedServices();
-                                    renderPlannerBoard();
+                                    openConfirmRemoveModal({
+                                        title: 'Remove staff assignment?',
+                                        subtitle: `${box.service?.display_label || 'Selected service'} • ${staff.full_name}`,
+                                        copy: `This will remove the booking from ${staff.full_name} at ${slot.label} and return the service to your selected services list.`,
+                                        approveLabel: 'Remove assignment',
+                                        onApprove: () => {
+                                            delete assignments[box.assignment.instance_id];
+                                            activeInstanceId = box.assignment.instance_id;
+                                            renderSelectedServices();
+                                            renderPlannerBoard();
+                                        },
+                                    });
                                 });
                             } else {
                                 boxButton.className = 'planner-slot-box is-empty';
@@ -1101,9 +1207,25 @@
                 button?.addEventListener('click', closeOptionModal);
             });
 
+            [confirmRemoveClose, confirmRemoveCancel].forEach((button) => {
+                button?.addEventListener('click', closeConfirmRemoveModal);
+            });
+
+            confirmRemoveApprove?.addEventListener('click', function () {
+                const action = pendingRemovalAction;
+                closeConfirmRemoveModal();
+                action?.();
+            });
+
             modal?.addEventListener('click', function (event) {
                 if (event.target === modal || event.target === modal.firstElementChild) {
                     closeOptionModal();
+                }
+            });
+
+            confirmRemoveModal?.addEventListener('click', function (event) {
+                if (event.target === confirmRemoveModal || event.target === confirmRemoveModal.firstElementChild) {
+                    closeConfirmRemoveModal();
                 }
             });
 
@@ -1159,6 +1281,10 @@
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
                     closeOptionModal();
+                }
+
+                if (event.key === 'Escape' && !confirmRemoveModal.classList.contains('hidden')) {
+                    closeConfirmRemoveModal();
                 }
             });
 
