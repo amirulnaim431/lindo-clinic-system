@@ -64,6 +64,7 @@ class ServiceController extends Controller
                 'status' => in_array($status, ['active', 'inactive', 'all'], true) ? $status : 'active',
             ],
             'categoryOptions' => Service::categoryOptions(),
+            'consultationCategoryOptions' => Service::consultationCategoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
             'staffOptions' => Staff::query()
                 ->where('is_active', true)
@@ -82,6 +83,7 @@ class ServiceController extends Controller
             'duration_minutes' => 60,
             'display_order' => 0,
             'category_key' => 'consultations',
+            'consultation_category_key' => 'wellness',
         ]));
     }
 
@@ -134,6 +136,7 @@ class ServiceController extends Controller
             'mode' => $mode,
             'service' => $service,
             'categoryOptions' => Service::categoryOptions(),
+            'consultationCategoryOptions' => Service::consultationCategoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
             'staffOptions' => Staff::query()
                 ->where('is_active', true)
@@ -164,6 +167,7 @@ class ServiceController extends Controller
                 Rule::unique('services', 'name')->ignore($service?->id),
             ],
             'category_key' => ['required', 'string', Rule::in(array_keys(Service::categoryOptions()))],
+            'consultation_category_key' => ['nullable', 'string', Rule::in(array_keys(Service::consultationCategoryOptions()))],
             'default_staff_role' => ['nullable', 'string', Rule::in(array_keys(Staff::operationalRoleOptions()))],
             'description' => ['nullable', 'string', 'max:4000'],
             'duration_minutes' => ['required', 'integer', 'min:15', 'max:480'],
@@ -181,6 +185,9 @@ class ServiceController extends Controller
         $data['is_active'] = $request->boolean('is_active');
         $data['is_promo'] = $request->boolean('is_promo');
         $data['display_order'] = (int) ($data['display_order'] ?? 0);
+        $data['consultation_category_key'] = $data['category_key'] === 'consultations'
+            ? ($data['consultation_category_key'] ?? null)
+            : null;
 
         if (! $data['is_promo']) {
             $data['promo_price'] = null;

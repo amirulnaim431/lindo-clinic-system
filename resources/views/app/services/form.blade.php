@@ -34,6 +34,16 @@
                             </select>
                         </div>
 
+                        <div class="col-3 field-block" data-consultation-category-field>
+                            <label class="field-label" for="consultation_category_key">Consultation department</label>
+                            <select id="consultation_category_key" name="consultation_category_key" class="form-select">
+                                <option value="">Choose department</option>
+                                @foreach ($consultationCategoryOptions as $key => $label)
+                                    <option value="{{ $key }}" @selected(old('consultation_category_key', $service->consultation_category_key) === $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
                         <div class="col-3 field-block">
                             <label class="field-label" for="display_order">Display order</label>
                             <input id="display_order" name="display_order" type="number" min="0" class="form-input" value="{{ old('display_order', $service->display_order ?? 0) }}">
@@ -138,6 +148,20 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const categoryInput = document.getElementById('category_key');
+            const consultationField = document.querySelector('[data-consultation-category-field]');
+            const consultationSelect = document.getElementById('consultation_category_key');
+
+            const syncConsultationField = function () {
+                const isConsultation = categoryInput?.value === 'consultations';
+
+                consultationField?.classList.toggle('hidden', !isConsultation);
+
+                if (!isConsultation && consultationSelect) {
+                    consultationSelect.value = '';
+                }
+            };
+
             document.querySelectorAll('.service-option-checkbox, .service-staff-checkbox').forEach(function (checkbox) {
                 const syncCard = function () {
                     const card = checkbox.closest('.selection-card');
@@ -153,6 +177,9 @@
                 syncCard();
                 checkbox.addEventListener('change', syncCard);
             });
+
+            syncConsultationField();
+            categoryInput?.addEventListener('change', syncConsultationField);
         });
     </script>
 </x-internal-layout>

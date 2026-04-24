@@ -76,7 +76,7 @@
                             <thead>
                                 <tr>
                                     <th>Service</th>
-                                    <th>Category</th>
+                                    <th>Category Path</th>
                                     <th>Default role</th>
                                     <th>Assigned staff</th>
                                     <th>Options</th>
@@ -96,7 +96,12 @@
                                                 <div class="small-note">{{ $service->description }}</div>
                                             @endif
                                         </td>
-                                        <td>{{ $service->category_label }}</td>
+                                        <td>
+                                            <div>{{ $service->displayCategoryPath() }}</div>
+                                            @if ($service->category_key === 'consultations' && $service->consultation_category_label)
+                                                <div class="small-note">Consultation department</div>
+                                            @endif
+                                        </td>
                                         <td>{{ $roleOptions[$service->default_staff_role] ?? '-' }}</td>
                                         <td>{{ $service->staff->pluck('full_name')->implode(', ') ?: '-' }}</td>
                                         <td>{{ $service->optionGroups->pluck('name')->implode(', ') ?: '-' }}</td>

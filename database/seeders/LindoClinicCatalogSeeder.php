@@ -25,6 +25,7 @@ class LindoClinicCatalogSeeder extends Seeder
             $optionGroups = $this->syncOptionGroups($catalog['option_groups'] ?? []);
             $services = $this->syncServices($catalog['services'] ?? []);
             $this->syncServiceOptionsAndAssignments($catalog['services'] ?? [], $services, $optionGroups);
+            $this->retireLegacyServices($catalog['retired_service_codes'] ?? []);
         });
     }
 
@@ -95,6 +96,7 @@ class LindoClinicCatalogSeeder extends Seeder
                 [
                     'name' => $service['name'],
                     'category_key' => $service['category_key'],
+                    'consultation_category_key' => $service['consultation_category_key'] ?? null,
                     'default_staff_role' => $service['default_staff_role'] ?? null,
                     'description' => $service['description'] ?? null,
                     'duration_minutes' => $service['duration_minutes'] ?? 60,
@@ -151,5 +153,21 @@ class LindoClinicCatalogSeeder extends Seeder
 
             $serviceRecord->staff()->sync($staffIds);
         }
+    }
+
+    private function retireLegacyServices(array $serviceCodes): void
+    {
+        $codes = collect($serviceCodes)
+            ->filter(fn ($code) => is_string($code) && trim($code) !== '')
+            ->values()
+            ->all();
+
+        if ($codes === []) {
+            return;
+        }
+
+        Service::query()
+            ->whereIn('service_code', $codes)
+            ->update(['is_active' => false]);
     }
 }

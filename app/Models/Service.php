@@ -21,6 +21,12 @@ class Service extends Model
         'spa' => 'Beauty Spa',
     ];
 
+    public const CONSULTATION_CATEGORY_OPTIONS = [
+        'wellness' => 'Wellness',
+        'aesthetics' => 'Aesthetic',
+        'spa' => 'Beauty Spa',
+    ];
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -29,6 +35,7 @@ class Service extends Model
         'service_code',
         'name',
         'category_key',
+        'consultation_category_key',
         'default_staff_role',
         'description',
         'duration_minutes',
@@ -53,6 +60,11 @@ class Service extends Model
         return self::CATEGORY_OPTIONS;
     }
 
+    public static function consultationCategoryOptions(): array
+    {
+        return self::CONSULTATION_CATEGORY_OPTIONS;
+    }
+
     public static function supportsCatalogFields(): bool
     {
         static $supportsCatalogFields = null;
@@ -61,6 +73,7 @@ class Service extends Model
             try {
                 $supportsCatalogFields =
                     Schema::hasColumn('services', 'category_key')
+                    && Schema::hasColumn('services', 'consultation_category_key')
                     && Schema::hasColumn('services', 'service_code')
                     && Schema::hasColumn('services', 'default_staff_role')
                     && Schema::hasColumn('services', 'description')
@@ -88,6 +101,38 @@ class Service extends Model
     {
         return self::CATEGORY_OPTIONS[$this->category_key]
             ?? str((string) $this->category_key)->replace('_', ' ')->title()->toString();
+    }
+
+    public function getConsultationCategoryKeyAttribute($value): ?string
+    {
+        if (! self::supportsCatalogFields()) {
+            return null;
+        }
+
+        if ($this->category_key !== 'consultations') {
+            return null;
+        }
+
+        return filled($value) ? (string) $value : null;
+    }
+
+    public function getConsultationCategoryLabelAttribute(): ?string
+    {
+        if (! $this->consultation_category_key) {
+            return null;
+        }
+
+        return self::CONSULTATION_CATEGORY_OPTIONS[$this->consultation_category_key]
+            ?? str((string) $this->consultation_category_key)->replace('_', ' ')->title()->toString();
+    }
+
+    public function displayCategoryPath(): string
+    {
+        if ($this->category_key === 'consultations' && $this->consultation_category_label) {
+            return $this->category_label.' / '.$this->consultation_category_label;
+        }
+
+        return $this->category_label;
     }
 
     public function getPromoPriceAttribute($value): ?int
