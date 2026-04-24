@@ -907,33 +907,20 @@
                 }
 
                 const relevantStaffIds = new Set(selectedServices.flatMap((service) => service.eligible_staff_ids || []));
-                const activeService = activeInstanceId ? getSelectedService(activeInstanceId) : null;
-                const activeEligibleStaffIds = new Set(activeService?.eligible_staff_ids || []);
 
-                return allStaff
-                    .filter((staff) => {
-                        if (!relevantStaffIds.has(staff.id)) {
-                            return false;
-                        }
+                return allStaff.filter((staff) => {
+                    if (!relevantStaffIds.has(staff.id)) {
+                        return false;
+                    }
 
-                        return plannerSlots.some((slot) => {
-                            const occupancy = boardOccupancy?.[staff.id]?.[slot.time];
-                            const existingCount = Number(occupancy?.count || 0);
-                            const draftCount = Object.values(assignments).filter((assignment) => assignment.staff_id === staff.id && assignment.start_time === slot.time).length;
+                    return plannerSlots.some((slot) => {
+                        const occupancy = boardOccupancy?.[staff.id]?.[slot.time];
+                        const existingCount = Number(occupancy?.count || 0);
+                        const draftCount = Object.values(assignments).filter((assignment) => assignment.staff_id === staff.id && assignment.start_time === slot.time).length;
 
-                            return (existingCount + draftCount) < capacityPerSlot;
-                        });
-                    })
-                    .sort((left, right) => {
-                        const leftPriority = activeEligibleStaffIds.has(left.id) ? 0 : 1;
-                        const rightPriority = activeEligibleStaffIds.has(right.id) ? 0 : 1;
-
-                        if (leftPriority !== rightPriority) {
-                            return leftPriority - rightPriority;
-                        }
-
-                        return String(left.full_name || '').localeCompare(String(right.full_name || ''));
+                        return (existingCount + draftCount) < capacityPerSlot;
                     });
+                });
             }
 
             function buildSlotBoxes(staff, slot) {
@@ -1399,6 +1386,7 @@
             customerNameInput?.addEventListener('input', function () {
                 const query = this.value.trim();
                 clearSelectedCustomer();
+                persistDraft();
 
                 if (query.length < 2) {
                     hideCustomerSuggestions();
@@ -1416,7 +1404,12 @@
                 if (customerIdInput.value) {
                     clearSelectedCustomer();
                 }
+
+                persistDraft();
             });
+
+            notesInput?.addEventListener('input', persistDraft);
+            dateInput?.addEventListener('input', persistDraft);
 
             bookingForm.addEventListener('submit', function (event) {
                 if (!allowBuilderSubmit) {
@@ -1472,6 +1465,10 @@
                 if (!event.target.closest('.customer-picker')) {
                     hideCustomerSuggestions();
                 }
+            });
+
+            window.addEventListener('beforeunload', function () {
+                persistDraft();
             });
 
             document.addEventListener('keydown', function (event) {
