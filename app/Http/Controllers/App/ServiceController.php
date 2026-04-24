@@ -25,7 +25,12 @@ class ServiceController extends Controller
 
         if ($catalogReady) {
             $services = Service::query()
-                ->with('optionGroups')
+                ->with([
+                    'optionGroups',
+                    'staff' => function ($query) {
+                        $query->where('is_active', true)->orderBy('full_name');
+                    },
+                ])
                 ->when($search !== '', function ($query) use ($search) {
                     $like = '%'.$search.'%';
                     $query->where(function ($builder) use ($like) {
@@ -60,6 +65,10 @@ class ServiceController extends Controller
             ],
             'categoryOptions' => Service::categoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
+            'staffOptions' => Staff::query()
+                ->where('is_active', true)
+                ->orderBy('full_name')
+                ->get(['id', 'full_name', 'role_key']),
         ]);
     }
 
@@ -85,8 +94,9 @@ class ServiceController extends Controller
         }
 
         $data = $this->validatedData($request);
-        $service = Service::query()->create(collect($data)->except('option_group_ids')->all());
+        $service = Service::query()->create(collect($data)->except(['option_group_ids', 'staff_ids'])->all());
         $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
+        $service->staff()->sync($data['staff_ids'] ?? []);
 
         return redirect()
             ->route('app.services.edit', $service)
@@ -109,8 +119,9 @@ class ServiceController extends Controller
         }
 
         $data = $this->validatedData($request, $service);
-        $service->update(collect($data)->except('option_group_ids')->all());
+        $service->update(collect($data)->except(['option_group_ids', 'staff_ids'])->all());
         $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
+        $service->staff()->sync($data['staff_ids'] ?? []);
 
         return redirect()
             ->route('app.services.edit', $service)
@@ -124,6 +135,10 @@ class ServiceController extends Controller
             'service' => $service,
             'categoryOptions' => Service::categoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
+            'staffOptions' => Staff::query()
+                ->where('is_active', true)
+                ->orderBy('full_name')
+                ->get(['id', 'full_name', 'role_key']),
             'optionGroups' => ServiceOptionGroup::query()
                 ->with('values')
                 ->where('is_active', true)
@@ -132,6 +147,9 @@ class ServiceController extends Controller
                 ->get(),
             'selectedOptionGroupIds' => $service->exists
                 ? $service->optionGroups()->pluck('service_option_groups.id')->map(fn ($id) => (string) $id)->all()
+                : [],
+            'selectedStaffIds' => $service->exists
+                ? $service->staff()->pluck('staff.id')->map(fn ($id) => (string) $id)->all()
                 : [],
         ]);
     }
@@ -156,6 +174,8 @@ class ServiceController extends Controller
             'is_promo' => ['nullable'],
             'option_group_ids' => ['nullable', 'array'],
             'option_group_ids.*' => ['string', Rule::exists('service_option_groups', 'id')],
+            'staff_ids' => ['nullable', 'array'],
+            'staff_ids.*' => ['string', Rule::exists('staff', 'id')],
         ]);
 
         $data['is_active'] = $request->boolean('is_active');

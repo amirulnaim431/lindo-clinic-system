@@ -85,13 +85,34 @@
                                         $selected = in_array((string) $group->id, old('option_group_ids', $selectedOptionGroupIds ?? []), true);
                                     @endphp
                                     <label class="selection-card {{ $selected ? 'is-selected' : '' }}">
-                                        <input type="checkbox" name="option_group_ids[]" value="{{ $group->id }}" class="selection-input service-option-checkbox" {{ $selected ? 'checked' : '' }}>
+                                        <input type="checkbox" name="option_group_ids[]" value="{{ $group->id }}" class="selection-input service-option-checkbox" data-badge-off="{{ $group->values->count().' options' }}" {{ $selected ? 'checked' : '' }}>
                                         <div class="selection-card__head">
                                             <div>
                                                 <div class="selection-card__title">{{ $group->name }}</div>
                                                 <div class="selection-card__meta">{{ $group->values->pluck('label')->implode(' | ') }}</div>
                                             </div>
                                             <span class="selection-card__badge">{{ $selected ? 'Assigned' : $group->values->count().' options' }}</span>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="col-12 field-block">
+                            <label class="field-label">Eligible staff</label>
+                            <div class="selection-grid">
+                                @foreach ($staffOptions as $staff)
+                                    @php
+                                        $selected = in_array((string) $staff->id, old('staff_ids', $selectedStaffIds ?? []), true);
+                                    @endphp
+                                    <label class="selection-card {{ $selected ? 'is-selected' : '' }}">
+                                        <input type="checkbox" name="staff_ids[]" value="{{ $staff->id }}" class="selection-input service-staff-checkbox" data-badge-off="Available" {{ $selected ? 'checked' : '' }}>
+                                        <div class="selection-card__head">
+                                            <div>
+                                                <div class="selection-card__title">{{ $staff->full_name }}</div>
+                                                <div class="selection-card__meta">{{ $staff->role_key }}</div>
+                                            </div>
+                                            <span class="selection-card__badge">{{ $selected ? 'Assigned' : 'Available' }}</span>
                                         </div>
                                     </label>
                                 @endforeach
@@ -117,7 +138,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.service-option-checkbox').forEach(function (checkbox) {
+            document.querySelectorAll('.service-option-checkbox, .service-staff-checkbox').forEach(function (checkbox) {
                 const syncCard = function () {
                     const card = checkbox.closest('.selection-card');
                     const badge = card ? card.querySelector('.selection-card__badge') : null;
@@ -125,7 +146,7 @@
                     card?.classList.toggle('is-selected', checkbox.checked);
 
                     if (badge) {
-                        badge.textContent = checkbox.checked ? 'Assigned' : 'Optional';
+                        badge.textContent = checkbox.checked ? 'Assigned' : (checkbox.dataset.badgeOff || 'Optional');
                     }
                 };
 

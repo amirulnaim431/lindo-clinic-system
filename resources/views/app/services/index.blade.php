@@ -78,6 +78,7 @@
                                     <th>Service</th>
                                     <th>Category</th>
                                     <th>Default role</th>
+                                    <th>Assigned staff</th>
                                     <th>Options</th>
                                     <th>Duration</th>
                                     <th>Price</th>
@@ -97,6 +98,7 @@
                                         </td>
                                         <td>{{ $service->category_label }}</td>
                                         <td>{{ $roleOptions[$service->default_staff_role] ?? '-' }}</td>
+                                        <td>{{ $service->staff->pluck('full_name')->implode(', ') ?: '-' }}</td>
                                         <td>{{ $service->optionGroups->pluck('name')->implode(', ') ?: '-' }}</td>
                                         <td>{{ (int) $service->duration_minutes }} mins</td>
                                         <td>{{ $service->price !== null ? 'RM '.number_format($service->price, 0) : '-' }}</td>
@@ -112,7 +114,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="small-note" style="text-align:center;padding:1rem;">No services found.</td>
+                                        <td colspan="10" class="small-note" style="text-align:center;padding:1rem;">No services found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
