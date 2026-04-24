@@ -217,7 +217,7 @@
             <input type="hidden" name="booking_payload" id="booking_payload">
 
             <div class="btn-row">
-                <button type="submit" class="btn btn-primary">Create Appointment</button>
+                <button type="submit" class="btn btn-primary" id="create-appointment-submit">Create Appointment</button>
             </div>
         </form>
     </div>
@@ -574,6 +574,7 @@
             const plannerBoardContainer = document.getElementById('planner-board');
             const bookingPayloadInput = document.getElementById('booking_payload');
             const bookingForm = document.getElementById('appointment-builder-form');
+            const createAppointmentSubmit = document.getElementById('create-appointment-submit');
             const notesInput = document.getElementById('notes');
 
             const customerIdInput = document.getElementById('customer_id');
@@ -606,6 +607,9 @@
             let pendingModalService = null;
             let pendingModalSelections = {};
             let pendingRemovalAction = null;
+            let allowBuilderSubmit = false;
+
+            const draftStorageKey = `lindo-appointment-builder:${dateInput?.value || @json($selectedDate)}`;
 
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
@@ -893,6 +897,8 @@
                     });
                     selectedServiceList.appendChild(card);
                 });
+
+                persistDraft();
             }
 
             function getVisibleStaffRows() {
@@ -1073,6 +1079,8 @@
 
                     plannerBoardContainer.appendChild(card);
                 });
+
+                persistDraft();
             }
 
             function buildPayloadForSubmit() {
@@ -1089,6 +1097,115 @@
                         slot_index: assignment.slot_index,
                     })),
                 };
+            }
+
+            function buildDraftPayload() {
+                return {
+                    customer_id: customerIdInput.value || '',
+                    customer_full_name: customerNameInput.value || '',
+                    customer_phone: customerPhoneInput.value || '',
+                    notes: notesInput?.value || '',
+                    services: selectedServices.map((service) => ({
+                        instance_id: service.instance_id,
+                        service_id: service.service_id,
+                        selected_options: service.selected_options || {},
+                    })),
+                    assignments: Object.values(assignments).map((assignment) => ({
+                        instance_id: assignment.instance_id,
+                        staff_id: assignment.staff_id,
+                        start_time: assignment.start_time,
+                        slot_index: assignment.slot_index,
+                    })),
+                    active_instance_id: activeInstanceId,
+                };
+            }
+
+            function persistDraft() {
+                try {
+                    window.sessionStorage.setItem(draftStorageKey, JSON.stringify(buildDraftPayload()));
+                } catch (error) {
+                    // Ignore storage failures; the in-memory draft still works.
+                }
+            }
+
+            function clearPersistedDraft() {
+                try {
+                    window.sessionStorage.removeItem(draftStorageKey);
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            }
+
+            function restorePersistedDraft() {
+                if (oldDraft && Array.isArray(oldDraft.services)) {
+                    return false;
+                }
+
+                try {
+                    const raw = window.sessionStorage.getItem(draftStorageKey);
+
+                    if (!raw) {
+                        return false;
+                    }
+
+                    const storedDraft = JSON.parse(raw);
+
+                    if (!storedDraft || !Array.isArray(storedDraft.services)) {
+                        return false;
+                    }
+
+                    if (storedDraft.customer_id) {
+                        customerIdInput.value = storedDraft.customer_id;
+                    }
+
+                    if (storedDraft.customer_full_name && !customerNameInput.value) {
+                        customerNameInput.value = storedDraft.customer_full_name;
+                    }
+
+                    if (storedDraft.customer_phone && !customerPhoneInput.value) {
+                        customerPhoneInput.value = storedDraft.customer_phone;
+                    }
+
+                    if (storedDraft.notes && notesInput && !notesInput.value) {
+                        notesInput.value = storedDraft.notes;
+                    }
+
+                    selectedServices = storedDraft.services
+                        .map((row) => {
+                            const service = getServiceById(row.service_id);
+
+                            if (!service) {
+                                return null;
+                            }
+
+                            const instance = createInstance(service, row.selected_options || {});
+                            instance.instance_id = row.instance_id || instance.instance_id;
+
+                            return instance;
+                        })
+                        .filter(Boolean);
+
+                    assignments = Object.fromEntries(
+                        (storedDraft.assignments || [])
+                            .filter((row) => row.instance_id && row.staff_id && row.start_time)
+                            .map((row) => [row.instance_id, {
+                                instance_id: row.instance_id,
+                                staff_id: row.staff_id,
+                                staff_name: allStaff.find((staff) => staff.id === row.staff_id)?.full_name || 'Staff',
+                                start_time: row.start_time,
+                                slot_index: Number(row.slot_index || 1),
+                            }])
+                    );
+
+                    activeInstanceId = storedDraft.active_instance_id
+                        || selectedServices.find((service) => !assignments[service.instance_id])?.instance_id
+                        || selectedServices[0]?.instance_id
+                        || null;
+
+                    return selectedServices.length > 0;
+                } catch (error) {
+                    return false;
+                }
             }
 
             function renderSelectedCustomer(customer) {
@@ -1199,6 +1316,7 @@
             serviceSearchInput?.addEventListener('input', renderServiceGrid);
 
             viewDateBoardButton?.addEventListener('click', function () {
+                persistDraft();
                 const params = new URLSearchParams();
                 params.set('date', dateInput.value || @json($selectedDate));
                 window.location.href = `${appointmentRoute}?${params.toString()}`;
@@ -1288,8 +1406,15 @@
             });
 
             bookingForm.addEventListener('submit', function (event) {
+                if (!allowBuilderSubmit) {
+                    event.preventDefault();
+                    persistDraft();
+                    return;
+                }
+
                 if (!selectedServices.length) {
                     event.preventDefault();
+                    allowBuilderSubmit = false;
                     window.alert('Select at least one service before creating the appointment.');
                     return;
                 }
@@ -1298,6 +1423,7 @@
 
                 if (unassigned.length) {
                     event.preventDefault();
+                    allowBuilderSubmit = false;
                     activeInstanceId = unassigned[0].instance_id;
                     renderSelectedServices();
                     renderPlannerBoard();
@@ -1306,6 +1432,7 @@
                 }
 
                 bookingPayloadInput.value = JSON.stringify(buildPayloadForSubmit());
+                clearPersistedDraft();
             });
 
             bookingForm.addEventListener('keydown', function (event) {
@@ -1381,6 +1508,20 @@
 
                 activeInstanceId = selectedServices.find((service) => !assignments[service.instance_id])?.instance_id || selectedServices[0]?.instance_id || null;
             }
+
+            if (!selectedServices.length) {
+                restorePersistedDraft();
+            }
+
+            createAppointmentSubmit?.addEventListener('click', function () {
+                allowBuilderSubmit = true;
+            });
+
+            bookingForm.querySelectorAll('button[type="button"]').forEach((button) => {
+                button.addEventListener('click', function () {
+                    allowBuilderSubmit = false;
+                });
+            });
 
             renderCategoryTabs();
             renderServiceGrid();
