@@ -1308,6 +1308,26 @@
                 bookingPayloadInput.value = JSON.stringify(buildPayloadForSubmit());
             });
 
+            bookingForm.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                const target = event.target;
+                const tagName = target?.tagName?.toLowerCase?.() || '';
+                const inputType = target?.getAttribute?.('type') || '';
+                const shouldAllowEnter = (
+                    tagName === 'textarea'
+                    || inputType === 'submit'
+                    || target?.id === 'service-option-confirm'
+                    || target?.id === 'confirm-remove-approve'
+                );
+
+                if (!shouldAllowEnter) {
+                    event.preventDefault();
+                }
+            });
+
             document.addEventListener('click', function (event) {
                 if (!event.target.closest('.customer-picker')) {
                     hideCustomerSuggestions();
