@@ -107,9 +107,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('app.appointments.store') }}" class="stack" id="appointment-builder-form">
-            @csrf
-
+        <div class="stack" id="appointment-builder-form">
             <section class="panel">
                 <div class="panel-body">
                     <div class="appointment-top-grid">
@@ -214,11 +212,19 @@
                 </div>
             </section>
 
-            <input type="hidden" name="booking_payload" id="booking_payload">
-
             <div class="btn-row">
-                <button type="submit" class="btn btn-primary" id="create-appointment-submit">Create Appointment</button>
+                <button type="button" class="btn btn-primary" id="create-appointment-submit">Create Appointment</button>
             </div>
+        </div>
+
+        <form method="POST" action="{{ route('app.appointments.store') }}" id="appointment-submit-form" class="hidden">
+            @csrf
+            <input type="hidden" name="date" id="submit_date">
+            <input type="hidden" name="customer_id" id="submit_customer_id">
+            <input type="hidden" name="customer_full_name" id="submit_customer_full_name">
+            <input type="hidden" name="customer_phone" id="submit_customer_phone">
+            <input type="hidden" name="notes" id="submit_notes">
+            <input type="hidden" name="booking_payload" id="booking_payload">
         </form>
     </div>
 
@@ -574,8 +580,14 @@
             const plannerBoardContainer = document.getElementById('planner-board');
             const bookingPayloadInput = document.getElementById('booking_payload');
             const bookingForm = document.getElementById('appointment-builder-form');
+            const appointmentSubmitForm = document.getElementById('appointment-submit-form');
             const createAppointmentSubmit = document.getElementById('create-appointment-submit');
             const notesInput = document.getElementById('notes');
+            const submitDateInput = document.getElementById('submit_date');
+            const submitCustomerIdInput = document.getElementById('submit_customer_id');
+            const submitCustomerNameInput = document.getElementById('submit_customer_full_name');
+            const submitCustomerPhoneInput = document.getElementById('submit_customer_phone');
+            const submitNotesInput = document.getElementById('submit_notes');
 
             const customerIdInput = document.getElementById('customer_id');
             const customerNameInput = document.getElementById('customer_full_name');
@@ -607,7 +619,6 @@
             let pendingModalService = null;
             let pendingModalSelections = {};
             let pendingRemovalAction = null;
-            let allowBuilderSubmit = false;
 
             const draftStorageKey = `lindo-appointment-builder:${dateInput?.value || @json($selectedDate)}`;
 
@@ -1411,20 +1422,8 @@
             notesInput?.addEventListener('input', persistDraft);
             dateInput?.addEventListener('input', persistDraft);
 
-            bookingForm.addEventListener('submit', function (event) {
-                const submitter = event.submitter || document.activeElement;
-                const isCreateSubmit = submitter === createAppointmentSubmit;
-
-                if (!allowBuilderSubmit || !isCreateSubmit) {
-                    event.preventDefault();
-                    allowBuilderSubmit = false;
-                    persistDraft();
-                    return;
-                }
-
+            createAppointmentSubmit?.addEventListener('click', function () {
                 if (!selectedServices.length) {
-                    event.preventDefault();
-                    allowBuilderSubmit = false;
                     window.alert('Select at least one service before creating the appointment.');
                     return;
                 }
@@ -1432,8 +1431,6 @@
                 const unassigned = selectedServices.filter((service) => !assignments[service.instance_id]);
 
                 if (unassigned.length) {
-                    event.preventDefault();
-                    allowBuilderSubmit = false;
                     activeInstanceId = unassigned[0].instance_id;
                     renderSelectedServices();
                     renderPlannerBoard();
@@ -1441,8 +1438,14 @@
                     return;
                 }
 
+                submitDateInput.value = dateInput?.value || '';
+                submitCustomerIdInput.value = customerIdInput?.value || '';
+                submitCustomerNameInput.value = customerNameInput?.value || '';
+                submitCustomerPhoneInput.value = customerPhoneInput?.value || '';
+                submitNotesInput.value = notesInput?.value || '';
                 bookingPayloadInput.value = JSON.stringify(buildPayloadForSubmit());
                 clearPersistedDraft();
+                appointmentSubmitForm?.requestSubmit();
             });
 
             bookingForm.addEventListener('keydown', function (event) {
@@ -1462,18 +1465,6 @@
 
                 if (!shouldAllowEnter) {
                     event.preventDefault();
-                }
-            });
-
-            bookingForm.addEventListener('click', function (event) {
-                const button = event.target.closest('button');
-
-                if (!button) {
-                    return;
-                }
-
-                if (button !== createAppointmentSubmit && button.type !== 'submit') {
-                    allowBuilderSubmit = false;
                 }
             });
 
@@ -1538,16 +1529,6 @@
             if (!selectedServices.length) {
                 restorePersistedDraft();
             }
-
-            createAppointmentSubmit?.addEventListener('click', function () {
-                allowBuilderSubmit = true;
-            });
-
-            bookingForm.querySelectorAll('button[type="button"]').forEach((button) => {
-                button.addEventListener('click', function () {
-                    allowBuilderSubmit = false;
-                });
-            });
 
             renderCategoryTabs();
             renderServiceGrid();
