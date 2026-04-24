@@ -8,12 +8,16 @@
             <div class="panel-body">
                 <div class="filter-bar__head" style="align-items:flex-end;gap:1rem;flex-wrap:wrap;">
                     <div>
-                        <div class="compact-label">Daily Client Schedule</div>
-                        <h2 class="panel-title-display">{{ strtoupper($selectedDateLabel) }}</h2>
+                        <div class="compact-label screen-only">Daily Client Schedule</div>
+                        <div class="print-header">
+                            <h1 class="print-header__title">DAILY CLIENT SCHEDULE</h1>
+                            <div class="print-header__date">{{ strtoupper($selectedDateLabel) }}</div>
+                        </div>
+                        <h2 class="panel-title-display screen-only">{{ strtoupper($selectedDateLabel) }}</h2>
                         <div class="small-note" style="margin-top:0.5rem;">Total treatments for the day: {{ $totalRows }}</div>
                     </div>
 
-                    <div class="btn-row" style="align-items:flex-end;flex-wrap:wrap;">
+                    <div class="btn-row screen-only" style="align-items:flex-end;flex-wrap:wrap;">
                         <a href="{{ route('app.calendar', ['date' => $previousDate]) }}" class="btn btn-secondary">&larr; Previous day</a>
                         <form method="GET" action="{{ route('app.calendar') }}" style="display:flex;align-items:end;gap:0.75rem;flex-wrap:wrap;">
                             <div class="field-block" style="min-width:180px;">
@@ -24,17 +28,18 @@
                         </form>
                         <a href="{{ route('app.calendar', ['date' => $nextDate]) }}" class="btn btn-secondary">Next day &rarr;</a>
                         <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-secondary">Open booking</a>
+                        <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
                     </div>
                 </div>
             </div>
         </section>
 
         @forelse ($scheduleSections as $sectionIndex => $section)
-            <section class="panel">
+            <section class="panel print-schedule-section">
                 <div class="panel-body" style="padding:0;">
-                    <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 1.25rem;border-bottom:1px solid rgba(26, 19, 23, 0.08);background:#f6f3f4;">
-                        <div style="font-weight:700;color:#1a1317;">PIC: {{ $section['staff_name'] }}</div>
-                        <div class="small-note" style="font-weight:700;">Count: {{ $section['count'] }}</div>
+                    <div class="schedule-section-head">
+                        <div class="schedule-section-head__pic">PIC: {{ $section['staff_name'] }}</div>
+                        <div class="schedule-section-head__count">Count: {{ $section['count'] }}</div>
                     </div>
 
                     <div class="table-shell">
@@ -82,6 +87,30 @@
     </div>
 
     <style>
+        .print-header {
+            display: none;
+        }
+
+        .screen-only {
+            display: initial;
+        }
+
+        .schedule-section-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(26, 19, 23, 0.08);
+            background: #f6f3f4;
+        }
+
+        .schedule-section-head__pic,
+        .schedule-section-head__count {
+            font-weight: 700;
+            color: #1a1317;
+        }
+
         .daily-schedule-table thead th {
             background: #070707;
             color: #fff;
@@ -107,6 +136,111 @@
         @media (max-width: 900px) {
             .daily-schedule-table {
                 min-width: 980px;
+            }
+        }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
+            }
+
+            body {
+                background: #fff !important;
+            }
+
+            .screen-only,
+            .sidebar-shell,
+            .internal-topbar,
+            .app-shell__chrome,
+            .page-header,
+            .small-note.screen-only {
+                display: none !important;
+            }
+
+            .print-header {
+                display: block;
+                text-align: center;
+            }
+
+            .print-header__title {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 700;
+                letter-spacing: 0.02em;
+                color: #000;
+            }
+
+            .print-header__date {
+                margin-top: 10px;
+                font-size: 18px;
+                font-weight: 700;
+                color: #000;
+            }
+
+            .stack {
+                gap: 10px !important;
+            }
+
+            .panel,
+            .panel-body,
+            .table-shell,
+            .table-wrap {
+                background: #fff !important;
+                box-shadow: none !important;
+                border: 0 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+
+            .print-schedule-section {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-top: 10px;
+            }
+
+            .schedule-section-head {
+                background: #e9eaee !important;
+                border: 1px solid #000;
+                border-bottom: 0;
+                padding: 6px 10px;
+            }
+
+            .daily-schedule-table {
+                width: 100%;
+                min-width: 0 !important;
+                border-collapse: collapse;
+                table-layout: fixed;
+                font-size: 12px;
+            }
+
+            .daily-schedule-table thead th {
+                background: #000 !important;
+                color: #fff !important;
+                border: 1px solid #000 !important;
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+
+            .daily-schedule-table td,
+            .daily-schedule-table th {
+                border: 1px solid #000 !important;
+                padding: 7px 6px;
+                color: #000 !important;
+                word-break: break-word;
+            }
+
+            .daily-schedule-table tbody td:nth-child(4) {
+                background: #f8cf9f !important;
+            }
+
+            .daily-schedule-table tbody tr:nth-child(even) td:nth-child(4) {
+                background: #f8cf9f !important;
+            }
+
+            a {
+                color: #000 !important;
+                text-decoration: none !important;
             }
         }
     </style>
