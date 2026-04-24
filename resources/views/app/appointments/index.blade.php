@@ -447,6 +447,27 @@
             max-height: calc(100vh - 48px);
         }
 
+        .booking-option-modal .modal-header,
+        .confirm-remove-modal .modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .booking-option-modal .modal-header > :first-child,
+        .confirm-remove-modal .modal-header > :first-child {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .booking-option-modal .modal-close,
+        .confirm-remove-modal .modal-close {
+            flex: 0 0 auto;
+            align-self: flex-start;
+            margin-left: auto;
+        }
+
         .confirm-remove-modal {
             width: min(560px, calc(100vw - 32px));
             background:
