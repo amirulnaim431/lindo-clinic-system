@@ -15,7 +15,7 @@
         $availability = $availability ?? null;
         $appointmentGroups = collect($appointmentGroups ?? []);
         $statusOptions = $statusOptions ?? [];
-        $quickCreate = $quickCreate ?? ['prefilled_slot' => null, 'slot_is_available' => false, 'slot_combinations' => [], 'message' => null];
+        $quickCreate = $quickCreate ?? ['prefilled_slot' => null, 'slot_is_available' => false, 'message' => null];
         $statusPalette = [
             'booked' => ['bg' => '#fff7ed', 'border' => '#fed7aa', 'text' => '#c2410c', 'label' => 'Pending'],
             'confirmed' => ['bg' => '#f0f9ff', 'border' => '#bae6fd', 'text' => '#0369a1', 'label' => 'Confirmed'],
@@ -29,13 +29,10 @@
             $allSlots = $availability['slots'];
             ksort($allSlots);
             foreach ($allSlots as $slotTime => $slotData) {
-                $combinations = $slotData['combinations'] ?? [];
                 $slotOptions[] = [
                     'time' => $slotTime,
-                    'combinations' => $combinations,
-                    'count' => count($combinations),
                     'is_prefilled' => $prefilledSlot === $slotTime,
-                    'is_available' => count($combinations) > 0,
+                    'is_available' => (bool) ($slotData['is_available'] ?? false),
                 ];
             }
         }
@@ -127,6 +124,20 @@
                     'price' => $service->price,
                     'promo_price' => $service->promo_price,
                     'is_promo' => (bool) $service->is_promo,
+                    'eligible_staff' => $service->staff
+                        ->where('is_active', true)
+                        ->sortBy('full_name')
+                        ->map(fn ($staff) => [
+                            'id' => (string) $staff->id,
+                            'full_name' => $staff->full_name,
+                            'role_key' => $staff->role_key,
+                            'role_label' => str((string) ($staff->job_title ?: $staff->role_key ?: $staff->operational_role ?: 'Staff'))
+                                ->replace('_', ' ')
+                                ->title()
+                                ->toString(),
+                        ])
+                        ->values()
+                        ->all(),
                     'option_groups' => $service->optionGroups->map(function ($group) {
                         return [
                             'id' => (string) $group->id,
@@ -147,6 +158,9 @@
                     ->mapWithKeys(fn ($valueId, $groupId) => [(string) $groupId => (string) $valueId])
                     ->all()];
             })
+            ->all();
+        $selectedStaff = collect($filters['selected_staff'] ?? [])
+            ->mapWithKeys(fn ($staffId, $serviceId) => [(string) $serviceId => $staffId ? (string) $staffId : null])
             ->all();
         $selectedCategoryKey = collect($selectedServiceIds)
             ->map(fn ($id) => $services->firstWhere('id', $id)?->category_key)
@@ -479,6 +493,46 @@
                                 </div>
                             </div>
 
+                            <div id="service-staff-panel" class="workflow-panel {{ count($selectedServiceOrderIds) ? '' : 'hidden' }}">
+                                <div class="ops-kicker">Staff assignment</div>
+                                <div class="selection-card__title" style="margin-top:6px;">Choose the staff member for each selected service before checking availability</div>
+                                <div id="service-staff-grid" class="form-grid" style="margin-top:14px;">
+                                    @foreach ($selectedServiceOrderIds as $serviceOrderId)
+                                        @php
+                                            $service = $services->firstWhere('id', $serviceOrderId);
+                                            $eligibleStaff = collect($service?->staff ?? [])->where('is_active', true)->sortBy('full_name')->values();
+                                            $currentStaffId = $selectedStaff[(string) $serviceOrderId] ?? null;
+                                        @endphp
+                                        @if ($service)
+                                            <div class="col-12" data-service-staff-row="{{ $serviceOrderId }}">
+                                                <div class="panel" style="margin:0;">
+                                                    <div class="panel-body">
+                                                        <div class="filter-bar__head" style="margin-bottom:1rem;">
+                                                            <div>
+                                                                <div class="selection-card__title">{{ $service->name }}</div>
+                                                                <div class="small-note">{{ $service->category_label }}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="field-block">
+                                                            <label class="field-label" for="selected-staff-{{ $serviceOrderId }}">Assigned staff</label>
+                                                            <select id="selected-staff-{{ $serviceOrderId }}" name="selected_staff[{{ $serviceOrderId }}]" class="field-input select-input staff-select" data-staff-service="{{ $serviceOrderId }}" required>
+                                                                <option value="">Choose eligible staff</option>
+                                                                @foreach ($eligibleStaff as $staff)
+                                                                    <option value="{{ $staff->id }}" @selected($currentStaffId === (string) $staff->id)>{{ $staff->full_name }} ({{ $staff->role_key }})</option>
+                                                                @endforeach
+                                                            </select>
+                                                            @if ($eligibleStaff->isEmpty())
+                                                                <div class="field-error" style="margin-top:10px;">No active staff assigned to this service yet.</div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+
                             <div>
                                 <div class="ops-kicker">Visit setup</div>
                                 <h4 class="panel-title-display" style="font-size:18px;">Choose service arrangement</h4>
@@ -582,6 +636,13 @@
                                                 @if (! empty($serviceSummary['scheduled_date']) && ! empty($serviceSummary['scheduled_time']))
                                                     <div class="small-note">{{ \Carbon\Carbon::parse($serviceSummary['scheduled_date'])->format('d M Y') }} {{ $serviceSummary['scheduled_time'] }}</div>
                                                 @endif
+                                                @php
+                                                    $chosenStaffId = $selectedStaff[(string) ($serviceSummary['id'] ?? '')] ?? null;
+                                                    $chosenStaff = collect($serviceSummary['eligible_staff'] ?? [])->firstWhere('id', $chosenStaffId);
+                                                @endphp
+                                                @if ($chosenStaff)
+                                                    <div class="small-note" style="margin-top:8px;">Selected staff: {{ $chosenStaff['full_name'] }} ({{ $chosenStaff['role_key'] }})</div>
+                                                @endif
                                                 @if (empty($serviceSummary['eligible_staff']))
                                                     <div class="field-error" style="margin-top:10px;font-size:13px;font-weight:700;">No active staff assigned.</div>
                                                 @else
@@ -628,16 +689,10 @@
                                                         type="button"
                                                         class="slot-button slot-select-button {{ $slot['is_available'] ? '' : 'is-disabled' }}"
                                                         data-slot-time="{{ $slot['time'] }}"
-                                                        data-combinations='@json($slot['combinations'])'
                                                         {{ $slot['is_available'] ? '' : 'disabled aria-disabled=true' }}
                                                     >
                                                         <div class="slot-card {{ $slot['is_prefilled'] ? 'is-selected' : '' }} {{ $slot['is_available'] ? '' : 'is-unavailable' }}">
-                                                            <div>
-                                                                <div class="slot-card__time">{{ $slot['time'] }}</div>
-                                                                <div class="slot-card__meta">
-                                                                    {{ $slot['is_available'] ? $slot['count'].' valid combo'.($slot['count'] === 1 ? '' : 's') : 'Unavailable' }}
-                                                                </div>
-                                                            </div>
+                                                            <div class="slot-card__time">{{ $slot['time'] }}</div>
                                                         </div>
                                                     </button>
                                                 @endforeach
@@ -646,7 +701,7 @@
                                     @endif
                                 </div>
 
-                                <div id="selected-slot-card" class="booking-panel booking-panel--modal {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_combinations']) ? '' : 'hidden' }}">
+                                <div id="selected-slot-card" class="booking-panel booking-panel--modal {{ $selectedArrangementMode === 'custom' && ! empty($availability['custom_is_available']) ? '' : 'hidden' }}">
                                     <div class="ops-kicker">Confirm booking</div>
                                     <div class="booking-panel__title">
                                         @if ($selectedArrangementMode === 'custom')
@@ -662,7 +717,6 @@
                                         <input type="hidden" name="date" value="{{ $selectedDate }}">
                                         <input type="hidden" name="slot" id="selected-slot-input" value="">
                                         <input type="hidden" name="arrangement_mode" value="{{ $selectedArrangementMode }}">
-                                        <input type="hidden" name="selected_combination" id="selected-combination-input" value="">
                                         @foreach ($selectedServiceIds as $serviceId)
                                             <input type="hidden" name="service_ids[]" value="{{ $serviceId }}">
                                         @endforeach
@@ -676,6 +730,13 @@
                                                 @foreach ($groupSelections as $groupId => $valueId)
                                                     <input type="hidden" name="selected_options[{{ $serviceId }}][{{ $groupId }}]" value="{{ $valueId }}">
                                                 @endforeach
+                                            @endforeach
+                                        </div>
+                                        <div id="booking-selected-staff-inputs">
+                                            @foreach ($selectedStaff as $serviceId => $staffId)
+                                                @if ($staffId)
+                                                    <input type="hidden" name="selected_staff[{{ $serviceId }}]" value="{{ $staffId }}">
+                                                @endif
                                             @endforeach
                                         </div>
                                         @foreach ($selectedServiceOrderIds as $serviceOrderId)
@@ -707,11 +768,6 @@
                                                 <label for="customer_phone">Customer phone</label>
                                                 <input id="customer_phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}" class="field-input" required>
                                             </div>
-                                        </div>
-
-                                        <div class="field-block">
-                                            <label for="selected_combination_select">Staff combination</label>
-                                            <select id="selected_combination_select" class="field-input select-input" required></select>
                                         </div>
 
                                         <div class="field-block">
@@ -840,23 +896,24 @@
             const slotCard = document.getElementById('selected-slot-card');
             const slotTimeLabel = document.getElementById('selected-slot-time-label');
             const slotInput = document.getElementById('selected-slot-input');
-            const comboInput = document.getElementById('selected-combination-input');
-            const comboSelect = document.getElementById('selected_combination_select');
             const workflowList = document.getElementById('workflow-list');
             const workflowPanel = document.getElementById('workflow-panel');
             const customSchedulePanel = document.getElementById('custom-schedule-panel');
             const customScheduleGrid = document.getElementById('custom-schedule-grid');
             const serviceOptionPanel = document.getElementById('service-option-panel');
             const serviceOptionGrid = document.getElementById('service-option-grid');
+            const serviceStaffPanel = document.getElementById('service-staff-panel');
+            const serviceStaffGrid = document.getElementById('service-staff-grid');
             const serviceOrderInputs = document.getElementById('service-order-inputs');
             const bookingServiceOrderInputs = document.getElementById('booking-service-order-inputs');
             const bookingSelectedOptionInputs = document.getElementById('booking-selected-option-inputs');
+            const bookingSelectedStaffInputs = document.getElementById('booking-selected-staff-inputs');
             const serviceCategoryTabs = Array.from(document.querySelectorAll('.service-category-tab'));
             const serviceCards = Array.from(document.querySelectorAll('[data-service-category]'));
             const serviceSearchInput = document.getElementById('service-search-input');
             const prefilledSlot = @json($prefilledSlot);
             const slotAvailable = @json($quickCreate['slot_is_available']);
-            const customCombinations = @json($availability['custom_combinations'] ?? []);
+            const customAvailabilityReady = @json((bool) ($availability['custom_is_available'] ?? false));
             const selectedArrangementMode = @json($selectedArrangementMode);
             const defaultDate = @json($selectedDate);
             const defaultCategoryKey = @json($defaultCategoryKey);
@@ -870,6 +927,7 @@
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const selectedServicesSeed = @json($selectedServiceOrderIds);
             const selectedOptionsSeed = @json($selectedOptions);
+            const selectedStaffSeed = @json($selectedStaff);
             const serviceCatalog = @json($serviceCatalog);
             const scrollStorageKey = 'lindo-appointments-scroll';
             const availabilityModal = document.getElementById('availability-modal');
@@ -878,6 +936,7 @@
             let selectedServiceOrder = Array.isArray(selectedServicesSeed) ? [...selectedServicesSeed] : [];
             let activeCategoryKey = defaultCategoryKey;
             let selectedOptions = typeof selectedOptionsSeed === 'object' && selectedOptionsSeed !== null ? { ...selectedOptionsSeed } : {};
+            let selectedStaff = typeof selectedStaffSeed === 'object' && selectedStaffSeed !== null ? { ...selectedStaffSeed } : {};
 
             const restoreScroll = sessionStorage.getItem(scrollStorageKey);
 
@@ -981,6 +1040,7 @@
                     .map((checkbox) => checkbox.value);
 
                 selectedServiceOrder = selectedServiceOrder.filter((id) => checkedIds.includes(id));
+                selectedStaff = Object.fromEntries(Object.entries(selectedStaff).filter(([serviceId]) => checkedIds.includes(serviceId)));
 
                 checkedIds.forEach((id) => {
                     if (!selectedServiceOrder.includes(id)) {
@@ -1085,6 +1145,7 @@
                 buildHiddenInputs(bookingServiceOrderInputs, 'service_order[]', selectedServiceOrder);
                 renderWorkflowList();
                 renderServiceOptionRows();
+                renderStaffSelectionRows();
                 renderCustomScheduleRows();
             }
 
@@ -1111,6 +1172,26 @@
                         input.value = valueId;
                         bookingSelectedOptionInputs.appendChild(input);
                     });
+                });
+            }
+
+            function buildSelectedStaffInputs() {
+                if (!bookingSelectedStaffInputs) {
+                    return;
+                }
+
+                bookingSelectedStaffInputs.innerHTML = '';
+
+                Object.entries(selectedStaff).forEach(([serviceId, staffId]) => {
+                    if (!selectedServiceOrder.includes(serviceId) || !staffId) {
+                        return;
+                    }
+
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = `selected_staff[${serviceId}]`;
+                    input.value = staffId;
+                    bookingSelectedStaffInputs.appendChild(input);
                 });
             }
 
@@ -1180,6 +1261,60 @@
                 });
 
                 buildSelectedOptionInputs();
+            }
+
+            function renderStaffSelectionRows() {
+                if (!serviceStaffGrid || !serviceStaffPanel) {
+                    return;
+                }
+
+                serviceStaffPanel.classList.toggle('hidden', selectedServiceOrder.length === 0);
+
+                if (!selectedServiceOrder.length) {
+                    serviceStaffGrid.innerHTML = '<div class="col-12 small-note">Select one or more services first.</div>';
+                    buildSelectedStaffInputs();
+                    return;
+                }
+
+                serviceStaffGrid.innerHTML = '';
+
+                selectedServiceOrder.forEach((serviceId) => {
+                    const service = serviceCatalog[serviceId];
+
+                    if (!service) {
+                        return;
+                    }
+
+                    const staffOptions = Array.isArray(service.eligible_staff) ? service.eligible_staff : [];
+                    const column = document.createElement('div');
+                    column.className = 'col-12';
+                    column.dataset.serviceStaffRow = serviceId;
+                    column.innerHTML = `
+                        <div class="panel" style="margin:0;">
+                            <div class="panel-body">
+                                <div class="filter-bar__head" style="margin-bottom:1rem;">
+                                    <div>
+                                        <div class="selection-card__title">${service.name}</div>
+                                        <div class="small-note">${service.category_label || ''}</div>
+                                    </div>
+                                </div>
+                                <div class="field-block">
+                                    <label class="field-label" for="selected-staff-${serviceId}">Assigned staff</label>
+                                    <select id="selected-staff-${serviceId}" name="selected_staff[${serviceId}]" class="field-input select-input staff-select" data-staff-service="${serviceId}" required>
+                                        <option value="">Choose eligible staff</option>
+                                        ${staffOptions.map((staff) => `
+                                            <option value="${staff.id}" ${selectedStaff[serviceId] === staff.id ? 'selected' : ''}>${staff.full_name} (${staff.role_key})</option>
+                                        `).join('')}
+                                    </select>
+                                    ${staffOptions.length ? '' : '<div class="field-error" style="margin-top:10px;">No active staff assigned to this service yet.</div>'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    serviceStaffGrid.appendChild(column);
+                });
+
+                buildSelectedStaffInputs();
             }
 
             function updateArrangementCards() {
@@ -1263,24 +1398,7 @@
                 renderServiceOptionRows();
             });
 
-            function setCombinations(combinations) {
-                if (! comboSelect) {
-                    return;
-                }
-
-                comboSelect.innerHTML = '';
-
-                combinations.forEach((combo, index) => {
-                    const option = document.createElement('option');
-                    option.value = combo.payload || '';
-                    option.textContent = combo.label || `Combination ${index + 1}`;
-                    comboSelect.appendChild(option);
-                });
-
-                comboInput.value = comboSelect.value || '';
-            }
-
-            function openSlot(time, combinations, triggerButton) {
+            function openSlot(time, triggerButton) {
                 slotButtons.forEach((button) => button.querySelector('.slot-card')?.classList.remove('is-selected'));
                 triggerButton?.querySelector('.slot-card')?.classList.add('is-selected');
 
@@ -1292,29 +1410,15 @@
                     slotInput.value = time || '';
                 }
 
-                setCombinations(combinations || []);
-
                 if (slotCard) {
                     slotCard.classList.remove('hidden');
                     slotCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
 
-            comboSelect?.addEventListener('change', function () {
-                comboInput.value = this.value || '';
-            });
-
             slotButtons.forEach((button) => {
                 button.addEventListener('click', function () {
-                    let combinations = [];
-
-                    try {
-                        combinations = JSON.parse(this.dataset.combinations || '[]');
-                    } catch (error) {
-                        combinations = [];
-                    }
-
-                    openSlot(this.dataset.slotTime || '', combinations, this);
+                    openSlot(this.dataset.slotTime || '', this);
                 });
             });
 
@@ -1322,17 +1426,31 @@
                 const matchedButton = Array.from(slotButtons).find((button) => button.dataset.slotTime === prefilledSlot);
 
                 if (matchedButton) {
-                    let combinations = [];
-
-                    try {
-                        combinations = JSON.parse(matchedButton.dataset.combinations || '[]');
-                    } catch (error) {
-                        combinations = [];
-                    }
-
-                    openSlot(prefilledSlot, combinations, matchedButton);
+                    openSlot(prefilledSlot, matchedButton);
                 }
             }
+
+            serviceStaffGrid?.addEventListener('change', function (event) {
+                const select = event.target.closest('.staff-select');
+
+                if (!select) {
+                    return;
+                }
+
+                const serviceId = select.dataset.staffService || '';
+
+                if (!serviceId) {
+                    return;
+                }
+
+                if (select.value) {
+                    selectedStaff[serviceId] = select.value;
+                } else {
+                    delete selectedStaff[serviceId];
+                }
+
+                buildSelectedStaffInputs();
+            });
 
             function hideCustomerSuggestions() {
                 if (customerSuggestions) {
@@ -1477,9 +1595,7 @@
             updateArrangementCards();
             applyCategoryTabState(defaultCategoryKey);
 
-            if (selectedArrangementMode === 'custom' && customCombinations.length) {
-                setCombinations(customCombinations);
-
+            if (selectedArrangementMode === 'custom' && customAvailabilityReady) {
                 if (slotCard) {
                     slotCard.classList.remove('hidden');
                 }
