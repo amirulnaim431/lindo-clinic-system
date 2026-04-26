@@ -230,6 +230,25 @@
         </div>
     </div>
 
+    <div id="calendar-board-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage modal-stage--wide">
+            <div class="modal-card calendar-board-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Reference board</div>
+                        <h3 class="modal-title">Calendar board</h3>
+                        <p class="modal-subtitle">Review the selected date without leaving the booking flow.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="calendar-board-modal-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body calendar-board-modal__body">
+                    <iframe id="calendar-board-frame" class="calendar-board-frame" title="Calendar board" src="about:blank"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
         .appointment-top-grid {
             display: grid;
@@ -409,6 +428,34 @@
             max-height: calc(100vh - 48px);
         }
 
+        .modal-stage--wide {
+            width: min(1400px, calc(100vw - 20px));
+            max-width: min(1400px, calc(100vw - 20px));
+        }
+
+        .calendar-board-modal {
+            width: 100%;
+            max-width: none;
+            min-height: min(88vh, 980px);
+            max-height: min(92vh, 1100px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-board-modal__body {
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0;
+        }
+
+        .calendar-board-frame {
+            width: 100%;
+            min-height: min(74vh, 900px);
+            border: 0;
+            border-radius: 0 0 28px 28px;
+            background: #fffdfd;
+        }
+
         .booking-option-modal .modal-header,
         .confirm-remove-modal .modal-header {
             display: flex;
@@ -518,7 +565,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const appointmentRoute = @json(route('app.appointments.index'));
+            const calendarRoute = @json(route('app.calendar'));
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const serviceCatalog = @json($serviceCatalog);
             const serviceCategories = @json($serviceCategoryMeta);
@@ -565,6 +612,9 @@
             const confirmRemoveClose = document.getElementById('confirm-remove-close');
             const confirmRemoveCancel = document.getElementById('confirm-remove-cancel');
             const confirmRemoveApprove = document.getElementById('confirm-remove-approve');
+            const calendarBoardModal = document.getElementById('calendar-board-modal');
+            const calendarBoardModalClose = document.getElementById('calendar-board-modal-close');
+            const calendarBoardFrame = document.getElementById('calendar-board-frame');
 
             let activeCategoryKey = serviceCategories[0]?.key || 'consultations';
             let activeConsultationDepartment = serviceCategories.find((group) => group.key === 'consultations')?.consultation_groups?.[0]?.key || 'wellness';
@@ -576,12 +626,45 @@
             let pendingModalSelections = {};
             let pendingRemovalAction = null;
 
-            const draftStorageKey = `lindo-appointment-builder:${dateInput?.value || @json($selectedDate)}`;
-
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
             const allStaff = Array.isArray(plannerBoard.staff) ? plannerBoard.staff : [];
             const plannerSlots = Array.isArray(plannerBoard.slots) ? plannerBoard.slots : [];
+
+            function getDraftStorageKey() {
+                return `lindo-appointment-builder:${dateInput?.value || @json($selectedDate)}`;
+            }
+
+            function buildCalendarBoardUrl() {
+                const params = new URLSearchParams();
+                params.set('date', dateInput?.value || @json($selectedDate));
+                params.set('embedded', '1');
+
+                return `${calendarRoute}?${params.toString()}`;
+            }
+
+            function openCalendarBoardModal() {
+                if (!calendarBoardModal || !calendarBoardFrame) {
+                    return;
+                }
+
+                persistDraft();
+                calendarBoardFrame.src = buildCalendarBoardUrl();
+                calendarBoardModal.classList.remove('hidden');
+                calendarBoardModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+            }
+
+            function closeCalendarBoardModal() {
+                if (!calendarBoardModal || !calendarBoardFrame) {
+                    return;
+                }
+
+                calendarBoardModal.classList.add('hidden');
+                calendarBoardModal.setAttribute('aria-hidden', 'true');
+                calendarBoardFrame.src = 'about:blank';
+                document.body.classList.remove('modal-open');
+            }
 
             function formatMoney(value) {
                 if (value === null || value === undefined || value === '') {
@@ -1089,7 +1172,7 @@
 
             function persistDraft() {
                 try {
-                    window.sessionStorage.setItem(draftStorageKey, JSON.stringify(buildDraftPayload()));
+                    window.sessionStorage.setItem(getDraftStorageKey(), JSON.stringify(buildDraftPayload()));
                 } catch (error) {
                     // Ignore storage failures; the in-memory draft still works.
                 }
@@ -1097,7 +1180,7 @@
 
             function clearPersistedDraft() {
                 try {
-                    window.sessionStorage.removeItem(draftStorageKey);
+                    window.sessionStorage.removeItem(getDraftStorageKey());
                 } catch (error) {
                     // Ignore storage failures.
                 }
@@ -1109,7 +1192,7 @@
                 }
 
                 try {
-                    const raw = window.sessionStorage.getItem(draftStorageKey);
+                    const raw = window.sessionStorage.getItem(getDraftStorageKey());
 
                     if (!raw) {
                         return false;
@@ -1282,12 +1365,7 @@
 
             serviceSearchInput?.addEventListener('input', renderServiceGrid);
 
-            viewDateBoardButton?.addEventListener('click', function () {
-                persistDraft();
-                const params = new URLSearchParams();
-                params.set('date', dateInput.value || @json($selectedDate));
-                window.location.href = `${appointmentRoute}?${params.toString()}`;
-            });
+            viewDateBoardButton?.addEventListener('click', openCalendarBoardModal);
 
             modalBody.addEventListener('click', function (event) {
                 const button = event.target.closest('.option-choice');
@@ -1350,6 +1428,14 @@
                 }
             });
 
+            calendarBoardModalClose?.addEventListener('click', closeCalendarBoardModal);
+
+            calendarBoardModal?.addEventListener('click', function (event) {
+                if (event.target === calendarBoardModal || event.target === calendarBoardModal.firstElementChild) {
+                    closeCalendarBoardModal();
+                }
+            });
+
             customerNameInput?.addEventListener('input', function () {
                 const query = this.value.trim();
                 clearSelectedCustomer();
@@ -1377,6 +1463,13 @@
 
             notesInput?.addEventListener('input', persistDraft);
             dateInput?.addEventListener('input', persistDraft);
+            dateInput?.addEventListener('change', function () {
+                persistDraft();
+
+                if (calendarBoardModal && !calendarBoardModal.classList.contains('hidden') && calendarBoardFrame) {
+                    calendarBoardFrame.src = buildCalendarBoardUrl();
+                }
+            });
 
             createAppointmentSubmit?.addEventListener('click', function () {
                 if (!selectedServices.length) {
@@ -1441,6 +1534,10 @@
 
                 if (event.key === 'Escape' && !confirmRemoveModal.classList.contains('hidden')) {
                     closeConfirmRemoveModal();
+                }
+
+                if (event.key === 'Escape' && calendarBoardModal && !calendarBoardModal.classList.contains('hidden')) {
+                    closeCalendarBoardModal();
                 }
             });
 

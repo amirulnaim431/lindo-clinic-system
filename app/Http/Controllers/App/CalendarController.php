@@ -15,6 +15,7 @@ class CalendarController extends Controller
     {
         $selectedDate = $this->resolveSelectedDate($request);
         $selectedDateLabel = $selectedDate->format('l (j/n/Y)');
+        $embedded = $request->boolean('embedded');
 
         $items = AppointmentItem::query()
             ->with([
@@ -124,6 +125,7 @@ class CalendarController extends Controller
         return view('app.calendar.index', [
             'title' => 'Calendar',
             'subtitle' => 'Clinic board grouped by PIC for the selected date.',
+            'embedded' => $embedded,
             'selectedDate' => $selectedDate,
             'selectedDateIso' => $selectedDate->toDateString(),
             'selectedDateLabel' => $selectedDateLabel,

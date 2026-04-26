@@ -218,6 +218,7 @@
             const shell = document.querySelector('[data-shell]');
             const sidebarToggle = document.querySelector('[data-sidebar-toggle]');
             const sidebarStorageKey = 'lindo-sidebar-minimized';
+            const liveRefreshEnabled = @json((bool) ($liveRefresh ?? false));
             const liveRefreshIntervalMs = 30000;
             let pendingInteraction = false;
 
@@ -294,26 +295,28 @@
                 }
             });
 
-            window.setInterval(function () {
-                fetch(window.location.href, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    credentials: 'same-origin',
-                    cache: 'no-store',
-                }).catch(function () {
-                    return null;
-                });
-            }, 300000);
+            if (liveRefreshEnabled) {
+                window.setInterval(function () {
+                    fetch(window.location.href, {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                    }).catch(function () {
+                        return null;
+                    });
+                }, 300000);
 
-            window.setInterval(function () {
-                if (document.hidden || hasActiveInteraction()) {
-                    return;
-                }
+                window.setInterval(function () {
+                    if (document.hidden || hasActiveInteraction()) {
+                        return;
+                    }
 
-                window.location.reload();
-            }, liveRefreshIntervalMs);
+                    window.location.reload();
+                }, liveRefreshIntervalMs);
+            }
         });
     </script>
 </body>
