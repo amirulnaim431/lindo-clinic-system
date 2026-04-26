@@ -20,16 +20,29 @@
                     <div class="calendar-toolbar screen-only">
                         <a href="{{ route('app.calendar', ['date' => $previousDate]) }}" class="btn btn-secondary">&larr; Previous day</a>
                         <form method="GET" action="{{ route('app.calendar') }}" class="calendar-toolbar__form">
-                            <div class="field-block calendar-toolbar__field">
-                                <label class="field-label" for="date">View date</label>
-                                <input id="date" name="date" type="date" value="{{ $selectedDateIso }}" class="form-input">
-                            </div>
+                            <input id="date" name="date" type="date" value="{{ $selectedDateIso }}" class="form-input calendar-toolbar__input" aria-label="View date">
                             <button type="submit" class="btn btn-primary">Apply</button>
                         </form>
                         <a href="{{ route('app.calendar', ['date' => $nextDate]) }}" class="btn btn-secondary">Next day &rarr;</a>
                         <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-secondary">Open booking</a>
                         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel screen-only">
+            <div class="panel-body">
+                <div class="calendar-stats-grid">
+                    @foreach ($summaryCards as $card)
+                        <div class="metric-card">
+                            <div class="metric-card__label">{{ $card['label'] }}</div>
+                            <div class="metric-card__value" style="font-size:22px;">{{ $card['value'] }}</div>
+                            @if ($card['meta'])
+                                <div class="metric-card__meta">{{ $card['meta'] }}</div>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </section>
@@ -93,9 +106,9 @@
 
         .calendar-hero {
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: space-between;
-            gap: 1.5rem 2rem;
+            gap: 1rem 2rem;
             flex-wrap: wrap;
         }
 
@@ -110,7 +123,7 @@
 
         .calendar-toolbar {
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: flex-end;
             gap: 0.75rem;
             flex: 0 1 auto;
@@ -119,13 +132,20 @@
 
         .calendar-toolbar__form {
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             gap: 0.75rem;
             flex-wrap: nowrap;
         }
 
-        .calendar-toolbar__field {
-            min-width: 220px;
+        .calendar-toolbar__input {
+            width: 190px;
+            min-width: 190px;
+        }
+
+        .calendar-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
         }
 
         .screen-only {
@@ -181,12 +201,16 @@
             }
 
             .calendar-toolbar__form {
-                width: 100%;
                 flex-wrap: wrap;
             }
 
-            .calendar-toolbar__field {
-                flex: 1 1 220px;
+            .calendar-toolbar__input {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .calendar-stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .daily-schedule-table {
@@ -209,7 +233,8 @@
             .internal-topbar,
             .app-shell__chrome,
             .page-header,
-            .small-note.screen-only {
+            .small-note.screen-only,
+            .calendar-stats-grid {
                 display: none !important;
             }
 

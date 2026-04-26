@@ -7,32 +7,6 @@
     $services = $services ?? collect();
     $serviceCategories = collect($serviceCategories ?? []);
     $plannerBoard = $plannerBoard ?? ['slots' => [], 'staff' => [], 'occupancy' => [], 'capacity_per_slot' => 2];
-    $dailyStatusCounts = [
-        'total' => $appointmentGroups->count(),
-        'checked_in' => 0,
-        'completed' => 0,
-        'reschedule' => 0,
-    ];
-
-    foreach ($appointmentGroups as $group) {
-        $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status;
-        if ($statusValue === 'checked_in') {
-            $dailyStatusCounts['checked_in']++;
-        } elseif ($statusValue === 'completed') {
-            $dailyStatusCounts['completed']++;
-        } elseif (in_array($statusValue, ['cancelled', 'no_show'], true)) {
-            $dailyStatusCounts['reschedule']++;
-        }
-    }
-
-    $summaryCards = [
-        ['label' => 'Date', 'value' => \Carbon\Carbon::parse($selectedDate)->format('d M'), 'meta' => \Carbon\Carbon::parse($selectedDate)->format('l')],
-        ['label' => 'Total', 'value' => $dailyStatusCounts['total'], 'meta' => null],
-        ['label' => 'Checked In', 'value' => $dailyStatusCounts['checked_in'], 'meta' => null],
-        ['label' => 'Completed', 'value' => $dailyStatusCounts['completed'], 'meta' => null],
-        ['label' => 'Reschedule', 'value' => $dailyStatusCounts['reschedule'], 'meta' => null],
-    ];
-
     $serviceCatalog = $services->mapWithKeys(function ($service) {
         return [
             (string) $service->id => [
@@ -132,24 +106,6 @@
                             <label class="field-label" for="customer_phone">Customer phone</label>
                             <input id="customer_phone" name="customer_phone" type="text" value="{{ old('customer_phone', $filters['customer_phone'] ?? '') }}" class="form-input" placeholder="Phone number" required>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="ops-card ops-card--hero">
-                <div class="ops-card__body">
-                    <div class="ops-kicker">{{ $isCheckInMode ? 'Status' : 'Appointments' }}</div>
-                    <h2 class="ops-title">{{ $isCheckInMode ? 'Status' : "Book and manage today's appointments" }}</h2>
-                    <div class="metrics-grid" style="margin-top:22px;">
-                        @foreach ($summaryCards as $card)
-                            <div class="metric-card">
-                                <div class="metric-card__label">{{ $card['label'] }}</div>
-                                <div class="metric-card__value" style="font-size:22px;">{{ $card['value'] }}</div>
-                                @if ($card['meta'])
-                                    <div class="metric-card__meta">{{ $card['meta'] }}</div>
-                                @endif
-                            </div>
-                        @endforeach
                     </div>
                 </div>
             </section>

@@ -69,6 +69,55 @@ class CalendarController extends Controller
             ->values()
             ->all();
 
+        $appointmentGroups = AppointmentGroup::query()
+            ->where('starts_at', '<=', $selectedDate->copy()->endOfDay())
+            ->where('ends_at', '>=', $selectedDate->copy()->startOfDay())
+            ->get(['id', 'status']);
+
+        $statusCounts = [
+            'total' => $appointmentGroups->count(),
+            'checked_in' => 0,
+            'completed' => 0,
+            'reschedule' => 0,
+        ];
+
+        foreach ($appointmentGroups as $group) {
+            $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status;
+
+            if ($statusValue === 'checked_in') {
+                $statusCounts['checked_in']++;
+            } elseif ($statusValue === 'completed') {
+                $statusCounts['completed']++;
+            } elseif (in_array($statusValue, ['cancelled', 'no_show'], true)) {
+                $statusCounts['reschedule']++;
+            }
+        }
+
+        $categoryCounts = [
+            'wellness' => 0,
+            'aesthetic' => 0,
+            'beauty_spa' => 0,
+        ];
+
+        foreach ($items as $item) {
+            $categoryKey = (string) ($item->service_category_key_snapshot ?: $item->service?->category_key ?: '');
+
+            if (array_key_exists($categoryKey, $categoryCounts)) {
+                $categoryCounts[$categoryKey]++;
+            }
+        }
+
+        $summaryCards = [
+            ['label' => 'Date', 'value' => $selectedDate->format('d M'), 'meta' => $selectedDate->format('l')],
+            ['label' => 'Grand Total', 'value' => $statusCounts['total'], 'meta' => null],
+            ['label' => 'Checked In', 'value' => $statusCounts['checked_in'], 'meta' => null],
+            ['label' => 'Completed', 'value' => $statusCounts['completed'], 'meta' => null],
+            ['label' => 'Rescheduled', 'value' => $statusCounts['reschedule'], 'meta' => null],
+            ['label' => 'Total Wellness', 'value' => $categoryCounts['wellness'], 'meta' => null],
+            ['label' => 'Total Aesthetic', 'value' => $categoryCounts['aesthetic'], 'meta' => null],
+            ['label' => 'Total Spa', 'value' => $categoryCounts['beauty_spa'], 'meta' => null],
+        ];
+
         return view('app.calendar.index', [
             'title' => 'Calendar',
             'subtitle' => 'Clinic board grouped by PIC for the selected date.',
@@ -79,6 +128,7 @@ class CalendarController extends Controller
             'nextDate' => $selectedDate->copy()->addDay()->toDateString(),
             'scheduleSections' => $groupedSchedules,
             'totalRows' => $items->count(),
+            'summaryCards' => $summaryCards,
         ]);
     }
 
