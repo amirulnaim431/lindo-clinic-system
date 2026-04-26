@@ -42,7 +42,7 @@ class CalendarController extends Controller
 
                 return [
                     'staff_id' => $staffId,
-                    'staff_name' => $staff?->full_name ?: ($group->first()?->staff_name_snapshot ?: 'Unassigned'),
+                    'staff_name' => $this->formatPicName($staff?->full_name ?: ($group->first()?->staff_name_snapshot ?: 'Unassigned')),
                     'staff_role' => $staff?->job_title ?: ($staff?->role_key ?: $group->first()?->staff_role_snapshot),
                     'sort_rank' => $staff ? Staff::appointmentGroupRankForStaff($staff) : 99,
                     'count' => $group->count(),
@@ -59,7 +59,7 @@ class CalendarController extends Controller
                             'client' => $customer?->full_name ?: 'Customer',
                             'membership' => $this->formatMembershipCell($customer, $isNewCustomer),
                             'treatment' => $this->formatTreatmentCell($item),
-                            'pic' => $item->displayStaffName(),
+                            'pic' => $this->formatPicName($item->displayStaffName()),
                             'remarks' => $item->group?->notes ?: '',
                             'manage_url' => route('app.appointments.index', ['date' => $item->starts_at?->format('Y-m-d') ?: $selectedDate->toDateString()]),
                         ];
@@ -145,6 +145,17 @@ class CalendarController extends Controller
         return $dateInput !== ''
             ? Carbon::parse($dateInput)->startOfDay()
             : now()->startOfDay();
+    }
+
+    private function formatPicName(string $name): string
+    {
+        $normalized = trim(preg_replace('/\s+/', ' ', $name));
+
+        return match ($normalized) {
+            "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad" => 'Dr Syarifah',
+            'Dr. Amanda Binti Elli' => 'Dr Amanda',
+            default => $normalized,
+        };
     }
 
     private function formatMembershipCell($customer, bool $isNewCustomer): string

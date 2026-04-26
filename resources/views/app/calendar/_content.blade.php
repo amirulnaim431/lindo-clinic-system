@@ -3,16 +3,18 @@
         <div class="flash flash--success">{{ session('success') }}</div>
     @endif
 
-    <section class="panel">
-        <div class="panel-body">
+    <section class="panel calendar-hero-panel">
+        <div class="panel-body calendar-hero-panel__body">
             <div class="calendar-hero">
                 <div class="calendar-hero__summary">
-                    <div class="compact-label screen-only">Calendar</div>
+                    <div class="calendar-title-line screen-only">
+                        <span class="compact-label">Calendar</span>
+                        <span class="calendar-title-line__date">{{ strtoupper($selectedDateLabel) }}</span>
+                    </div>
                     <div class="print-header">
                         <h1 class="print-header__title">DAILY CLIENT SCHEDULE</h1>
                         <div class="print-header__date">{{ strtoupper($selectedDateLabel) }}</div>
                     </div>
-                    <h2 class="panel-title-display screen-only">{{ strtoupper($selectedDateLabel) }}</h2>
                     <div class="small-note calendar-hero__note">Total treatments for the day: {{ $totalRows }}</div>
                 </div>
 
@@ -73,11 +75,11 @@
                             <colgroup>
                                 <col style="width: 5%;">
                                 <col style="width: 10%;">
-                                <col style="width: 20%;">
+                                <col style="width: 19%;">
                                 <col style="width: 11%;">
-                                <col style="width: 24%;">
-                                <col style="width: 15%;">
-                                <col style="width: 15%;">
+                                <col style="width: 25%;">
+                                <col style="width: 11%;">
+                                <col style="width: 19%;">
                             </colgroup>
                             <thead>
                                 <tr>
@@ -135,28 +137,46 @@
         gap: 1rem;
     }
 
+    .calendar-hero-panel__body {
+        padding-top: 1.1rem;
+        padding-bottom: 1.1rem;
+    }
+
     .calendar-hero {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem 2rem;
+        gap: 0.75rem 1.5rem;
         flex-wrap: wrap;
     }
 
     .calendar-hero__summary {
-        flex: 1 1 420px;
+        flex: 1 1 300px;
         min-width: 280px;
     }
 
+    .calendar-title-line {
+        display: flex;
+        align-items: baseline;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+    }
+
+    .calendar-title-line__date {
+        font-size: clamp(1.4rem, 2.1vw, 2rem);
+        line-height: 1.05;
+        color: #1a1317;
+    }
+
     .calendar-hero__note {
-        margin-top: 0.5rem;
+        margin-top: 0.35rem;
     }
 
     .calendar-toolbar {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 0.75rem;
+        gap: 0.45rem;
         flex: 0 1 auto;
         flex-wrap: wrap;
     }
@@ -164,13 +184,13 @@
     .calendar-toolbar__form {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.45rem;
         flex-wrap: nowrap;
     }
 
     .calendar-toolbar__input {
-        width: 190px;
-        min-width: 190px;
+        width: 170px;
+        min-width: 170px;
     }
 
     .calendar-stats-grid {
@@ -245,8 +265,7 @@
     }
 
     .daily-schedule-table tbody td:nth-child(2),
-    .daily-schedule-table tbody td:nth-child(4),
-    .daily-schedule-table tbody td:nth-child(6) {
+    .daily-schedule-table tbody td:nth-child(4) {
         white-space: nowrap;
     }
 
@@ -394,8 +413,7 @@
 
         .daily-schedule-table tbody td:nth-child(1),
         .daily-schedule-table tbody td:nth-child(2),
-        .daily-schedule-table tbody td:nth-child(4),
-        .daily-schedule-table tbody td:nth-child(6) {
+        .daily-schedule-table tbody td:nth-child(4) {
             white-space: nowrap;
         }
 
