@@ -429,13 +429,14 @@
         }
 
         .modal-stage--wide {
-            width: min(1400px, calc(100vw - 20px));
-            max-width: min(1400px, calc(100vw - 20px));
+            width: 100%;
+            max-width: none;
+            padding: 1.25rem;
         }
 
         .calendar-board-modal {
-            width: 100%;
-            max-width: none;
+            width: min(1400px, calc(100vw - 2.5rem));
+            margin: auto;
             min-height: min(88vh, 980px);
             max-height: min(92vh, 1100px);
             display: flex;
