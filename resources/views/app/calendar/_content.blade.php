@@ -147,12 +147,12 @@
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem 1.5rem;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .calendar-hero__summary {
-        flex: 1 1 300px;
-        min-width: 280px;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .calendar-title-line {
@@ -176,21 +176,27 @@
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 0.45rem;
-        flex: 0 1 auto;
-        flex-wrap: wrap;
+        gap: 0.4rem;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        white-space: nowrap;
     }
 
     .calendar-toolbar__form {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.4rem;
         flex-wrap: nowrap;
     }
 
     .calendar-toolbar__input {
-        width: 170px;
-        min-width: 170px;
+        width: 150px;
+        min-width: 150px;
+    }
+
+    .calendar-toolbar .btn {
+        min-height: 42px;
+        padding: 0.68rem 0.95rem;
     }
 
     .calendar-stats-grid {
@@ -283,8 +289,14 @@
             align-items: stretch;
         }
 
+        .calendar-hero {
+            flex-wrap: wrap;
+        }
+
         .calendar-toolbar {
             justify-content: flex-start;
+            flex-wrap: wrap;
+            white-space: normal;
         }
 
         .calendar-toolbar__form {
