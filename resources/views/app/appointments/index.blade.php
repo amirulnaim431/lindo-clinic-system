@@ -441,6 +441,18 @@
             max-height: min(92vh, 1100px);
             display: flex;
             flex-direction: column;
+            position: relative;
+        }
+
+        .calendar-board-modal .modal-header {
+            padding-right: 4.25rem;
+        }
+
+        .calendar-board-modal .modal-close {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 2;
         }
 
         .calendar-board-modal__body {
