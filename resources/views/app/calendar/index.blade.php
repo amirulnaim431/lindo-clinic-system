@@ -6,21 +6,21 @@
 
         <section class="panel">
             <div class="panel-body">
-                <div class="filter-bar__head" style="align-items:flex-end;gap:1rem;flex-wrap:wrap;">
-                    <div>
-                        <div class="compact-label screen-only">Daily Client Schedule</div>
+                <div class="calendar-hero">
+                    <div class="calendar-hero__summary">
+                        <div class="compact-label screen-only">Calendar</div>
                         <div class="print-header">
                             <h1 class="print-header__title">DAILY CLIENT SCHEDULE</h1>
                             <div class="print-header__date">{{ strtoupper($selectedDateLabel) }}</div>
                         </div>
                         <h2 class="panel-title-display screen-only">{{ strtoupper($selectedDateLabel) }}</h2>
-                        <div class="small-note" style="margin-top:0.5rem;">Total treatments for the day: {{ $totalRows }}</div>
+                        <div class="small-note calendar-hero__note">Total treatments for the day: {{ $totalRows }}</div>
                     </div>
 
-                    <div class="btn-row screen-only" style="align-items:flex-end;flex-wrap:wrap;">
+                    <div class="calendar-toolbar screen-only">
                         <a href="{{ route('app.calendar', ['date' => $previousDate]) }}" class="btn btn-secondary">&larr; Previous day</a>
-                        <form method="GET" action="{{ route('app.calendar') }}" style="display:flex;align-items:end;gap:0.75rem;flex-wrap:wrap;">
-                            <div class="field-block" style="min-width:180px;">
+                        <form method="GET" action="{{ route('app.calendar') }}" class="calendar-toolbar__form">
+                            <div class="field-block calendar-toolbar__field">
                                 <label class="field-label" for="date">View date</label>
                                 <input id="date" name="date" type="date" value="{{ $selectedDateIso }}" class="form-input">
                             </div>
@@ -91,6 +91,43 @@
             display: none;
         }
 
+        .calendar-hero {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1.5rem 2rem;
+            flex-wrap: wrap;
+        }
+
+        .calendar-hero__summary {
+            flex: 1 1 420px;
+            min-width: 280px;
+        }
+
+        .calendar-hero__note {
+            margin-top: 0.5rem;
+        }
+
+        .calendar-toolbar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            flex: 0 1 auto;
+            flex-wrap: wrap;
+        }
+
+        .calendar-toolbar__form {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.75rem;
+            flex-wrap: nowrap;
+        }
+
+        .calendar-toolbar__field {
+            min-width: 220px;
+        }
+
         .screen-only {
             display: initial;
         }
@@ -134,6 +171,24 @@
         }
 
         @media (max-width: 900px) {
+            .calendar-hero,
+            .calendar-toolbar {
+                align-items: stretch;
+            }
+
+            .calendar-toolbar {
+                justify-content: flex-start;
+            }
+
+            .calendar-toolbar__form {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .calendar-toolbar__field {
+                flex: 1 1 220px;
+            }
+
             .daily-schedule-table {
                 min-width: 980px;
             }

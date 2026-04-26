@@ -70,7 +70,7 @@ class CalendarController extends Controller
             ->all();
 
         return view('app.calendar.index', [
-            'title' => 'Daily Client Schedule',
+            'title' => 'Calendar',
             'subtitle' => 'Clinic board grouped by PIC for the selected date.',
             'selectedDate' => $selectedDate,
             'selectedDateIso' => $selectedDate->toDateString(),
