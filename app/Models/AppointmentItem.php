@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AppointmentItem extends Model
 {
@@ -55,6 +56,11 @@ class AppointmentItem extends Model
         return $this->hasMany(AppointmentItemOptionSelection::class)
             ->orderBy('display_order')
             ->orderBy('option_group_name');
+    }
+
+    public function slotReservation(): HasOne
+    {
+        return $this->hasOne(AppointmentSlotReservation::class);
     }
 
     public function displayServiceName(): string

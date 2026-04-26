@@ -76,30 +76,33 @@ class AppointmentTreatmentHistoryTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $combinationPayload = json_encode([
-            'duration_minutes' => 60,
-            'arrangement_mode' => 'same_slot',
-            'service_order' => [$service->id],
-            'service_staff_map' => [
-                $service->id => $staff->id,
+        $instanceId = 'tirze-test-instance';
+        $bookingPayload = json_encode([
+            'services' => [
+                [
+                    'instance_id' => $instanceId,
+                    'service_id' => $service->id,
+                    'selected_options' => [
+                        $group->id => $value->id,
+                    ],
+                ],
+            ],
+            'assignments' => [
+                [
+                    'instance_id' => $instanceId,
+                    'staff_id' => $staff->id,
+                    'start_time' => '10:00',
+                    'slot_index' => 1,
+                ],
             ],
         ]);
 
         $response = $this->actingAs($admin)->post(route('app.appointments.store'), [
             'date' => now()->toDateString(),
-            'slot' => '10:00',
-            'arrangement_mode' => 'same_slot',
-            'service_ids' => [$service->id],
-            'service_order' => [$service->id],
-            'selected_options' => [
-                $service->id => [
-                    $group->id => $value->id,
-                ],
-            ],
-            'selected_combination' => $combinationPayload,
             'customer_full_name' => 'Test Customer',
             'customer_phone' => '0123456789',
             'notes' => 'Follow-up booking',
+            'booking_payload' => $bookingPayload,
         ]);
 
         $response->assertRedirect();
@@ -115,6 +118,24 @@ class AppointmentTreatmentHistoryTest extends TestCase
             'option_group_name' => 'Cycle',
             'option_value_label' => 'MT2',
         ]);
+
+        $this->assertDatabaseHas('appointment_slot_reservations', [
+            'staff_id' => $staff->id,
+            'start_time' => '10:00:00',
+            'slot_index' => 1,
+        ]);
+
+        $duplicateResponse = $this->actingAs($admin)->from(route('app.appointments.index'))->post(route('app.appointments.store'), [
+            'date' => now()->toDateString(),
+            'customer_full_name' => 'Second Customer',
+            'customer_phone' => '0199999999',
+            'notes' => 'Duplicate box test',
+            'booking_payload' => $bookingPayload,
+        ]);
+
+        $duplicateResponse->assertRedirect(route('app.appointments.index'));
+        $duplicateResponse->assertSessionHasErrors('booking_payload');
+        $this->assertDatabaseCount('appointment_groups', 1);
 
         $customerId = DB::table('customers')->where('phone', '0123456789')->value('id');
         $historyResponse = $this->actingAs($admin)->get(route('app.customers.show', $customerId));
