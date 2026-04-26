@@ -33,8 +33,19 @@
 
         <section class="panel screen-only">
             <div class="panel-body">
-                <div class="calendar-stats-grid">
-                    @foreach ($summaryCards as $card)
+                <div class="calendar-stats-grid calendar-stats-grid--top">
+                    @foreach ($topSummaryCards as $card)
+                        <div class="metric-card">
+                            <div class="metric-card__label">{{ $card['label'] }}</div>
+                            <div class="metric-card__value" style="font-size:22px;">{{ $card['value'] }}</div>
+                            @if ($card['meta'])
+                                <div class="metric-card__meta">{{ $card['meta'] }}</div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                <div class="calendar-stats-grid calendar-stats-grid--bottom">
+                    @foreach ($bottomSummaryCards as $card)
                         <div class="metric-card">
                             <div class="metric-card__label">{{ $card['label'] }}</div>
                             <div class="metric-card__value" style="font-size:22px;">{{ $card['value'] }}</div>
@@ -144,8 +155,19 @@
 
         .calendar-stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 1rem;
+        }
+
+        .calendar-stats-grid + .calendar-stats-grid {
+            margin-top: 1rem;
+        }
+
+        .calendar-stats-grid--top {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .calendar-stats-grid--bottom {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
         .screen-only {
@@ -210,6 +232,10 @@
             }
 
             .calendar-stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .calendar-stats-grid--bottom {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 

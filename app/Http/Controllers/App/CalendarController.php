@@ -107,12 +107,15 @@ class CalendarController extends Controller
             }
         }
 
-        $summaryCards = [
+        $topSummaryCards = [
             ['label' => 'Date', 'value' => $selectedDate->format('d M'), 'meta' => $selectedDate->format('l')],
             ['label' => 'Grand Total', 'value' => $statusCounts['total'], 'meta' => null],
             ['label' => 'Checked In', 'value' => $statusCounts['checked_in'], 'meta' => null],
             ['label' => 'Completed', 'value' => $statusCounts['completed'], 'meta' => null],
             ['label' => 'Rescheduled', 'value' => $statusCounts['reschedule'], 'meta' => null],
+        ];
+
+        $bottomSummaryCards = [
             ['label' => 'Total Wellness', 'value' => $categoryCounts['wellness'], 'meta' => null],
             ['label' => 'Total Aesthetic', 'value' => $categoryCounts['aesthetic'], 'meta' => null],
             ['label' => 'Total Spa', 'value' => $categoryCounts['beauty_spa'], 'meta' => null],
@@ -128,7 +131,8 @@ class CalendarController extends Controller
             'nextDate' => $selectedDate->copy()->addDay()->toDateString(),
             'scheduleSections' => $groupedSchedules,
             'totalRows' => $items->count(),
-            'summaryCards' => $summaryCards,
+            'topSummaryCards' => $topSummaryCards,
+            'bottomSummaryCards' => $bottomSummaryCards,
         ]);
     }
 
