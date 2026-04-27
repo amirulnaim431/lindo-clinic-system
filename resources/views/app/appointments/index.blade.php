@@ -109,33 +109,35 @@
         @endif
 
         <div class="stack" id="appointment-builder-form">
-            <section class="panel">
-                <div class="panel-body">
-                    <div class="appointment-top-grid">
-                        <div class="field-block appointment-top-grid__date">
-                            <label class="field-label" for="date">Appointment date</label>
-                            <input id="date" name="date" type="date" value="{{ old('date', $selectedDate) }}" class="form-input" required>
-                            <div class="btn-row" style="margin-top:0.85rem;">
-                                <button type="button" class="btn btn-secondary" id="view-date-board">View calendar board</button>
-                                <a href="{{ route('app.appointments.index', $isCheckInMode ? ['mode' => 'checkin'] : []) }}" class="btn btn-secondary">Today</a>
+            @unless ($isCheckInMode)
+                <section class="panel">
+                    <div class="panel-body">
+                        <div class="appointment-top-grid">
+                            <div class="field-block appointment-top-grid__date">
+                                <label class="field-label" for="date">Appointment date</label>
+                                <input id="date" name="date" type="date" value="{{ old('date', $selectedDate) }}" class="form-input" required>
+                                <div class="btn-row" style="margin-top:0.85rem;">
+                                    <button type="button" class="btn btn-secondary" id="view-date-board">View calendar board</button>
+                                    <a href="{{ route('app.appointments.index') }}" class="btn btn-secondary">Today</a>
+                                </div>
+                            </div>
+
+                            <div class="field-block customer-picker appointment-top-grid__name" style="position:relative;">
+                                <label class="field-label" for="customer_full_name">Customer name</label>
+                                <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', $filters['customer_id'] ?? '') }}">
+                                <input id="customer_full_name" name="customer_full_name" type="text" value="{{ old('customer_full_name', $filters['customer_full_name'] ?? '') }}" class="form-input" placeholder="Start typing member name or phone" autocomplete="off" required>
+                                <div id="customer_selected_hint" class="small-note {{ old('customer_id', $filters['customer_id'] ?? '') ? '' : 'hidden' }}" style="margin-top:0.55rem;"></div>
+                                <div id="customer_suggestions" class="customer-suggestion-list hidden"></div>
+                            </div>
+
+                            <div class="field-block appointment-top-grid__phone">
+                                <label class="field-label" for="customer_phone">Customer phone</label>
+                                <input id="customer_phone" name="customer_phone" type="text" value="{{ old('customer_phone', $filters['customer_phone'] ?? '') }}" class="form-input" placeholder="Phone number" required>
                             </div>
                         </div>
-
-                        <div class="field-block customer-picker appointment-top-grid__name" style="position:relative;">
-                            <label class="field-label" for="customer_full_name">Customer name</label>
-                            <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', $filters['customer_id'] ?? '') }}">
-                            <input id="customer_full_name" name="customer_full_name" type="text" value="{{ old('customer_full_name', $filters['customer_full_name'] ?? '') }}" class="form-input" placeholder="Start typing member name or phone" autocomplete="off" required>
-                            <div id="customer_selected_hint" class="small-note {{ old('customer_id', $filters['customer_id'] ?? '') ? '' : 'hidden' }}" style="margin-top:0.55rem;"></div>
-                            <div id="customer_suggestions" class="customer-suggestion-list hidden"></div>
-                        </div>
-
-                        <div class="field-block appointment-top-grid__phone">
-                            <label class="field-label" for="customer_phone">Customer phone</label>
-                            <input id="customer_phone" name="customer_phone" type="text" value="{{ old('customer_phone', $filters['customer_phone'] ?? '') }}" class="form-input" placeholder="Phone number" required>
-                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            @endunless
 
             @if ($isCheckInMode)
                 <section class="panel">
@@ -1817,6 +1819,10 @@
             }
 
             function renderSelectedCustomer(customer) {
+                if (!customerHint) {
+                    return;
+                }
+
                 if (!customer) {
                     customerHint.textContent = '';
                     customerHint.classList.add('hidden');
@@ -1837,14 +1843,22 @@
             }
 
             function hideCustomerSuggestions() {
+                if (!customerSuggestions) {
+                    return;
+                }
+
                 customerSuggestions.innerHTML = '';
                 customerSuggestions.classList.add('hidden');
             }
 
             function selectCustomer(customer) {
-                customerIdInput.value = customer.id || '';
-                customerNameInput.value = customer.full_name || '';
-                if (customer.phone) {
+                if (customerIdInput) {
+                    customerIdInput.value = customer.id || '';
+                }
+                if (customerNameInput) {
+                    customerNameInput.value = customer.full_name || '';
+                }
+                if (customerPhoneInput && customer.phone) {
                     customerPhoneInput.value = customer.phone;
                 }
                 renderSelectedCustomer(customer);
@@ -1852,7 +1866,9 @@
             }
 
             function clearSelectedCustomer() {
-                customerIdInput.value = '';
+                if (customerIdInput) {
+                    customerIdInput.value = '';
+                }
                 renderSelectedCustomer(null);
             }
 
@@ -1983,11 +1999,11 @@
                     }
                 });
 
-                if (oldCustomerId && customerNameInput.value) {
+                if (oldCustomerId && customerNameInput?.value) {
                     renderSelectedCustomer({
                         id: oldCustomerId,
                         full_name: customerNameInput.value,
-                        phone: customerPhoneInput.value,
+                        phone: customerPhoneInput?.value || '',
                         membership_code: '',
                         membership_type: '',
                         current_package: '',
@@ -2202,11 +2218,11 @@
                 }
             });
 
-            if (oldCustomerId && customerNameInput.value) {
+            if (oldCustomerId && customerNameInput?.value) {
                 renderSelectedCustomer({
                     id: oldCustomerId,
                     full_name: customerNameInput.value,
-                    phone: customerPhoneInput.value,
+                    phone: customerPhoneInput?.value || '',
                     membership_code: '',
                     membership_type: '',
                     current_package: '',
