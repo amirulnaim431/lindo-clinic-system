@@ -67,6 +67,28 @@
         'completed' => $appointmentGroups->filter(fn ($group) => ($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status) === 'completed')->count(),
         'reschedule' => $appointmentGroups->filter(fn ($group) => in_array(($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status), ['cancelled', 'no_show'], true))->count(),
     ];
+    $trafficListRows = $appointmentGroups->map(function ($group) {
+        $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status;
+        $customer = $group->customer;
+        $membership = $customer?->current_package ?: ($customer?->membership_type ?: ($customer?->membership_code ?: '-'));
+
+        return [
+            'status' => $statusValue,
+            'time' => optional($group->starts_at)->format('g:i A') ?: '-',
+            'customer' => $customer?->full_name ?: 'Walk-in customer',
+            'phone' => $customer?->phone ?: '-',
+            'membership' => $membership,
+            'treatment' => $group->items->map(fn ($item) => $item->displayServiceName())->filter()->implode(' | ') ?: '-',
+            'pic' => $group->items->map(fn ($item) => $item->displayStaffName())->filter()->unique()->implode(' | ') ?: '-',
+            'booked_by' => $group->source ? str((string) $group->source)->replace('_', ' ')->title()->toString() : 'Admin',
+            'remarks' => $group->notes ?: '-',
+        ];
+    })->values();
+    $trafficLists = [
+        'checked_in' => $trafficListRows->where('status', 'checked_in')->values(),
+        'completed' => $trafficListRows->where('status', 'completed')->values(),
+        'reschedule' => $trafficListRows->filter(fn ($row) => in_array($row['status'], ['cancelled', 'no_show'], true))->values(),
+    ];
 @endphp
 
 <x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="null">
@@ -125,18 +147,18 @@
                     </div>
                     <div class="panel-body stack">
                         <div class="checkin-metrics">
-                            <div class="metric-card">
+                            <button type="button" class="metric-card checkin-metric-button" data-traffic-list="checked_in">
                                 <div class="metric-card__label">Checked In</div>
                                 <div class="metric-card__value">{{ $trafficCounts['checked_in'] }}</div>
-                            </div>
-                            <div class="metric-card">
+                            </button>
+                            <button type="button" class="metric-card checkin-metric-button" data-traffic-list="completed">
                                 <div class="metric-card__label">Completed</div>
                                 <div class="metric-card__value">{{ $trafficCounts['completed'] }}</div>
-                            </div>
-                            <div class="metric-card">
+                            </button>
+                            <button type="button" class="metric-card checkin-metric-button" data-traffic-list="reschedule">
                                 <div class="metric-card__label">Rescheduled</div>
                                 <div class="metric-card__value">{{ $trafficCounts['reschedule'] }}</div>
-                            </div>
+                            </button>
                         </div>
 
                         <div class="checkin-list">
@@ -176,18 +198,8 @@
                                                 <button type="submit" class="btn btn-primary">Complete</button>
                                             </form>
                                         @endif
-                                        <form method="POST" action="{{ route('app.appointments.status', $group) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="cancelled">
-                                            <button type="submit" class="btn btn-secondary">Reschedule</button>
-                                        </form>
-                                        <form method="POST" action="{{ route('app.appointments.status', $group) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="no_show">
-                                            <button type="submit" class="btn btn-secondary">Remove</button>
-                                        </form>
+                                        <button type="button" class="btn btn-secondary checkin-remark-action" data-action-url="{{ route('app.appointments.status', $group) }}" data-status="cancelled" data-title="Reschedule customer" data-customer="{{ $customer?->full_name ?: 'Walk-in customer' }}">Reschedule</button>
+                                        <button type="button" class="btn btn-secondary checkin-remark-action" data-action-url="{{ route('app.appointments.status', $group) }}" data-status="no_show" data-title="Remove customer from traffic board" data-customer="{{ $customer?->full_name ?: 'Walk-in customer' }}">Remove</button>
                                     </div>
                                 </div>
                             @empty
@@ -335,6 +347,60 @@
                 </div>
                 <div class="modal-body calendar-board-modal__body">
                     <iframe id="calendar-board-frame" class="calendar-board-frame" title="Calendar board" src="about:blank"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="traffic-list-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage modal-stage--wide">
+            <div class="modal-card traffic-list-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Printable list</div>
+                        <h3 class="modal-title" id="traffic-list-title">Customer list</h3>
+                        <p class="modal-subtitle" id="traffic-list-subtitle">Review and print this traffic list.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="traffic-list-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body traffic-list-body">
+                    <div id="traffic-list-content"></div>
+                    <div class="btn-row screen-actions">
+                        <button type="button" class="btn btn-primary" id="traffic-list-print">Print list</button>
+                        <button type="button" class="btn btn-secondary" id="traffic-list-cancel">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="checkin-remark-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card confirm-remove-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Front desk remark</div>
+                        <h3 class="modal-title" id="checkin-remark-title">Update appointment</h3>
+                        <p class="modal-subtitle" id="checkin-remark-subtitle">Add a reason or remark before updating this customer.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="checkin-remark-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" id="checkin-remark-form" class="stack">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="status" id="checkin-remark-status">
+                        <div class="field-block">
+                            <label class="field-label" for="checkin-remark-notes">Remark / reason</label>
+                            <textarea id="checkin-remark-notes" name="notes" class="form-input booking-textarea" placeholder="Example: customer requested another date, duplicate entry, cancelled at counter"></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-primary">Save update</button>
+                            <button type="button" class="btn btn-secondary" id="checkin-remark-cancel">Cancel</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -655,6 +721,20 @@
             gap: 1rem;
         }
 
+        .checkin-metric-button {
+            appearance: none;
+            border: 1px solid rgba(26, 19, 23, 0.08);
+            text-align: left;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .checkin-metric-button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(198, 139, 154, 0.5);
+            box-shadow: 0 18px 36px rgba(92, 58, 69, 0.1);
+        }
+
         .checkin-list {
             display: grid;
             gap: 0.9rem;
@@ -701,6 +781,114 @@
             flex-wrap: wrap;
         }
 
+        .traffic-list-modal {
+            width: min(1180px, calc(100vw - 2.5rem));
+            max-height: min(92vh, 980px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .traffic-list-modal .modal-header {
+            padding-right: 4.25rem;
+        }
+
+        .traffic-list-modal .modal-close {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 2;
+        }
+
+        .traffic-list-body {
+            overflow: auto;
+        }
+
+        .traffic-print-header {
+            text-align: center;
+            margin-bottom: 1.1rem;
+        }
+
+        .traffic-print-title {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #1a1317;
+        }
+
+        .traffic-print-subtitle {
+            margin-top: 0.35rem;
+            color: rgba(26, 19, 23, 0.62);
+        }
+
+        .traffic-list-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .traffic-list-table th {
+            background: #070707;
+            color: #fff;
+            font-size: 0.74rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .traffic-list-table th,
+        .traffic-list-table td {
+            border: 1px solid rgba(7, 7, 7, 0.16);
+            padding: 0.65rem 0.7rem;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        .traffic-list-empty {
+            border: 1px solid rgba(198, 139, 154, 0.16);
+            border-radius: 24px;
+            padding: 1.4rem;
+            text-align: center;
+            color: rgba(26, 19, 23, 0.66);
+            background: #fff;
+        }
+
+        @media print {
+            body.is-printing-traffic * {
+                visibility: hidden !important;
+            }
+
+            body.is-printing-traffic #traffic-list-content,
+            body.is-printing-traffic #traffic-list-content * {
+                visibility: visible !important;
+            }
+
+            body.is-printing-traffic #traffic-list-content {
+                position: fixed;
+                inset: 0;
+                padding: 12mm;
+                background: #fff;
+            }
+
+            body.is-printing-traffic .screen-actions {
+                display: none !important;
+            }
+
+            body.is-printing-traffic .traffic-list-table {
+                font-size: 10px;
+            }
+
+            body.is-printing-traffic .traffic-list-table th,
+            body.is-printing-traffic .traffic-list-table td {
+                border: 1px solid #000 !important;
+                color: #000 !important;
+                padding: 5px;
+            }
+
+            body.is-printing-traffic .traffic-list-table th {
+                background: #000 !important;
+                color: #fff !important;
+            }
+        }
+
         @media (max-width: 960px) {
             .appointment-top-grid {
                 grid-template-columns: 1fr;
@@ -729,6 +917,10 @@
             .checkin-card__actions {
                 justify-content: flex-start;
             }
+
+            .traffic-list-table {
+                min-width: 920px;
+            }
         }
     </style>
 
@@ -742,6 +934,21 @@
             const plannerBoard = @json($plannerBoard);
             const oldDraft = @json($oldBookingPayload);
             const oldCustomerId = @json(old('customer_id', $filters['customer_id'] ?? ''));
+            const trafficLists = @json($trafficLists);
+            const trafficListMeta = {
+                checked_in: {
+                    title: 'Checked In Customers',
+                    subtitle: 'Customers currently checked in for the selected date.',
+                },
+                completed: {
+                    title: 'Completed Customers',
+                    subtitle: 'Customers marked complete for the selected date.',
+                },
+                reschedule: {
+                    title: 'Rescheduled / Removed Customers',
+                    subtitle: 'Customers cancelled, rescheduled, or removed from active clinic traffic.',
+                },
+            };
 
             const dateInput = document.getElementById('date');
             const viewDateBoardButton = document.getElementById('view-date-board');
@@ -785,6 +992,21 @@
             const calendarBoardModal = document.getElementById('calendar-board-modal');
             const calendarBoardModalClose = document.getElementById('calendar-board-modal-close');
             const calendarBoardFrame = document.getElementById('calendar-board-frame');
+            const trafficListModal = document.getElementById('traffic-list-modal');
+            const trafficListTitle = document.getElementById('traffic-list-title');
+            const trafficListSubtitle = document.getElementById('traffic-list-subtitle');
+            const trafficListContent = document.getElementById('traffic-list-content');
+            const trafficListClose = document.getElementById('traffic-list-close');
+            const trafficListCancel = document.getElementById('traffic-list-cancel');
+            const trafficListPrint = document.getElementById('traffic-list-print');
+            const checkinRemarkModal = document.getElementById('checkin-remark-modal');
+            const checkinRemarkForm = document.getElementById('checkin-remark-form');
+            const checkinRemarkStatus = document.getElementById('checkin-remark-status');
+            const checkinRemarkNotes = document.getElementById('checkin-remark-notes');
+            const checkinRemarkTitle = document.getElementById('checkin-remark-title');
+            const checkinRemarkSubtitle = document.getElementById('checkin-remark-subtitle');
+            const checkinRemarkClose = document.getElementById('checkin-remark-close');
+            const checkinRemarkCancel = document.getElementById('checkin-remark-cancel');
 
             let activeCategoryKey = serviceCategories[0]?.key || 'consultations';
             let activeConsultationDepartment = serviceCategories.find((group) => group.key === 'consultations')?.consultation_groups?.[0]?.key || 'wellness';
@@ -834,6 +1056,105 @@
                 calendarBoardModal.classList.add('hidden');
                 calendarBoardModal.setAttribute('aria-hidden', 'true');
                 calendarBoardFrame.src = 'about:blank';
+                document.body.classList.remove('modal-open');
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function openTrafficListModal(listKey) {
+                if (!trafficListModal || !trafficListContent) {
+                    return;
+                }
+
+                const meta = trafficListMeta[listKey] || trafficListMeta.checked_in;
+                const rows = Array.isArray(trafficLists?.[listKey]) ? trafficLists[listKey] : [];
+                trafficListTitle.textContent = meta.title;
+                trafficListSubtitle.textContent = meta.subtitle;
+
+                if (!rows.length) {
+                    trafficListContent.innerHTML = `
+                        <div class="traffic-print-header">
+                            <div class="traffic-print-title">${escapeHtml(meta.title)}</div>
+                            <div class="traffic-print-subtitle">${escapeHtml(meta.subtitle)}</div>
+                        </div>
+                        <div class="traffic-list-empty">No customers in this list yet.</div>
+                    `;
+                } else {
+                    trafficListContent.innerHTML = `
+                        <div class="traffic-print-header">
+                            <div class="traffic-print-title">${escapeHtml(meta.title)}</div>
+                            <div class="traffic-print-subtitle">${escapeHtml(meta.subtitle)}</div>
+                        </div>
+                        <table class="traffic-list-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:5%;">No.</th>
+                                    <th style="width:9%;">Time</th>
+                                    <th style="width:17%;">Customer</th>
+                                    <th style="width:11%;">Phone</th>
+                                    <th style="width:11%;">Package</th>
+                                    <th style="width:19%;">Treatment</th>
+                                    <th style="width:13%;">PIC</th>
+                                    <th style="width:8%;">Booked By</th>
+                                    <th style="width:17%;">Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows.map((row, index) => `
+                                    <tr>
+                                        <td>${index + 1}</td>
+                                        <td>${escapeHtml(row.time)}</td>
+                                        <td>${escapeHtml(row.customer)}</td>
+                                        <td>${escapeHtml(row.phone)}</td>
+                                        <td>${escapeHtml(row.membership)}</td>
+                                        <td>${escapeHtml(row.treatment)}</td>
+                                        <td>${escapeHtml(row.pic)}</td>
+                                        <td>${escapeHtml(row.booked_by)}</td>
+                                        <td>${escapeHtml(row.remarks)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+                trafficListModal.classList.remove('hidden');
+                trafficListModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+            }
+
+            function closeTrafficListModal() {
+                trafficListModal?.classList.add('hidden');
+                trafficListModal?.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open', 'is-printing-traffic');
+            }
+
+            function openCheckinRemarkModal(button) {
+                if (!checkinRemarkModal || !checkinRemarkForm) {
+                    return;
+                }
+
+                checkinRemarkForm.action = button.dataset.actionUrl || '';
+                checkinRemarkStatus.value = button.dataset.status || '';
+                checkinRemarkNotes.value = '';
+                checkinRemarkTitle.textContent = button.dataset.title || 'Update appointment';
+                checkinRemarkSubtitle.textContent = `Add a reason or remark for ${button.dataset.customer || 'this customer'}.`;
+                checkinRemarkModal.classList.remove('hidden');
+                checkinRemarkModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+                window.setTimeout(() => checkinRemarkNotes?.focus(), 80);
+            }
+
+            function closeCheckinRemarkModal() {
+                checkinRemarkModal?.classList.add('hidden');
+                checkinRemarkModal?.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('modal-open');
             }
 
@@ -1519,10 +1840,37 @@
             if (isCheckInMode) {
                 viewDateBoardButton?.addEventListener('click', openCalendarBoardModal);
                 calendarBoardModalClose?.addEventListener('click', closeCalendarBoardModal);
+                document.querySelectorAll('[data-traffic-list]').forEach((button) => {
+                    button.addEventListener('click', () => openTrafficListModal(button.dataset.trafficList));
+                });
+                document.querySelectorAll('.checkin-remark-action').forEach((button) => {
+                    button.addEventListener('click', () => openCheckinRemarkModal(button));
+                });
+                [trafficListClose, trafficListCancel].forEach((button) => {
+                    button?.addEventListener('click', closeTrafficListModal);
+                });
+                [checkinRemarkClose, checkinRemarkCancel].forEach((button) => {
+                    button?.addEventListener('click', closeCheckinRemarkModal);
+                });
+                trafficListPrint?.addEventListener('click', function () {
+                    document.body.classList.add('is-printing-traffic');
+                    window.print();
+                    window.setTimeout(() => document.body.classList.remove('is-printing-traffic'), 250);
+                });
 
                 calendarBoardModal?.addEventListener('click', function (event) {
                     if (event.target === calendarBoardModal || event.target === calendarBoardModal.firstElementChild) {
                         closeCalendarBoardModal();
+                    }
+                });
+                trafficListModal?.addEventListener('click', function (event) {
+                    if (event.target === trafficListModal || event.target === trafficListModal.firstElementChild) {
+                        closeTrafficListModal();
+                    }
+                });
+                checkinRemarkModal?.addEventListener('click', function (event) {
+                    if (event.target === checkinRemarkModal || event.target === checkinRemarkModal.firstElementChild) {
+                        closeCheckinRemarkModal();
                     }
                 });
 
@@ -1557,6 +1905,12 @@
                 document.addEventListener('keydown', function (event) {
                     if (event.key === 'Escape' && calendarBoardModal && !calendarBoardModal.classList.contains('hidden')) {
                         closeCalendarBoardModal();
+                    }
+                    if (event.key === 'Escape' && trafficListModal && !trafficListModal.classList.contains('hidden')) {
+                        closeTrafficListModal();
+                    }
+                    if (event.key === 'Escape' && checkinRemarkModal && !checkinRemarkModal.classList.contains('hidden')) {
+                        closeCheckinRemarkModal();
                     }
                 });
 

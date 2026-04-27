@@ -690,9 +690,13 @@ class AppointmentController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(AppointmentStatus::values())],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $appointmentGroup->status = $validated['status'];
+        if ($request->filled('notes')) {
+            $appointmentGroup->notes = trim((string) $validated['notes']);
+        }
         $appointmentGroup->save();
 
         return back()->with('success', 'Status updated.');
