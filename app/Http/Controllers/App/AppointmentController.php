@@ -640,23 +640,40 @@ class AppointmentController extends Controller
         }
 
         $digits = preg_replace('/\D+/', '', $query);
+        $normalizedQuery = preg_replace('/\s+/', '', mb_strtolower($query));
+        $minimumSuggestions = 5;
+        $suggestionLimit = 8;
 
-        $customers = Customer::query()
+        $baseSelect = [
+            'id',
+            'full_name',
+            'phone',
+            'membership_code',
+            'membership_type',
+            'current_package',
+        ];
+
+        $directCustomers = Customer::query()
             ->select([
-                'id',
-                'full_name',
-                'phone',
-                'membership_code',
-                'membership_type',
-                'current_package',
+                ...$baseSelect,
             ])
-            ->where(function ($builder) use ($query, $digits) {
+            ->where(function ($builder) use ($query, $digits, $normalizedQuery) {
                 $like = '%'.$query.'%';
+                $normalizedLike = '%'.$normalizedQuery.'%';
 
                 $builder
                     ->where('full_name', 'like', $like)
                     ->orWhere('phone', 'like', $like)
-                    ->orWhere('membership_code', 'like', $like);
+                    ->orWhere('membership_code', 'like', $like)
+                    ->orWhere('membership_type', 'like', $like)
+                    ->orWhere('current_package', 'like', $like);
+
+                if ($normalizedQuery !== '') {
+                    $builder->orWhereRaw(
+                        'LOWER(REPLACE(full_name, " ", "")) like ?',
+                        [$normalizedLike]
+                    );
+                }
 
                 if ($digits !== '') {
                     $builder->orWhereRaw(
@@ -667,8 +684,33 @@ class AppointmentController extends Controller
             })
             ->orderByRaw("CASE WHEN full_name IS NULL OR full_name = '' THEN 1 ELSE 0 END")
             ->orderBy('full_name')
-            ->limit(5)
-            ->get()
+            ->limit($suggestionLimit)
+            ->get();
+
+        $customers = $directCustomers;
+
+        if ($customers->count() < $minimumSuggestions && $digits === '' && mb_strlen($normalizedQuery) >= 2) {
+            $fallbackLimit = $minimumSuggestions - $customers->count();
+            $firstLetter = mb_substr($normalizedQuery, 0, 1);
+            $existingIds = $customers->pluck('id')->all();
+
+            $fallbackCustomers = Customer::query()
+                ->select($baseSelect)
+                ->when($existingIds !== [], fn ($builder) => $builder->whereNotIn('id', $existingIds))
+                ->where(function ($builder) use ($firstLetter) {
+                    $builder
+                        ->where('full_name', 'like', $firstLetter.'%')
+                        ->orWhere('full_name', 'like', '% '.$firstLetter.'%');
+                })
+                ->orderByRaw("CASE WHEN full_name IS NULL OR full_name = '' THEN 1 ELSE 0 END")
+                ->orderBy('full_name')
+                ->limit($fallbackLimit)
+                ->get();
+
+            $customers = $customers->concat($fallbackCustomers)->values();
+        }
+
+        $customers = $customers
             ->map(function (Customer $customer) {
                 return [
                     'id' => (string) $customer->id,

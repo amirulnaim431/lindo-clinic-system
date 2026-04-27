@@ -7,6 +7,7 @@ use App\Models\ServiceOptionGroup;
 use App\Models\ServiceOptionValue;
 use App\Models\Staff;
 use App\Models\User;
+use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -261,5 +262,25 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('9:00 AM - 9:45 AM');
         $response->assertSee('10:00 AM - 10:45 AM');
+    }
+
+    public function test_customer_search_returns_multiple_short_query_suggestions(): void
+    {
+        $admin = $this->createAdmin();
+
+        foreach (['Abigail Tan', 'Adam Abu', 'Aina Bakar', 'Alyssa Binti Ahmad', 'Amirul Basri'] as $name) {
+            Customer::query()->create([
+                'full_name' => $name,
+                'phone' => '01'.fake()->unique()->numerify('########'),
+                'current_package' => 'Bronze',
+            ]);
+        }
+
+        $response = $this->actingAs($admin)->getJson(route('app.appointments.customer-search', [
+            'q' => 'ab',
+        ]));
+
+        $response->assertOk();
+        $this->assertGreaterThanOrEqual(5, count($response->json('customers')));
     }
 }
