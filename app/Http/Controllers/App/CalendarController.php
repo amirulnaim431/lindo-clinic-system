@@ -142,9 +142,6 @@ class CalendarController extends Controller
         $topSummaryCards = [
             ['label' => 'Date', 'value' => $selectedDate->format('d M'), 'meta' => $selectedDate->format('l')],
             ['label' => 'Grand Total', 'value' => $statusCounts['total'], 'meta' => null],
-            ['label' => 'Checked In', 'value' => $statusCounts['checked_in'], 'meta' => null],
-            ['label' => 'Completed', 'value' => $statusCounts['completed'], 'meta' => null],
-            ['label' => 'Rescheduled', 'value' => $statusCounts['reschedule'], 'meta' => null],
         ];
 
         $bottomSummaryCards = [
@@ -222,14 +219,11 @@ class CalendarController extends Controller
             return $isNewCustomer ? 'NEW' : 'NONE';
         }
 
-        $parts = array_filter([
-            $customer->membership_type,
-            $customer->membership_code,
-            $customer->current_package,
-        ]);
+        $membership = $customer->current_package
+            ?: ($customer->membership_type ?: $customer->membership_code);
 
-        if ($parts !== []) {
-            return implode(' | ', $parts);
+        if ($membership) {
+            return $membership;
         }
 
         return $isNewCustomer ? 'NEW' : 'NONE';

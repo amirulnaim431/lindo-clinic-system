@@ -62,6 +62,11 @@
 
     $oldBookingPayload = old('booking_payload');
     $oldBookingPayload = is_string($oldBookingPayload) ? json_decode($oldBookingPayload, true) : null;
+    $trafficCounts = [
+        'checked_in' => $appointmentGroups->filter(fn ($group) => ($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status) === 'checked_in')->count(),
+        'completed' => $appointmentGroups->filter(fn ($group) => ($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status) === 'completed')->count(),
+        'reschedule' => $appointmentGroups->filter(fn ($group) => in_array(($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status), ['cancelled', 'no_show'], true))->count(),
+    ];
 @endphp
 
 <x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="null">
@@ -89,8 +94,8 @@
                             <label class="field-label" for="date">Appointment date</label>
                             <input id="date" name="date" type="date" value="{{ old('date', $selectedDate) }}" class="form-input" required>
                             <div class="btn-row" style="margin-top:0.85rem;">
-                                <button type="button" class="btn btn-secondary" id="view-date-board">View appointments</button>
-                                <a href="{{ route('app.appointments.index') }}" class="btn btn-secondary">Today</a>
+                                <button type="button" class="btn btn-secondary" id="view-date-board">View calendar board</button>
+                                <a href="{{ route('app.appointments.index', $isCheckInMode ? ['mode' => 'checkin'] : []) }}" class="btn btn-secondary">Today</a>
                             </div>
                         </div>
 
@@ -110,6 +115,91 @@
                 </div>
             </section>
 
+            @if ($isCheckInMode)
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="compact-label">Clinic traffic</div>
+                            <h3 class="panel-title-display" style="font-size:24px;">Today's customer check-in board</h3>
+                        </div>
+                    </div>
+                    <div class="panel-body stack">
+                        <div class="checkin-metrics">
+                            <div class="metric-card">
+                                <div class="metric-card__label">Checked In</div>
+                                <div class="metric-card__value">{{ $trafficCounts['checked_in'] }}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-card__label">Completed</div>
+                                <div class="metric-card__value">{{ $trafficCounts['completed'] }}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-card__label">Rescheduled</div>
+                                <div class="metric-card__value">{{ $trafficCounts['reschedule'] }}</div>
+                            </div>
+                        </div>
+
+                        <div class="checkin-list">
+                            @forelse ($appointmentGroups as $group)
+                                @php
+                                    $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status;
+                                    $statusLabel = $group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : str($statusValue)->replace('_', ' ')->title();
+                                    $customer = $group->customer;
+                                    $membershipLabel = $customer?->current_package ?: ($customer?->membership_type ?: ($customer?->membership_code ?: 'No package'));
+                                    $treatments = $group->items->map(fn ($item) => $item->displayServiceName())->filter()->implode(' | ');
+                                    $picNames = $group->items->map(fn ($item) => $item->displayStaffName())->filter()->unique()->implode(' | ');
+                                @endphp
+                                <div class="checkin-card">
+                                    <div>
+                                        <div class="checkin-card__time">{{ optional($group->starts_at)->format('g:i A') ?: '-' }}</div>
+                                        <div class="checkin-card__name">{{ $customer?->full_name ?: 'Walk-in customer' }}</div>
+                                        <div class="checkin-card__meta">
+                                            {{ $customer?->phone ?: 'No phone' }} &middot; {{ $membershipLabel }} &middot; {{ $treatments ?: 'No treatment listed' }}
+                                        </div>
+                                        <div class="checkin-card__meta">PIC: {{ $picNames ?: '-' }}</div>
+                                    </div>
+                                    <div class="checkin-card__actions">
+                                        <span class="status-chip">{{ $statusLabel }}</span>
+                                        @if ($statusValue !== 'checked_in')
+                                            <form method="POST" action="{{ route('app.appointments.status', $group) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="hidden" name="status" value="checked_in">
+                                                <button type="submit" class="btn btn-secondary">Check in</button>
+                                            </form>
+                                        @endif
+                                        @if ($statusValue !== 'completed')
+                                            <form method="POST" action="{{ route('app.appointments.status', $group) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="hidden" name="status" value="completed">
+                                                <button type="submit" class="btn btn-primary">Complete</button>
+                                            </form>
+                                        @endif
+                                        <form method="POST" action="{{ route('app.appointments.status', $group) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="cancelled">
+                                            <button type="submit" class="btn btn-secondary">Reschedule</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('app.appointments.status', $group) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="no_show">
+                                            <button type="submit" class="btn btn-secondary">Remove</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="empty-state">
+                                    <div class="empty-state__title">No booked customers for this date</div>
+                                    <div class="empty-state__body">Booked appointments will appear here for front desk check-in and traffic control.</div>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </section>
+            @else
             <section class="panel">
                 <div class="panel-header">
                     <div>
@@ -171,6 +261,7 @@
             <div class="btn-row">
                 <button type="button" class="btn btn-primary" id="create-appointment-submit">Create Appointment</button>
             </div>
+            @endif
         </div>
 
         <form method="POST" action="{{ route('app.appointments.store') }}" id="appointment-submit-form" class="hidden">
@@ -237,7 +328,7 @@
                 <div class="modal-header">
                     <div>
                         <div class="modal-kicker">Reference board</div>
-                        <h3 class="modal-title">View appointments</h3>
+                        <h3 class="modal-title">View calendar board</h3>
                         <p class="modal-subtitle">Check PIC availability without leaving the booking flow.</p>
                     </div>
                     <button type="button" class="modal-close" id="calendar-board-modal-close" aria-label="Close">&times;</button>
@@ -558,6 +649,58 @@
             margin-top: 0.25rem;
         }
 
+        .checkin-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .checkin-list {
+            display: grid;
+            gap: 0.9rem;
+        }
+
+        .checkin-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border: 1px solid rgba(26, 19, 23, 0.08);
+            border-radius: 26px;
+            background: #fff;
+            padding: 1rem 1.1rem;
+            box-shadow: 0 14px 28px rgba(92, 58, 69, 0.06);
+        }
+
+        .checkin-card__time {
+            color: #c68b9a;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        .checkin-card__name {
+            margin-top: 0.25rem;
+            color: #1a1317;
+            font-weight: 800;
+            font-size: 1.05rem;
+        }
+
+        .checkin-card__meta {
+            margin-top: 0.25rem;
+            color: rgba(26, 19, 23, 0.62);
+            font-size: 0.92rem;
+        }
+
+        .checkin-card__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+        }
+
         @media (max-width: 960px) {
             .appointment-top-grid {
                 grid-template-columns: 1fr;
@@ -573,11 +716,25 @@
             .planner-slot-row {
                 grid-template-columns: 1fr;
             }
+
+            .checkin-metrics {
+                grid-template-columns: 1fr;
+            }
+
+            .checkin-card {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .checkin-card__actions {
+                justify-content: flex-start;
+            }
         }
     </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const isCheckInMode = @json($isCheckInMode);
             const calendarRoute = @json(route('app.calendar'));
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const serviceCatalog = @json($serviceCatalog);
@@ -1283,14 +1440,9 @@
                 if (customer.phone) {
                     parts.push(customer.phone);
                 }
-                if (customer.membership_code) {
-                    parts.push(`Member ${customer.membership_code}`);
-                }
-                if (customer.membership_type) {
-                    parts.push(customer.membership_type);
-                }
-                if (customer.current_package) {
-                    parts.push(customer.current_package);
+                const membership = customer.current_package || customer.membership_type || customer.membership_code;
+                if (membership) {
+                    parts.push(membership);
                 }
 
                 customerHint.textContent = `Linked to existing customer: ${parts.join(' | ')}`;
@@ -1347,14 +1499,10 @@
                         const button = document.createElement('button');
                         button.type = 'button';
                         button.className = `customer-suggestion${index === 0 ? ' is-active' : ''}`;
+                        const membership = customer.current_package || customer.membership_type || customer.membership_code || '';
                         button.innerHTML = `
                             <div class="customer-suggestion__name">${customer.full_name || 'Customer'}</div>
-                            <div class="customer-suggestion__meta">
-                                ${customer.phone || 'No phone'}
-                                ${customer.membership_type ? ` | ${customer.membership_type}` : ''}
-                                ${customer.membership_code ? ` | Member ${customer.membership_code}` : ''}
-                                ${customer.current_package ? ` | ${customer.current_package}` : ''}
-                            </div>
+                            <div class="customer-suggestion__meta">${customer.phone || 'No phone'}${membership ? ` | ${membership}` : ''}</div>
                         `;
                         button.addEventListener('click', () => selectCustomer(customer));
                         customerSuggestions.appendChild(button);
@@ -1366,6 +1514,64 @@
                         hideCustomerSuggestions();
                     }
                 }
+            }
+
+            if (isCheckInMode) {
+                viewDateBoardButton?.addEventListener('click', openCalendarBoardModal);
+                calendarBoardModalClose?.addEventListener('click', closeCalendarBoardModal);
+
+                calendarBoardModal?.addEventListener('click', function (event) {
+                    if (event.target === calendarBoardModal || event.target === calendarBoardModal.firstElementChild) {
+                        closeCalendarBoardModal();
+                    }
+                });
+
+                customerNameInput?.addEventListener('input', function () {
+                    const query = this.value.trim();
+                    clearSelectedCustomer();
+
+                    if (query.length < 2) {
+                        hideCustomerSuggestions();
+                        return;
+                    }
+
+                    searchCustomers(query);
+                });
+
+                customerNameInput?.addEventListener('blur', function () {
+                    window.setTimeout(hideCustomerSuggestions, 120);
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!event.target.closest('.customer-picker')) {
+                        hideCustomerSuggestions();
+                    }
+                });
+
+                dateInput?.addEventListener('change', function () {
+                    if (calendarBoardModal && !calendarBoardModal.classList.contains('hidden') && calendarBoardFrame) {
+                        calendarBoardFrame.src = buildCalendarBoardUrl();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape' && calendarBoardModal && !calendarBoardModal.classList.contains('hidden')) {
+                        closeCalendarBoardModal();
+                    }
+                });
+
+                if (oldCustomerId && customerNameInput.value) {
+                    renderSelectedCustomer({
+                        id: oldCustomerId,
+                        full_name: customerNameInput.value,
+                        phone: customerPhoneInput.value,
+                        membership_code: '',
+                        membership_type: '',
+                        current_package: '',
+                    });
+                }
+
+                return;
             }
 
             categoryTabs.addEventListener('click', function (event) {
