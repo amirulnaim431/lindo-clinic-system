@@ -93,6 +93,10 @@
                                 @foreach ($optionGroups as $group)
                                     @php
                                         $selected = in_array((string) $group->id, old('option_group_ids', $selectedOptionGroupIds ?? []), true);
+                                        $requirement = old(
+                                            'option_group_requirement.'.(string) $group->id,
+                                            ($selectedOptionGroupRequirements[(string) $group->id] ?? false) ? 'required' : 'optional'
+                                        );
                                     @endphp
                                     <label class="selection-card {{ $selected ? 'is-selected' : '' }}">
                                         <input type="checkbox" name="option_group_ids[]" value="{{ $group->id }}" class="selection-input service-option-checkbox" data-badge-off="{{ $group->values->count().' options' }}" {{ $selected ? 'checked' : '' }}>
@@ -101,7 +105,14 @@
                                                 <div class="selection-card__title">{{ $group->name }}</div>
                                                 <div class="selection-card__meta">{{ $group->values->pluck('label')->implode(' | ') }}</div>
                                             </div>
-                                            <span class="selection-card__badge">{{ $selected ? 'Assigned' : $group->values->count().' options' }}</span>
+                                            <span class="selection-card__badge">{{ $selected ? ($requirement === 'required' ? 'Required' : 'Optional') : $group->values->count().' options' }}</span>
+                                        </div>
+                                        <div class="option-requirement-toggle {{ $selected ? '' : 'hidden' }}">
+                                            <span class="micro-label">Booking requirement</span>
+                                            <select name="option_group_requirement[{{ $group->id }}]" class="form-select service-option-requirement">
+                                                <option value="optional" @selected($requirement !== 'required')>Optional</option>
+                                                <option value="required" @selected($requirement === 'required')>Required</option>
+                                            </select>
                                         </div>
                                     </label>
                                 @endforeach
@@ -166,16 +177,24 @@
                 const syncCard = function () {
                     const card = checkbox.closest('.selection-card');
                     const badge = card ? card.querySelector('.selection-card__badge') : null;
+                    const requirementWrap = card ? card.querySelector('.option-requirement-toggle') : null;
+                    const requirementSelect = card ? card.querySelector('.service-option-requirement') : null;
 
                     card?.classList.toggle('is-selected', checkbox.checked);
+                    requirementWrap?.classList.toggle('hidden', !checkbox.checked);
 
                     if (badge) {
-                        badge.textContent = checkbox.checked ? 'Assigned' : (checkbox.dataset.badgeOff || 'Optional');
+                        if (checkbox.checked && requirementSelect) {
+                            badge.textContent = requirementSelect.value === 'required' ? 'Required' : 'Optional';
+                        } else {
+                            badge.textContent = checkbox.checked ? 'Assigned' : (checkbox.dataset.badgeOff || 'Optional');
+                        }
                     }
                 };
 
                 syncCard();
                 checkbox.addEventListener('change', syncCard);
+                checkbox.closest('.selection-card')?.querySelector('.service-option-requirement')?.addEventListener('change', syncCard);
             });
 
             syncConsultationField();

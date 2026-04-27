@@ -1,4 +1,4 @@
-<div class="stack calendar-board-shell{{ !empty($embedded) ? ' calendar-board-shell--embedded' : '' }}">
+<div class="stack calendar-board-shell{{ !empty($embedded) ? ' calendar-board-shell--embedded' : '' }}{{ !empty($compact) ? ' calendar-board-shell--compact' : '' }}">
     @if (session('success') && empty($embedded))
         <div class="flash flash--success">{{ session('success') }}</div>
     @endif
@@ -19,25 +19,25 @@
                 </div>
 
                 <div class="calendar-toolbar screen-only">
-                    <a href="{{ route('app.calendar', ['date' => $previousDate, 'embedded' => !empty($embedded) ? 1 : null]) }}" class="btn btn-secondary">&larr; Previous day</a>
+                    <a href="{{ route('app.calendar', ['date' => $previousDate, 'embedded' => !empty($embedded) ? 1 : null, 'compact' => !empty($compact) ? 1 : null]) }}" class="btn btn-secondary">&larr; Previous day</a>
                     <form method="GET" action="{{ route('app.calendar') }}" class="calendar-toolbar__form">
                         @if (!empty($embedded))
                             <input type="hidden" name="embedded" value="1">
                         @endif
+                        @if (!empty($compact))
+                            <input type="hidden" name="compact" value="1">
+                        @endif
                         <input id="date" name="date" type="date" value="{{ $selectedDateIso }}" class="form-input calendar-toolbar__input" aria-label="View date">
                         <button type="submit" class="btn btn-primary">Apply</button>
                     </form>
-                    <a href="{{ route('app.calendar', ['date' => $nextDate, 'embedded' => !empty($embedded) ? 1 : null]) }}" class="btn btn-secondary">Next day &rarr;</a>
-                    @if (empty($embedded))
-                        <a href="{{ route('app.appointments.index', ['date' => $selectedDateIso]) }}" class="btn btn-secondary">Open booking</a>
-                    @endif
+                    <a href="{{ route('app.calendar', ['date' => $nextDate, 'embedded' => !empty($embedded) ? 1 : null, 'compact' => !empty($compact) ? 1 : null]) }}" class="btn btn-secondary">Next day &rarr;</a>
                     <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="panel screen-only">
+    <section class="panel screen-only {{ !empty($compact) ? 'calendar-summary-panel--compact' : '' }}">
         <div class="panel-body">
             <div class="calendar-stats-grid calendar-stats-grid--top">
                 @foreach ($topSummaryCards as $card)
@@ -95,7 +95,7 @@
                             <tbody>
                                 @foreach ($section['rows'] as $rowIndex => $row)
                                     <tr>
-                                        <td>{{ collect($scheduleSections)->take($sectionIndex)->sum('count') + $rowIndex + 1 }}</td>
+                                        <td>{{ !empty($row['is_placeholder']) ? '-' : collect($scheduleSections)->take($sectionIndex)->sum('count') + collect($section['rows'])->take($rowIndex)->filter(fn ($priorRow) => empty($priorRow['is_placeholder']))->count() + 1 }}</td>
                                         <td>{{ $row['time'] }}</td>
                                         <td>{{ $row['client'] }}</td>
                                         <td>{{ $row['membership'] }}</td>
@@ -128,18 +128,17 @@
     }
 
     .calendar-board-shell--embedded {
-        padding: 1rem;
+        padding: 0.75rem;
         background: linear-gradient(180deg, #fffdfd 0%, #fff7fa 100%);
         min-height: 100vh;
     }
 
-    .calendar-board-shell--embedded .stack {
+    .calendar-board-shell--embedded.stack {
         gap: 1rem;
     }
 
     .calendar-hero-panel__body {
-        padding-top: 1.1rem;
-        padding-bottom: 1.1rem;
+        padding: 0.85rem 1.1rem;
     }
 
     .calendar-hero {
@@ -195,8 +194,48 @@
     }
 
     .calendar-toolbar .btn {
-        min-height: 42px;
-        padding: 0.68rem 0.95rem;
+        min-height: 40px;
+        padding: 0.62rem 0.9rem;
+    }
+
+    .calendar-board-shell--compact {
+        font-size: 0.92rem;
+    }
+
+    .calendar-board-shell--compact .calendar-hero-panel__body {
+        padding: 0.7rem 0.85rem;
+    }
+
+    .calendar-board-shell--compact .calendar-title-line__date {
+        font-size: clamp(1.15rem, 1.8vw, 1.55rem);
+    }
+
+    .calendar-board-shell--compact .calendar-hero__note {
+        margin-top: 0.18rem;
+    }
+
+    .calendar-board-shell--compact .calendar-toolbar .btn {
+        min-height: 36px;
+        padding: 0.5rem 0.72rem;
+    }
+
+    .calendar-board-shell--compact .calendar-toolbar__input {
+        min-height: 36px;
+        width: 140px;
+        min-width: 140px;
+    }
+
+    .calendar-board-shell--compact .calendar-summary-panel--compact {
+        display: none;
+    }
+
+    .calendar-board-shell--compact .schedule-section-head {
+        padding: 0.7rem 0.9rem;
+    }
+
+    .calendar-board-shell--compact .daily-schedule-table td,
+    .calendar-board-shell--compact .daily-schedule-table th {
+        padding: 0.48rem 0.55rem;
     }
 
     .calendar-stats-grid {

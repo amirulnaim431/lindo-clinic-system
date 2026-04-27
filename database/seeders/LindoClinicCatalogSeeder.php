@@ -150,7 +150,8 @@ class LindoClinicCatalogSeeder extends Seeder
 
             $pivotPayload = [];
 
-            foreach (($service['option_groups'] ?? []) as $index => $groupCode) {
+            foreach (($service['option_groups'] ?? []) as $index => $optionGroupConfig) {
+                $groupCode = is_array($optionGroupConfig) ? ($optionGroupConfig['code'] ?? null) : $optionGroupConfig;
                 $group = $optionGroups[$groupCode] ?? null;
 
                 if (! $group) {
@@ -159,7 +160,9 @@ class LindoClinicCatalogSeeder extends Seeder
 
                 $pivotPayload[$group->id] = [
                     'id' => (string) Str::ulid(),
-                    'is_required' => true,
+                    'is_required' => (bool) (is_array($optionGroupConfig)
+                        ? ($optionGroupConfig['is_required'] ?? false)
+                        : $this->defaultOptionGroupRequirement((string) $groupCode)),
                     'display_order' => $index + 1,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -176,6 +179,17 @@ class LindoClinicCatalogSeeder extends Seeder
 
             $serviceRecord->staff()->sync($staffIds);
         }
+    }
+
+    private function defaultOptionGroupRequirement(string $groupCode): bool
+    {
+        return ! in_array($groupCode, [
+            'tirze_dosage',
+            'tirze_session',
+            'tirze_maintenance',
+            'session_1_to_4',
+            'session_1_to_6',
+        ], true);
     }
 
     private function retireLegacyServices(array $serviceCodes): void

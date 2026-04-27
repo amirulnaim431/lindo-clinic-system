@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
 {
-    private const PLANNER_START_HOUR = 9;
+    private const PLANNER_START_HOUR = 10;
     private const PLANNER_END_HOUR = 19;
     private const PLANNER_SLOT_DURATION_MINUTES = 45;
     private const PLANNER_SLOT_STEP_MINUTES = 60;
@@ -778,8 +778,8 @@ class AppointmentController extends Controller
                 ]);
             }
 
-            $clinicStart = $start->copy()->setTime(9, 0);
-            $clinicEnd = $start->copy()->setTime(18, 0);
+            $clinicStart = $start->copy()->setTime(self::PLANNER_START_HOUR, 0);
+            $clinicEnd = $start->copy()->setTime(self::PLANNER_END_HOUR, 0);
 
             if ($start->lt($clinicStart) || $end->gt($clinicEnd)) {
                 throw ValidationException::withMessages([

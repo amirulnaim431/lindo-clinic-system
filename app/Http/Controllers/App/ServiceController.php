@@ -96,8 +96,11 @@ class ServiceController extends Controller
         }
 
         $data = $this->validatedData($request);
-        $service = Service::query()->create(collect($data)->except(['option_group_ids', 'staff_ids'])->all());
-        $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
+        $service = Service::query()->create(collect($data)->except(['option_group_ids', 'option_group_requirement', 'staff_ids'])->all());
+        $service->optionGroups()->sync($this->optionGroupSyncPayload(
+            $data['option_group_ids'] ?? [],
+            $data['option_group_requirement'] ?? []
+        ));
         $service->staff()->sync($data['staff_ids'] ?? []);
 
         return redirect()
@@ -121,8 +124,11 @@ class ServiceController extends Controller
         }
 
         $data = $this->validatedData($request, $service);
-        $service->update(collect($data)->except(['option_group_ids', 'staff_ids'])->all());
-        $service->optionGroups()->sync($this->optionGroupSyncPayload($data['option_group_ids'] ?? []));
+        $service->update(collect($data)->except(['option_group_ids', 'option_group_requirement', 'staff_ids'])->all());
+        $service->optionGroups()->sync($this->optionGroupSyncPayload(
+            $data['option_group_ids'] ?? [],
+            $data['option_group_requirement'] ?? []
+        ));
         $service->staff()->sync($data['staff_ids'] ?? []);
 
         return redirect()
@@ -151,6 +157,14 @@ class ServiceController extends Controller
             'selectedOptionGroupIds' => $service->exists
                 ? $service->optionGroups()->pluck('service_option_groups.id')->map(fn ($id) => (string) $id)->all()
                 : [],
+            'selectedOptionGroupRequirements' => $service->exists
+                ? $service->optionGroups()
+                    ->get()
+                    ->mapWithKeys(fn (ServiceOptionGroup $group) => [
+                        (string) $group->id => (bool) ($group->pivot?->is_required ?? true),
+                    ])
+                    ->all()
+                : [],
             'selectedStaffIds' => $service->exists
                 ? $service->staff()->pluck('staff.id')->map(fn ($id) => (string) $id)->all()
                 : [],
@@ -178,6 +192,8 @@ class ServiceController extends Controller
             'is_promo' => ['nullable'],
             'option_group_ids' => ['nullable', 'array'],
             'option_group_ids.*' => ['string', Rule::exists('service_option_groups', 'id')],
+            'option_group_requirement' => ['nullable', 'array'],
+            'option_group_requirement.*' => ['nullable', 'string', Rule::in(['required', 'optional'])],
             'staff_ids' => ['nullable', 'array'],
             'staff_ids.*' => ['string', Rule::exists('staff', 'id')],
         ]);
@@ -196,17 +212,21 @@ class ServiceController extends Controller
         return $data;
     }
 
-    private function optionGroupSyncPayload(array $optionGroupIds): array
+    private function optionGroupSyncPayload(array $optionGroupIds, array $requirements = []): array
     {
         return collect($optionGroupIds)
             ->values()
-            ->mapWithKeys(fn ($id, $index) => [(string) $id => [
-                'id' => (string) Str::ulid(),
-                'is_required' => true,
-                'display_order' => $index + 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]])
+            ->mapWithKeys(function ($id, $index) use ($requirements) {
+                $groupId = (string) $id;
+
+                return [$groupId => [
+                    'id' => (string) Str::ulid(),
+                    'is_required' => ($requirements[$groupId] ?? 'optional') === 'required',
+                    'display_order' => $index + 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]];
+            })
             ->all();
     }
 }

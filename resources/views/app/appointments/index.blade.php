@@ -89,7 +89,7 @@
                             <label class="field-label" for="date">Appointment date</label>
                             <input id="date" name="date" type="date" value="{{ old('date', $selectedDate) }}" class="form-input" required>
                             <div class="btn-row" style="margin-top:0.85rem;">
-                                <button type="button" class="btn btn-secondary" id="view-date-board">View date board</button>
+                                <button type="button" class="btn btn-secondary" id="view-date-board">View appointments</button>
                                 <a href="{{ route('app.appointments.index') }}" class="btn btn-secondary">Today</a>
                             </div>
                         </div>
@@ -237,8 +237,8 @@
                 <div class="modal-header">
                     <div>
                         <div class="modal-kicker">Reference board</div>
-                        <h3 class="modal-title">Calendar board</h3>
-                        <p class="modal-subtitle">Review the selected date without leaving the booking flow.</p>
+                        <h3 class="modal-title">View appointments</h3>
+                        <p class="modal-subtitle">Check PIC availability without leaving the booking flow.</p>
                     </div>
                     <button type="button" class="modal-close" id="calendar-board-modal-close" aria-label="Close">&times;</button>
                 </div>
@@ -652,6 +652,7 @@
                 const params = new URLSearchParams();
                 params.set('date', dateInput?.value || @json($selectedDate));
                 params.set('embedded', '1');
+                params.set('compact', '1');
 
                 return `${calendarRoute}?${params.toString()}`;
             }
@@ -1285,6 +1286,12 @@
                 if (customer.membership_code) {
                     parts.push(`Member ${customer.membership_code}`);
                 }
+                if (customer.membership_type) {
+                    parts.push(customer.membership_type);
+                }
+                if (customer.current_package) {
+                    parts.push(customer.current_package);
+                }
 
                 customerHint.textContent = `Linked to existing customer: ${parts.join(' | ')}`;
                 customerHint.classList.remove('hidden');
@@ -1342,7 +1349,12 @@
                         button.className = `customer-suggestion${index === 0 ? ' is-active' : ''}`;
                         button.innerHTML = `
                             <div class="customer-suggestion__name">${customer.full_name || 'Customer'}</div>
-                            <div class="customer-suggestion__meta">${customer.phone || 'No phone'}${customer.membership_code ? ` | Member ${customer.membership_code}` : ''}${customer.current_package ? ` | ${customer.current_package}` : ''}</div>
+                            <div class="customer-suggestion__meta">
+                                ${customer.phone || 'No phone'}
+                                ${customer.membership_type ? ` | ${customer.membership_type}` : ''}
+                                ${customer.membership_code ? ` | Member ${customer.membership_code}` : ''}
+                                ${customer.current_package ? ` | ${customer.current_package}` : ''}
+                            </div>
                         `;
                         button.addEventListener('click', () => selectCustomer(customer));
                         customerSuggestions.appendChild(button);
@@ -1560,6 +1572,8 @@
                     full_name: customerNameInput.value,
                     phone: customerPhoneInput.value,
                     membership_code: '',
+                    membership_type: '',
+                    current_package: '',
                 });
             }
 

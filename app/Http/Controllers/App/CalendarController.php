@@ -16,6 +16,7 @@ class CalendarController extends Controller
         $selectedDate = $this->resolveSelectedDate($request);
         $selectedDateLabel = $selectedDate->format('l (j/n/Y)');
         $embedded = $request->boolean('embedded');
+        $compact = $request->boolean('compact');
 
         $items = AppointmentItem::query()
             ->with([
@@ -35,7 +36,12 @@ class CalendarController extends Controller
             ->get()
             ->keyBy('customer_id');
 
-        $groupedSchedules = $items
+        $activeStaff = Staff::query()
+            ->where('is_active', true)
+            ->get(['id', 'full_name', 'role_key', 'job_title', 'department', 'operational_role']);
+        $activeStaff = Staff::sortForPicSelector($activeStaff);
+
+        $groupedByStaff = $items
             ->groupBy(fn (AppointmentItem $item) => (string) ($item->staff_id ?: 'unassigned'))
             ->map(function ($group, $staffId) use ($customerVisitStats, $selectedDate) {
                 $staff = $group->first()?->staff;
@@ -65,7 +71,27 @@ class CalendarController extends Controller
                         ];
                     })->all(),
                 ];
+            });
+
+        $groupedSchedules = $activeStaff
+            ->map(function (Staff $staff) use ($groupedByStaff, $selectedDate) {
+                $staffId = (string) $staff->id;
+                $existingSection = $groupedByStaff->get($staffId);
+
+                if ($existingSection) {
+                    return $existingSection;
+                }
+
+                return [
+                    'staff_id' => $staffId,
+                    'staff_name' => $this->formatPicName($staff->full_name),
+                    'staff_role' => $staff->job_title ?: ($staff->role_key ?: null),
+                    'sort_rank' => Staff::appointmentGroupRankForStaff($staff),
+                    'count' => 0,
+                    'rows' => $this->buildAvailableRowsForStaff($selectedDate, $staff),
+                ];
             })
+            ->concat($groupedByStaff->filter(fn (array $section, string $staffId) => $staffId === 'unassigned'))
             ->sortBy(fn (array $section) => sprintf('%02d-%s', $section['sort_rank'], mb_strtolower($section['staff_name'])))
             ->values()
             ->all();
@@ -96,12 +122,17 @@ class CalendarController extends Controller
 
         $categoryCounts = [
             'wellness' => 0,
-            'aesthetic' => 0,
-            'beauty_spa' => 0,
+            'aesthetics' => 0,
+            'spa' => 0,
         ];
 
         foreach ($items as $item) {
             $categoryKey = (string) ($item->service_category_key_snapshot ?: $item->service?->category_key ?: '');
+            $categoryKey = match ($categoryKey) {
+                'aesthetic' => 'aesthetics',
+                'beauty_spa' => 'spa',
+                default => $categoryKey,
+            };
 
             if (array_key_exists($categoryKey, $categoryCounts)) {
                 $categoryCounts[$categoryKey]++;
@@ -118,14 +149,15 @@ class CalendarController extends Controller
 
         $bottomSummaryCards = [
             ['label' => 'Total Wellness', 'value' => $categoryCounts['wellness'], 'meta' => null],
-            ['label' => 'Total Aesthetic', 'value' => $categoryCounts['aesthetic'], 'meta' => null],
-            ['label' => 'Total Spa', 'value' => $categoryCounts['beauty_spa'], 'meta' => null],
+            ['label' => 'Total Aesthetic', 'value' => $categoryCounts['aesthetics'], 'meta' => null],
+            ['label' => 'Total Spa', 'value' => $categoryCounts['spa'], 'meta' => null],
         ];
 
         return view('app.calendar.index', [
             'title' => 'Calendar',
             'subtitle' => 'Clinic board grouped by PIC for the selected date.',
             'embedded' => $embedded,
+            'compact' => $compact,
             'selectedDate' => $selectedDate,
             'selectedDateIso' => $selectedDate->toDateString(),
             'selectedDateLabel' => $selectedDateLabel,
@@ -156,6 +188,32 @@ class CalendarController extends Controller
             'Dr. Amanda Binti Elli' => 'Dr Amanda',
             default => $normalized,
         };
+    }
+
+    private function buildAvailableRowsForStaff(Carbon $selectedDate, Staff $staff): array
+    {
+        $rows = [];
+        $cursor = $selectedDate->copy()->setTime(10, 0);
+        $cutoff = $selectedDate->copy()->setTime(19, 0);
+
+        while ($cursor->copy()->addMinutes(45)->lte($cutoff)) {
+            $slotEnd = $cursor->copy()->addMinutes(45);
+
+            $rows[] = [
+                'item_id' => null,
+                'time' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
+                'client' => 'Available',
+                'membership' => '-',
+                'treatment' => 'No appointment yet',
+                'pic' => $this->formatPicName($staff->full_name),
+                'remarks' => 'Available',
+                'is_placeholder' => true,
+            ];
+
+            $cursor->addHour();
+        }
+
+        return $rows;
     }
 
     private function formatMembershipCell($customer, bool $isNewCustomer): string
