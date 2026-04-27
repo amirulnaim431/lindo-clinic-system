@@ -168,15 +168,21 @@
                                     $statusLabel = $group->status instanceof \App\Enums\AppointmentStatus ? $group->status->label() : str($statusValue)->replace('_', ' ')->title();
                                     $customer = $group->customer;
                                     $membershipLabel = $customer?->current_package ?: ($customer?->membership_type ?: ($customer?->membership_code ?: 'No package'));
+                                    $membershipTone = str($membershipLabel)->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->toString();
                                     $treatments = $group->items->map(fn ($item) => $item->displayServiceName())->filter()->implode(' | ');
                                     $picNames = $group->items->map(fn ($item) => $item->displayStaffName())->filter()->unique()->implode(' | ');
                                 @endphp
                                 <div class="checkin-card">
                                     <div>
                                         <div class="checkin-card__time">{{ optional($group->starts_at)->format('g:i A') ?: '-' }}</div>
-                                        <div class="checkin-card__name">{{ $customer?->full_name ?: 'Walk-in customer' }}</div>
+                                        <div class="checkin-card__name">
+                                            <span>{{ $customer?->full_name ?: 'Walk-in customer' }}</span>
+                                            @if ($membershipLabel !== 'No package')
+                                                <span class="membership-pill membership-pill--{{ $membershipTone }}">{{ $membershipLabel }}</span>
+                                            @endif
+                                        </div>
                                         <div class="checkin-card__meta">
-                                            {{ $customer?->phone ?: 'No phone' }} &middot; {{ $membershipLabel }} &middot; {{ $treatments ?: 'No treatment listed' }}
+                                            {{ $customer?->phone ?: 'No phone' }} &middot; {{ $treatments ?: 'No treatment listed' }}
                                         </div>
                                         <div class="checkin-card__meta">PIC: {{ $picNames ?: '-' }}</div>
                                     </div>
@@ -705,6 +711,10 @@
         }
 
         .customer-suggestion__name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
             font-weight: 700;
             color: #1a1317;
         }
@@ -761,10 +771,53 @@
         }
 
         .checkin-card__name {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            flex-wrap: wrap;
             margin-top: 0.25rem;
             color: #1a1317;
             font-weight: 800;
             font-size: 1.05rem;
+        }
+
+        .membership-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.22rem 0.62rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border: 1px solid rgba(198, 139, 154, 0.24);
+            background: #fff4f7;
+            color: #8f5262;
+        }
+
+        .membership-pill--bronze {
+            background: #f7d0a8;
+            border-color: #e0aa72;
+            color: #6f3e1d;
+        }
+
+        .membership-pill--silver {
+            background: #e8eaee;
+            border-color: #c5cbd3;
+            color: #4b5663;
+        }
+
+        .membership-pill--gold {
+            background: #f9e4a7;
+            border-color: #dfbd52;
+            color: #765a10;
+        }
+
+        .membership-pill--new {
+            background: #d9ecd0;
+            border-color: #b9d8aa;
+            color: #356325;
         }
 
         .checkin-card__meta {
@@ -1066,6 +1119,19 @@
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#039;');
+            }
+
+            function membershipPillHtml(membership) {
+                if (!membership) {
+                    return '';
+                }
+
+                const tone = String(membership)
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+
+                return `<span class="membership-pill membership-pill--${escapeHtml(tone)}">${escapeHtml(membership)}</span>`;
             }
 
             function openTrafficListModal(listKey) {
@@ -1822,7 +1888,10 @@
                         button.className = `customer-suggestion${index === 0 ? ' is-active' : ''}`;
                         const membership = customer.current_package || customer.membership_type || customer.membership_code || '';
                         button.innerHTML = `
-                            <div class="customer-suggestion__name">${customer.full_name || 'Customer'}</div>
+                            <div class="customer-suggestion__name">
+                                <span>${customer.full_name || 'Customer'}</span>
+                                ${membershipPillHtml(membership)}
+                            </div>
                             <div class="customer-suggestion__meta">${customer.phone || 'No phone'}${membership ? ` | ${membership}` : ''}</div>
                         `;
                         button.addEventListener('click', () => selectCustomer(customer));
@@ -1960,11 +2029,18 @@
 
                 const groupId = button.dataset.groupId;
                 const valueId = button.dataset.valueId;
-                pendingModalSelections[groupId] = valueId;
+                const shouldClearSelection = pendingModalSelections[groupId] === valueId;
+
+                if (shouldClearSelection) {
+                    delete pendingModalSelections[groupId];
+                } else {
+                    pendingModalSelections[groupId] = valueId;
+                }
 
                 modalBody.querySelectorAll(`[data-group-id="${groupId}"]`).forEach((choice) => {
-                    choice.classList.toggle('btn-primary', choice.dataset.valueId === valueId);
-                    choice.classList.toggle('btn-secondary', choice.dataset.valueId !== valueId);
+                    const isSelected = !shouldClearSelection && choice.dataset.valueId === valueId;
+                    choice.classList.toggle('btn-primary', isSelected);
+                    choice.classList.toggle('btn-secondary', !isSelected);
                 });
             });
 
