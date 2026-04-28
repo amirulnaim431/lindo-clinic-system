@@ -73,25 +73,26 @@ class CalendarController extends Controller
                 ];
             });
 
-        $groupedSchedules = $activeStaff
-            ->map(function (Staff $staff) use ($groupedByStaff, $selectedDate) {
-                $staffId = (string) $staff->id;
-                $existingSection = $groupedByStaff->get($staffId);
+        $groupedSchedules = $groupedByStaff
+            ->sortBy(fn (array $section) => sprintf('%02d-%s', $section['sort_rank'], mb_strtolower($section['staff_name'])))
+            ->values()
+            ->all();
 
-                if ($existingSection) {
-                    return $existingSection;
-                }
+        $availabilitySections = $activeStaff
+            ->map(function (Staff $staff) use ($items, $selectedDate) {
+                $staffItems = $items
+                    ->filter(fn (AppointmentItem $item) => (string) $item->staff_id === (string) $staff->id)
+                    ->groupBy(fn (AppointmentItem $item) => $item->starts_at?->format('H:i') ?: 'unknown');
 
                 return [
-                    'staff_id' => $staffId,
+                    'staff_id' => (string) $staff->id,
                     'staff_name' => $this->formatPicName($staff->full_name),
                     'staff_role' => $staff->job_title ?: ($staff->role_key ?: null),
                     'sort_rank' => Staff::appointmentGroupRankForStaff($staff),
-                    'count' => 0,
-                    'rows' => $this->buildAvailableRowsForStaff($selectedDate, $staff),
+                    'booking_windows' => 9,
+                    'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems),
                 ];
             })
-            ->concat($groupedByStaff->filter(fn (array $section, string $staffId) => $staffId === 'unassigned'))
             ->sortBy(fn (array $section) => sprintf('%02d-%s', $section['sort_rank'], mb_strtolower($section['staff_name'])))
             ->values()
             ->all();
@@ -161,6 +162,7 @@ class CalendarController extends Controller
             'previousDate' => $selectedDate->copy()->subDay()->toDateString(),
             'nextDate' => $selectedDate->copy()->addDay()->toDateString(),
             'scheduleSections' => $groupedSchedules,
+            'availabilitySections' => $availabilitySections,
             'totalRows' => $items->count(),
             'topSummaryCards' => $topSummaryCards,
             'bottomSummaryCards' => $bottomSummaryCards,
@@ -187,7 +189,7 @@ class CalendarController extends Controller
         };
     }
 
-    private function buildAvailableRowsForStaff(Carbon $selectedDate, Staff $staff): array
+    private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems): array
     {
         $rows = [];
         $cursor = $selectedDate->copy()->setTime(10, 0);
@@ -195,16 +197,27 @@ class CalendarController extends Controller
 
         while ($cursor->copy()->addMinutes(45)->lte($cutoff)) {
             $slotEnd = $cursor->copy()->addMinutes(45);
+            $slotItems = collect($staffItems->get($cursor->format('H:i'), []))->values();
 
             $rows[] = [
-                'item_id' => null,
-                'time' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
-                'client' => 'Available',
-                'membership' => '-',
-                'treatment' => 'No appointment yet',
-                'pic' => $this->formatPicName($staff->full_name),
-                'remarks' => 'Available',
-                'is_placeholder' => true,
+                'label' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
+                'boxes' => collect(range(0, 1))->map(function (int $index) use ($slotItems) {
+                    $item = $slotItems->get($index);
+
+                    if (! $item) {
+                        return [
+                            'type' => 'empty',
+                            'title' => 'Empty box',
+                            'body' => 'Available',
+                        ];
+                    }
+
+                    return [
+                        'type' => 'occupied',
+                        'title' => $item->group?->customer?->full_name ?: 'Customer',
+                        'body' => $this->formatTreatmentCell($item),
+                    ];
+                })->all(),
             ];
 
             $cursor->addHour();

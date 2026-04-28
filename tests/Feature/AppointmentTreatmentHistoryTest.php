@@ -235,7 +235,7 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $this->assertDatabaseCount('appointment_item_option_selections', 0);
     }
 
-    public function test_calendar_shows_empty_staff_availability_rows(): void
+    public function test_calendar_empty_date_shows_simple_empty_state(): void
     {
         $admin = $this->createAdmin();
         $this->createStaff(['full_name' => 'Dr Amanda Binti Elli']);
@@ -245,9 +245,26 @@ class AppointmentTreatmentHistoryTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('PIC: Dr Amanda');
+        $response->assertSee('No appointments yet');
+        $response->assertDontSee('PIC: Dr Amanda');
+    }
+
+    public function test_embedded_calendar_reference_board_shows_empty_staff_boxes(): void
+    {
+        $admin = $this->createAdmin();
+        $this->createStaff(['full_name' => 'Dr Amanda Binti Elli']);
+
+        $response = $this->actingAs($admin)->get(route('app.calendar', [
+            'date' => '2026-04-28',
+            'embedded' => 1,
+            'compact' => 1,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Dr Amanda');
         $response->assertSee('10:00 AM - 10:45 AM');
-        $response->assertSee('No appointment yet');
+        $response->assertSee('Empty box');
+        $response->assertSee('Available');
     }
 
     public function test_appointment_builder_does_not_offer_9am_slots(): void

@@ -61,65 +61,93 @@
         </div>
     </section>
 
-    @forelse ($scheduleSections as $sectionIndex => $section)
-        <section class="panel print-schedule-section">
-            <div class="panel-body" style="padding:0;">
-                <div class="schedule-section-head">
-                    <div class="schedule-section-head__pic">PIC: {{ $section['staff_name'] }}</div>
-                    <div class="schedule-section-head__count">Count: {{ $section['count'] }}</div>
-                </div>
+    @if (!empty($compact))
+        <section class="calendar-reference-board">
+            @foreach ($availabilitySections as $section)
+                <div class="planner-staff-card calendar-reference-card">
+                    <div class="planner-staff-card__head">
+                        <div>
+                            <div class="selection-card__title">{{ $section['staff_name'] }}</div>
+                            <div class="small-note">{{ $section['staff_role'] ?: 'Staff' }}</div>
+                        </div>
+                        <div class="small-note">{{ $section['booking_windows'] }} booking windows</div>
+                    </div>
 
-                <div class="table-shell calendar-table-shell">
-                    <div class="table-wrap calendar-table-wrap">
-                        <table class="daily-schedule-table">
-                            <colgroup>
-                                <col style="width: 5%;">
-                                <col style="width: 10%;">
-                                <col style="width: 19%;">
-                                <col style="width: 11%;">
-                                <col style="width: 25%;">
-                                <col style="width: 11%;">
-                                <col style="width: 19%;">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>No.</th>
-                                    <th>Time</th>
-                                    <th>Client</th>
-                                    <th>M/SHIP</th>
-                                    <th>Treatment</th>
-                                    <th>PIC</th>
-                                    <th>Remarks</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($section['rows'] as $rowIndex => $row)
+                    @foreach ($section['rows'] as $row)
+                        <div class="planner-slot-row calendar-reference-row">
+                            <div class="planner-slot-label">{{ $row['label'] }}</div>
+                            @foreach ($row['boxes'] as $box)
+                                <div class="planner-slot-box {{ $box['type'] === 'occupied' ? 'is-occupied' : 'is-empty' }}">
+                                    <div class="planner-slot-box__title">{{ $box['title'] }}</div>
+                                    <div>{{ $box['body'] }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endforeach
+                </div>
+            @endforeach
+        </section>
+    @else
+        @forelse ($scheduleSections as $sectionIndex => $section)
+            <section class="panel print-schedule-section">
+                <div class="panel-body" style="padding:0;">
+                    <div class="schedule-section-head">
+                        <div class="schedule-section-head__pic">PIC: {{ $section['staff_name'] }}</div>
+                        <div class="schedule-section-head__count">Count: {{ $section['count'] }}</div>
+                    </div>
+
+                    <div class="table-shell calendar-table-shell">
+                        <div class="table-wrap calendar-table-wrap">
+                            <table class="daily-schedule-table">
+                                <colgroup>
+                                    <col style="width: 5%;">
+                                    <col style="width: 10%;">
+                                    <col style="width: 19%;">
+                                    <col style="width: 11%;">
+                                    <col style="width: 25%;">
+                                    <col style="width: 11%;">
+                                    <col style="width: 19%;">
+                                </colgroup>
+                                <thead>
                                     <tr>
-                                        <td>{{ !empty($row['is_placeholder']) ? '-' : collect($scheduleSections)->take($sectionIndex)->sum('count') + collect($section['rows'])->take($rowIndex)->filter(fn ($priorRow) => empty($priorRow['is_placeholder']))->count() + 1 }}</td>
-                                        <td>{{ $row['time'] }}</td>
-                                        <td>{{ $row['client'] }}</td>
-                                        <td>{{ $row['membership'] }}</td>
-                                        <td>{{ $row['treatment'] }}</td>
-                                        <td>{{ $row['pic'] }}</td>
-                                        <td>{{ $row['remarks'] ?: '-' }}</td>
+                                        <th>No.</th>
+                                        <th>Time</th>
+                                        <th>Client</th>
+                                        <th>M/SHIP</th>
+                                        <th>Treatment</th>
+                                        <th>PIC</th>
+                                        <th>Remarks</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    @foreach ($section['rows'] as $rowIndex => $row)
+                                        <tr>
+                                            <td>{{ collect($scheduleSections)->take($sectionIndex)->sum('count') + $rowIndex + 1 }}</td>
+                                            <td>{{ $row['time'] }}</td>
+                                            <td>{{ $row['client'] }}</td>
+                                            <td>{{ $row['membership'] }}</td>
+                                            <td>{{ $row['treatment'] }}</td>
+                                            <td>{{ $row['pic'] }}</td>
+                                            <td>{{ $row['remarks'] ?: '-' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-    @empty
-        <section class="panel">
-            <div class="panel-body">
-                <div class="empty-state">
-                    <div class="empty-state__title">No appointments scheduled for this date</div>
-                    <div class="empty-state__body">Choose another date or open the booking page to add the first appointment.</div>
+            </section>
+        @empty
+            <section class="panel">
+                <div class="panel-body">
+                    <div class="empty-state">
+                        <div class="empty-state__title">No appointments yet</div>
+                        <div class="empty-state__body">Choose another date or add the first appointment from the booking page.</div>
+                    </div>
                 </div>
-            </div>
-        </section>
-    @endforelse
+            </section>
+        @endforelse
+    @endif
 </div>
 
 <style>
@@ -263,6 +291,77 @@
         font-size: 1.25rem;
     }
 
+    .calendar-reference-board {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .calendar-reference-card {
+        border: 1px solid rgba(26, 19, 23, 0.08);
+        border-radius: 28px;
+        background: #fff;
+        overflow: hidden;
+        box-shadow: 0 24px 70px rgba(92, 58, 69, 0.08);
+    }
+
+    .planner-staff-card__head {
+        padding: 1rem 1.15rem;
+        border-bottom: 1px solid rgba(26, 19, 23, 0.06);
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .selection-card__title {
+        font-weight: 700;
+        color: #1a1317;
+    }
+
+    .planner-slot-row {
+        display: grid;
+        grid-template-columns: minmax(130px, 170px) repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 0.95rem 1.15rem;
+        border-top: 1px solid rgba(26, 19, 23, 0.05);
+    }
+
+    .planner-slot-label {
+        font-weight: 700;
+        color: #1a1317;
+        align-self: center;
+    }
+
+    .planner-slot-box {
+        min-height: 88px;
+        border-radius: 20px;
+        border: 1px dashed rgba(26, 19, 23, 0.12);
+        background: #fcfafb;
+        padding: 0.8rem 0.9rem;
+        font-size: 0.92rem;
+        color: rgba(26, 19, 23, 0.74);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.3rem;
+    }
+
+    .planner-slot-box.is-empty {
+        background: #fcfafb;
+    }
+
+    .planner-slot-box.is-occupied {
+        border-style: solid;
+        background: #f4f0f1;
+        color: rgba(26, 19, 23, 0.7);
+    }
+
+    .planner-slot-box__title {
+        font-weight: 700;
+        color: #1a1317;
+    }
+
     .screen-only {
         display: initial;
     }
@@ -353,6 +452,10 @@
 
         .calendar-stats-grid--bottom {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .planner-slot-row {
+            grid-template-columns: 1fr;
         }
 
         .daily-schedule-table {
