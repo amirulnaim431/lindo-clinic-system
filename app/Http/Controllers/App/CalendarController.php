@@ -15,10 +15,10 @@ class CalendarController extends Controller
 {
     private const PIC_ORDER = [
         'aqilah' => 1,
-        'adila' => 2,
-        'amanda' => 3,
-        'farhana' => 4,
-        'emma' => 5,
+        'emma' => 2,
+        'farhana' => 3,
+        'amanda' => 4,
+        'adila' => 5,
         'sora' => 6,
         'monica' => 7,
     ];
@@ -55,14 +55,18 @@ class CalendarController extends Controller
         $schedule = ClinicSetting::appointmentSchedule();
 
         $groupedByStaff = $items
-            ->groupBy(fn (AppointmentItem $item) => (string) ($item->staff_id ?: 'unassigned'))
-            ->map(function ($group, $staffId) use ($customerVisitStats, $selectedDate) {
+            ->groupBy(function (AppointmentItem $item) {
+                $staffName = $item->staff?->full_name ?: ($item->staff_name_snapshot ?: 'Unassigned');
+
+                return mb_strtolower($this->formatPicName($staffName));
+            })
+            ->map(function ($group, $staffKey) use ($customerVisitStats, $selectedDate) {
                 $staff = $group->first()?->staff;
                 $staffName = $staff?->full_name ?: ($group->first()?->staff_name_snapshot ?: 'Unassigned');
                 $rows = $this->buildMergedScheduleRows($group, $customerVisitStats, $selectedDate);
 
                 return [
-                    'staff_id' => $staffId,
+                    'staff_id' => (string) $staffKey,
                     'staff_name' => $this->formatPicName($staffName),
                     'staff_role' => $staff?->job_title ?: ($staff?->role_key ?: $group->first()?->staff_role_snapshot),
                     'sort_rank' => $this->picSortRank($staff ?: $staffName),
@@ -77,18 +81,21 @@ class CalendarController extends Controller
             ->all();
 
         $availabilitySections = $activeStaff
-            ->map(function (Staff $staff) use ($items, $selectedDate, $schedule) {
+            ->groupBy(fn (Staff $staff) => mb_strtolower($this->formatPicName($staff->full_name)))
+            ->map(function ($staffGroup) use ($items, $selectedDate, $schedule) {
+                $staff = $staffGroup->first();
+                $staffIds = $staffGroup->pluck('id')->map(fn ($id) => (string) $id)->all();
                 $staffItems = $items
-                    ->filter(fn (AppointmentItem $item) => (string) $item->staff_id === (string) $staff->id)
+                    ->filter(fn (AppointmentItem $item) => in_array((string) $item->staff_id, $staffIds, true))
                     ->groupBy(fn (AppointmentItem $item) => $item->starts_at?->format('H:i') ?: 'unknown');
 
                 return [
-                    'staff_id' => (string) $staff->id,
+                    'staff_id' => (string) $staffIds[0],
                     'staff_name' => $this->formatPicName($staff->full_name),
                     'staff_role' => $staff->job_title ?: ($staff->role_key ?: null),
                     'sort_rank' => $this->picSortRank($staff),
                     'booking_windows' => $this->bookingWindowCount($selectedDate, $schedule),
-                    'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems, $schedule, $staff),
+                    'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems, $schedule, $staffIds),
                 ];
             })
             ->sortBy(fn (array $section) => sprintf('%02d-%s', $section['sort_rank'], mb_strtolower($section['staff_name'])))
@@ -250,7 +257,7 @@ class CalendarController extends Controller
         return $staff instanceof Staff ? 50 + Staff::appointmentGroupRankForStaff($staff) : 99;
     }
 
-    private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems, array $schedule, Staff $staff): array
+    private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems, array $schedule, array $staffIds): array
     {
         $rows = [];
         $cursor = $this->timeOnDate($selectedDate, $schedule['start_time']);
@@ -259,7 +266,7 @@ class CalendarController extends Controller
         $slotStep = (int) $schedule['slot_step_minutes'];
         $capacity = (int) $schedule['boxes_per_slot'];
         $blocks = AppointmentSlotBlock::query()
-            ->where('staff_id', $staff->id)
+            ->whereIn('staff_id', $staffIds)
             ->whereDate('slot_date', $selectedDate->toDateString())
             ->get()
             ->groupBy(fn (AppointmentSlotBlock $block) => substr((string) $block->start_time, 0, 5));

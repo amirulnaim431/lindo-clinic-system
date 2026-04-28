@@ -146,7 +146,7 @@
 
                     <section class="panel">
                         <div class="panel-header">
-                            <x-section-heading kicker="Operational scope" title="Eligible services" subtitle="Assign only the services this person can deliver or oversee operationally." />
+                            <x-section-heading kicker="Operational scope" title="Eligible services" subtitle="Assign only the services this person can deliver or oversee operationally. This is the same assignment list used on each service edit page." />
                         </div>
                         <div class="panel-body">
                             @if ($services->count())
@@ -162,7 +162,7 @@
                                                         <div class="selection-card__meta">{{ $service->description }}</div>
                                                     @endif
                                                 </div>
-                                                <span class="selection-card__badge">{{ $isSelected ? 'Assigned' : (((int) ($service->duration_minutes ?? 60)) . ' min') }}</span>
+                                                <span class="selection-card__badge">{{ $isSelected ? 'Assigned' : 'Not assigned' }}</span>
                                             </div>
                                         </label>
                                     @endforeach
@@ -316,7 +316,7 @@
                 if (badge) {
                     badge.textContent = checkbox.classList.contains('permission-checkbox')
                         ? (checkbox.checked ? 'Enabled' : 'Optional')
-                        : (checkbox.checked ? 'Assigned' : 'Optional');
+                        : (checkbox.checked ? 'Assigned' : 'Not assigned');
                 }
             };
 

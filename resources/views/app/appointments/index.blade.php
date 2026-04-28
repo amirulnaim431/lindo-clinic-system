@@ -1364,6 +1364,12 @@
                 const rows = Array.isArray(trafficLists?.[listKey]) ? trafficLists[listKey] : [];
                 trafficListTitle.textContent = meta.title;
                 trafficListSubtitle.textContent = meta.subtitle;
+                const rescheduleDateControl = listKey === 'reschedule' ? `
+                    <div class="traffic-followup-tools">
+                        <label class="field-label" for="traffic-followup-date">Follow-up date</label>
+                        <input id="traffic-followup-date" type="date" class="form-input" value="${escapeHtml(dateInput?.value || @json($selectedDate))}">
+                    </div>
+                ` : '';
 
                 if (!rows.length) {
                     trafficListContent.innerHTML = `
@@ -1371,6 +1377,7 @@
                             <div class="traffic-print-title">${escapeHtml(meta.title)}</div>
                             <div class="traffic-print-subtitle">${escapeHtml(meta.subtitle)}</div>
                         </div>
+                        ${rescheduleDateControl}
                         <div class="traffic-list-empty">No customers in this list yet.</div>
                     `;
                 } else {
@@ -1379,12 +1386,7 @@
                             <div class="traffic-print-title">${escapeHtml(meta.title)}</div>
                             <div class="traffic-print-subtitle">${escapeHtml(meta.subtitle)}</div>
                         </div>
-                        ${listKey === 'reschedule' ? `
-                            <div class="traffic-followup-tools">
-                                <label class="field-label" for="traffic-followup-date">Follow-up date</label>
-                                <input id="traffic-followup-date" type="date" class="form-input" value="${escapeHtml(dateInput?.value || @json($selectedDate))}">
-                            </div>
-                        ` : ''}
+                        ${rescheduleDateControl}
                         <table class="traffic-list-table">
                             <thead>
                                 <tr>
@@ -2358,6 +2360,10 @@
                     window.print();
                     window.setTimeout(() => document.body.classList.remove('is-printing-traffic'), 250);
                 });
+                const requestedTrafficList = new URLSearchParams(window.location.search).get('status');
+                if (requestedTrafficList && trafficListMeta[requestedTrafficList]) {
+                    window.setTimeout(() => openTrafficListModal(requestedTrafficList), 80);
+                }
 
                 calendarBoardModal?.addEventListener('click', function (event) {
                     if (event.target === calendarBoardModal || event.target === calendarBoardModal.firstElementChild) {

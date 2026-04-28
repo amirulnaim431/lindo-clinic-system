@@ -88,6 +88,16 @@ class Staff extends Model
         'others' => 'Others',
     ];
 
+    private const APPOINTMENT_PIC_NAME_ORDER = [
+        'aqilah' => 1,
+        'emma' => 2,
+        'farhana' => 3,
+        'amanda' => 4,
+        'adila' => 5,
+        'sora' => 6,
+        'monica' => 7,
+    ];
+
     protected $table = 'staff';
 
     public $incrementing = false;
@@ -266,6 +276,13 @@ class Staff extends Model
         return $staffList
             ->filter(fn (self $staff) => self::shouldIncludeInPicSelector($staff))
             ->sort(function (self $left, self $right) {
+                $leftNameRank = self::appointmentPicNameRank($left);
+                $rightNameRank = self::appointmentPicNameRank($right);
+
+                if ($leftNameRank !== $rightNameRank) {
+                    return $leftNameRank <=> $rightNameRank;
+                }
+
                 $leftRank = match (self::picGroupKeyForStaff($left)) {
                     'management' => 1,
                     'doctor' => 2,
@@ -361,9 +378,28 @@ class Staff extends Model
         return self::APPOINTMENT_GROUP_LABELS[$group] ?? 'Others';
     }
 
+    public static function appointmentPicNameRank(self $staff): int
+    {
+        $name = mb_strtolower(trim((string) $staff->full_name));
+
+        foreach (self::APPOINTMENT_PIC_NAME_ORDER as $needle => $rank) {
+            if (str_contains($name, $needle)) {
+                return $rank;
+            }
+        }
+
+        return 99;
+    }
+
     public static function appointmentGroupRankForStaff(self $staff): int
     {
-        return match (self::appointmentGroupKeyForStaff($staff)) {
+        $nameRank = self::appointmentPicNameRank($staff);
+
+        if ($nameRank < 99) {
+            return $nameRank;
+        }
+
+        return 100 + match (self::appointmentGroupKeyForStaff($staff)) {
             'management' => 1,
             'doctor' => 2,
             'nurse' => 3,

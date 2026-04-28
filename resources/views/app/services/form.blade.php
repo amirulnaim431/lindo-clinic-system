@@ -116,19 +116,20 @@
 
                         <div class="col-12 field-block">
                             <label class="field-label">Eligible staff</label>
+                            <div class="small-note" style="margin-bottom:0.75rem;">This uses the same service assignment list shown in Staff Directory. Updating either side will tally after saving.</div>
                             <div class="selection-grid">
                                 @foreach ($staffOptions as $staff)
                                     @php
                                         $selected = in_array((string) $staff->id, old('staff_ids', $selectedStaffIds ?? []), true);
                                     @endphp
                                     <label class="selection-card {{ $selected ? 'is-selected' : '' }}">
-                                        <input type="checkbox" name="staff_ids[]" value="{{ $staff->id }}" class="selection-input service-staff-checkbox" data-badge-off="Available" {{ $selected ? 'checked' : '' }}>
+                                        <input type="checkbox" name="staff_ids[]" value="{{ $staff->id }}" class="selection-input service-staff-checkbox" data-badge-off="Not assigned" {{ $selected ? 'checked' : '' }}>
                                         <div class="selection-card__head">
                                             <div>
                                                 <div class="selection-card__title">{{ $staff->full_name }}</div>
                                                 <div class="selection-card__meta">{{ $staff->role_key }}</div>
                                             </div>
-                                            <span class="selection-card__badge">{{ $selected ? 'Assigned' : 'Available' }}</span>
+                                            <span class="selection-card__badge">{{ $selected ? 'Assigned' : 'Not assigned' }}</span>
                                         </div>
                                     </label>
                                 @endforeach
@@ -182,7 +183,7 @@
                         if (checkbox.checked && requirementSelect) {
                             badge.textContent = requirementSelect.value === 'required' ? 'Required' : 'Optional';
                         } else {
-                            badge.textContent = checkbox.checked ? 'Assigned' : (checkbox.dataset.badgeOff || 'Optional');
+                            badge.textContent = checkbox.checked ? 'Assigned' : (checkbox.dataset.badgeOff || 'Not assigned');
                         }
                     }
                 };
