@@ -1290,6 +1290,7 @@
             let breakModeEnabled = false;
             let assignmentClickTimer = null;
             let pendingBreakRemarkResolve = null;
+            let isSubmittingAppointment = false;
 
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
@@ -1297,7 +1298,7 @@
             const plannerSlots = Array.isArray(plannerBoard.slots) ? plannerBoard.slots : [];
 
             function getDraftStorageKey() {
-                return `lindo-appointment-builder:${dateInput?.value || @json($selectedDate)}`;
+                return `lindo-appointment-builder-v2:${dateInput?.value || @json($selectedDate)}`;
             }
 
             function buildCalendarBoardUrl() {
@@ -2148,6 +2149,18 @@
                 }
             }
 
+            function resetBookingBuilderDraft({ clearStorage = false } = {}) {
+                selectedServices = [];
+                assignments = {};
+                activeInstanceId = null;
+                renderSelectedServices();
+                renderPlannerBoard();
+
+                if (clearStorage) {
+                    clearPersistedDraft();
+                }
+            }
+
             function restorePersistedDraft() {
                 if (oldDraft && Array.isArray(oldDraft.services)) {
                     return false;
@@ -2612,6 +2625,7 @@
                 submitCustomerPhoneInput.value = customerPhoneInput?.value || '';
                 submitNotesInput.value = notesInput?.value || '';
                 bookingPayloadInput.value = JSON.stringify(buildPayloadForSubmit());
+                isSubmittingAppointment = true;
                 clearPersistedDraft();
                 appointmentSubmitForm?.requestSubmit();
             });
@@ -2643,6 +2657,11 @@
             });
 
             window.addEventListener('beforeunload', function () {
+                if (isSubmittingAppointment) {
+                    clearPersistedDraft();
+                    return;
+                }
+
                 persistDraft();
             });
 
