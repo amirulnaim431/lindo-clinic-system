@@ -43,7 +43,7 @@ class StaffController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $data['is_active'] = (bool)($data['is_active'] ?? false);
+        $data['is_active'] = (bool) ($data['is_active'] ?? false);
 
         Staff::create($data);
 
@@ -68,7 +68,7 @@ class StaffController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $data['is_active'] = (bool)($data['is_active'] ?? false);
+        $data['is_active'] = (bool) ($data['is_active'] ?? false);
 
         $staff->update($data);
 
