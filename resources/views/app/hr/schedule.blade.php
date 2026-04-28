@@ -448,7 +448,7 @@
                         <head>
                             <title>${escapeHtml(payload?.label || 'HR summary detail')}</title>
                             <style>
-                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
+                                body { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; color: #36242d; }
                                 h1 { margin: 0 0 8px; font-size: 28px; }
                                 p { margin: 0 0 20px; color: #7c6670; }
                                 table { width: 100%; border-collapse: collapse; }
@@ -621,7 +621,7 @@
                         <head>
                             <title>${escapeHtml(payload?.title || 'Leave detail')}</title>
                             <style>
-                                body { font-family: Georgia, serif; padding: 24px; color: #36242d; }
+                                body { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; color: #36242d; }
                                 h1 { margin: 0 0 8px; font-size: 28px; }
                                 p { margin: 0 0 16px; color: #7c6670; }
                                 table { width: 100%; border-collapse: collapse; }

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,8 +7,8 @@
 @layer base {
     :root {
         color-scheme: light;
-        --font-display: 'Playfair Display', 'Times New Roman', serif;
-        --font-sans: 'Playfair Display', 'Times New Roman', serif;
+        --font-display: 'Plus Jakarta Sans', 'Manrope', 'Inter', system-ui, sans-serif;
+        --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         --app-bg: #fffdfd;
         --app-bg-soft: #fff7f9;
         --app-panel: rgba(255, 255, 255, 0.96);
@@ -789,6 +789,37 @@
         background:
             radial-gradient(circle at top right, rgba(201, 146, 115, 0.14), transparent 34%),
             rgba(255, 255, 255, 0.04);
+    }
+
+    .slot-button.is-disabled {
+        cursor: not-allowed;
+    }
+
+    .slot-card.is-unavailable {
+        border-color: #d7dce4;
+        background: #eff2f6;
+        box-shadow: none;
+        opacity: 0.75;
+    }
+
+    .slot-card.is-unavailable .slot-card__time,
+    .slot-card.is-unavailable .slot-card__meta {
+        color: #7f8a99;
+    }
+
+    .staff-group-list {
+        display: grid;
+        gap: 0.6rem;
+        margin-top: 0.75rem;
+    }
+
+    .staff-group-item__label {
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--app-accent-strong);
+        margin-bottom: 0.4rem;
     }
 
     .service-card__title,
@@ -2342,6 +2373,17 @@
 
     .calendar-editor-modal {
         width: min(1120px, 100%);
+    }
+
+    .availability-modal-card {
+        width: min(1080px, 100%);
+        max-height: calc(100vh - 3rem);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .availability-modal-card .modal-body {
+        overflow-y: auto;
     }
 
     .calendar-editor {
