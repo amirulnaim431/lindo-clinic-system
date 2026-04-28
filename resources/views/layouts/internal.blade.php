@@ -36,9 +36,11 @@
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
         $canHrSchedule = $user && method_exists($user, 'canAccessHrSchedule') ? $user->canAccessHrSchedule() : false;
+        $canSettings = $canManageAppointments;
         $canHrNav = $canHrSchedule || $canStaff;
         $customersNavActive = request()->routeIs('app.customers.*') || request()->routeIs('app.customers.import.*');
         $hrNavActive = request()->routeIs('app.hr.*') || request()->routeIs('app.staff.*');
+        $settingsNavActive = request()->routeIs('app.settings.*');
         $sidebarLogoPath = public_path('assets/branding/sidebar-logo.png');
         $sidebarLogoUrl = file_exists($sidebarLogoPath) ? asset('assets/branding/sidebar-logo.png') : null;
     @endphp
@@ -98,6 +100,13 @@
                             <a href="{{ $r('app.services.index') }}" class="app-nav-link {{ $is('app.services.*') ? 'is-active' : '' }}">
                                 <span class="app-nav-icon" aria-hidden="true">&#9776;</span>
                                 <span>Services</span>
+                            </a>
+                        @endif
+
+                        @if ($canSettings)
+                            <a href="{{ $r('app.settings.edit') }}" class="app-nav-link {{ $settingsNavActive ? 'is-active' : '' }}">
+                                <span class="app-nav-icon" aria-hidden="true">&#9881;</span>
+                                <span>Clinic Settings</span>
                             </a>
                         @endif
                     </div>

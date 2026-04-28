@@ -73,15 +73,21 @@
         $membership = $customer?->current_package ?: ($customer?->membership_type ?: ($customer?->membership_code ?: '-'));
 
         return [
+            'id' => (string) $group->id,
             'status' => $statusValue,
+            'customer_id' => (string) ($customer?->id ?: ''),
             'time' => optional($group->starts_at)->format('g:i A') ?: '-',
             'customer' => $customer?->full_name ?: 'Walk-in customer',
             'phone' => $customer?->phone ?: '-',
             'membership' => $membership,
-            'treatment' => $group->items->map(fn ($item) => $item->displayServiceName())->filter()->implode(' | ') ?: '-',
+            'treatment' => $group->items->map(fn ($item) => $item->displayServiceName())->filter()->unique()->implode(' | ') ?: '-',
             'pic' => $group->items->map(fn ($item) => $item->displayStaffName())->filter()->unique()->implode(' | ') ?: '-',
             'booked_by' => $group->source ? str((string) $group->source)->replace('_', ' ')->title()->toString() : 'Admin',
             'remarks' => $group->notes ?: '-',
+            'booking_url' => route('app.appointments.index', array_filter([
+                'date' => $group->starts_at?->format('Y-m-d'),
+                'customer_id' => $customer?->id,
+            ])),
         ];
     })->values();
     $trafficLists = [
@@ -89,6 +95,7 @@
         'completed' => $trafficListRows->where('status', 'completed')->values(),
         'reschedule' => $trafficListRows->filter(fn ($row) => in_array($row['status'], ['cancelled', 'no_show'], true))->values(),
     ];
+    $prefillCustomer = $prefillCustomer ?? null;
 @endphp
 
 <x-internal-layout :title="$isCheckInMode ? 'Customer Check-In' : 'Appointments'" :subtitle="null">
@@ -173,11 +180,17 @@
                                     $membershipTone = str($membershipLabel)->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->toString();
                                     $treatments = $group->items->map(fn ($item) => $item->displayServiceName())->filter()->implode(' | ');
                                     $picNames = $group->items->map(fn ($item) => $item->displayStaffName())->filter()->unique()->implode(' | ');
+                                    $statusTone = match ($statusValue) {
+                                        'checked_in' => 'warning',
+                                        'completed' => 'success',
+                                        default => 'danger',
+                                    };
                                 @endphp
                                 <div class="checkin-card">
                                     <div>
                                         <div class="checkin-card__time">{{ optional($group->starts_at)->format('g:i A') ?: '-' }}</div>
                                         <div class="checkin-card__name">
+                                            <span class="traffic-light traffic-light--{{ $statusTone }}" title="{{ $statusLabel }}"></span>
                                             <span>{{ $customer?->full_name ?: 'Walk-in customer' }}</span>
                                             @if ($membershipLabel !== 'No package')
                                                 <span class="membership-pill membership-pill--{{ $membershipTone }}">{{ $membershipLabel }}</span>
@@ -207,7 +220,7 @@
                                             </form>
                                         @endif
                                         <button type="button" class="btn btn-secondary checkin-remark-action" data-action-url="{{ route('app.appointments.status', $group) }}" data-status="cancelled" data-title="Reschedule customer" data-customer="{{ $customer?->full_name ?: 'Walk-in customer' }}">Reschedule</button>
-                                        <button type="button" class="btn btn-secondary checkin-remark-action" data-action-url="{{ route('app.appointments.status', $group) }}" data-status="no_show" data-title="Remove customer from traffic board" data-customer="{{ $customer?->full_name ?: 'Walk-in customer' }}">Remove</button>
+                                        <button type="button" class="btn btn-secondary checkin-remark-action" data-action-url="{{ route('app.appointments.status', $group) }}" data-status="no_show" data-title="Cancel customer appointment" data-customer="{{ $customer?->full_name ?: 'Walk-in customer' }}">Cancel</button>
                                     </div>
                                 </div>
                             @empty
@@ -262,6 +275,14 @@
                     <div>
                         <div class="compact-label">Eligible staff board</div>
                         <h3 class="panel-title-display" style="font-size:24px;">Assign services into staff time boxes</h3>
+                    </div>
+                    <div class="break-toggle-wrap">
+                        <span class="traffic-light traffic-light--danger"></span>
+                        <label class="break-toggle">
+                            <input type="checkbox" id="break-mode-toggle">
+                            <span class="break-toggle__track"></span>
+                            <span class="break-toggle__label">Break</span>
+                        </label>
                     </div>
                 </div>
                 <div class="panel-body stack">
@@ -525,7 +546,10 @@
 
         .planner-staff-card__head {
             padding: 1rem 1.15rem;
-            border-bottom: 1px solid rgba(26, 19, 23, 0.06);
+            border-bottom: 1px solid rgba(198, 139, 154, 0.22);
+            background:
+                radial-gradient(circle at top left, rgba(198, 139, 154, 0.18), transparent 42%),
+                linear-gradient(135deg, #fff7fa 0%, #fff 70%);
             display: flex;
             justify-content: space-between;
             gap: 1rem;
@@ -581,6 +605,13 @@
             border-style: solid;
             background: #f4f0f1;
             color: rgba(26, 19, 23, 0.7);
+        }
+
+        .planner-slot-box.is-blocked {
+            border-style: solid;
+            border-color: rgba(151, 51, 63, 0.28);
+            background: #fff0f1;
+            color: #7f2f3b;
         }
 
         .planner-slot-box__title {
@@ -725,6 +756,80 @@
             color: rgba(26, 19, 23, 0.6);
             font-size: 0.9rem;
             margin-top: 0.25rem;
+        }
+
+        .traffic-light {
+            width: 0.72rem;
+            height: 0.72rem;
+            border-radius: 999px;
+            display: inline-block;
+            box-shadow: 0 0 0 4px rgba(26, 19, 23, 0.04);
+        }
+
+        .traffic-light--danger {
+            background: #d85062;
+        }
+
+        .traffic-light--warning {
+            background: #e8b84f;
+        }
+
+        .traffic-light--success {
+            background: #58ad72;
+        }
+
+        .break-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid rgba(198, 139, 154, 0.18);
+            border-radius: 999px;
+            background: #fff8fa;
+        }
+
+        .break-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .break-toggle input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .break-toggle__track {
+            width: 48px;
+            height: 26px;
+            border-radius: 999px;
+            background: #eadde1;
+            position: relative;
+            transition: background 0.18s ease;
+        }
+
+        .break-toggle__track::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            box-shadow: 0 5px 12px rgba(26, 19, 23, 0.18);
+            transition: transform 0.18s ease;
+        }
+
+        .break-toggle input:checked + .break-toggle__track {
+            background: #d85062;
+        }
+
+        .break-toggle input:checked + .break-toggle__track::after {
+            transform: translateX(22px);
         }
 
         .checkin-metrics {
@@ -906,6 +1011,34 @@
             background: #fff;
         }
 
+        .traffic-followup-tools {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+
+        .traffic-followup-tools .form-input {
+            width: 180px;
+        }
+
+        .traffic-customer-link {
+            color: #1a1317;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .followup-check {
+            margin-right: 0.35rem;
+        }
+
+        .followup-check input:checked + span::after {
+            content: 'Followed up';
+            color: #1f7a48;
+            font-weight: 700;
+            margin-right: 0.35rem;
+        }
+
         @media print {
             body.is-printing-traffic * {
                 visibility: hidden !important;
@@ -979,11 +1112,22 @@
         }
     </style>
 
+    @php
+        $prefillCustomerPayload = $prefillCustomer ? [
+            'id' => (string) $prefillCustomer->id,
+            'full_name' => $prefillCustomer->full_name,
+            'phone' => $prefillCustomer->phone,
+        ] : null;
+    @endphp
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const isCheckInMode = @json($isCheckInMode);
             const calendarRoute = @json(route('app.calendar'));
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
+            const slotBlockUrl = @json(route('app.appointments.slot-blocks.store'));
+            const csrfToken = @json(csrf_token());
+            const prefillCustomer = @json($prefillCustomerPayload);
             const serviceCatalog = @json($serviceCatalog);
             const serviceCategories = @json($serviceCategoryMeta);
             const plannerBoard = @json($plannerBoard);
@@ -1062,6 +1206,7 @@
             const checkinRemarkSubtitle = document.getElementById('checkin-remark-subtitle');
             const checkinRemarkClose = document.getElementById('checkin-remark-close');
             const checkinRemarkCancel = document.getElementById('checkin-remark-cancel');
+            const breakModeToggle = document.getElementById('break-mode-toggle');
 
             let activeCategoryKey = serviceCategories[0]?.key || 'consultations';
             let activeConsultationDepartment = serviceCategories.find((group) => group.key === 'consultations')?.consultation_groups?.[0]?.key || 'wellness';
@@ -1072,6 +1217,8 @@
             let pendingModalService = null;
             let pendingModalSelections = {};
             let pendingRemovalAction = null;
+            let breakModeEnabled = false;
+            let assignmentClickTimer = null;
 
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
@@ -1160,6 +1307,12 @@
                             <div class="traffic-print-title">${escapeHtml(meta.title)}</div>
                             <div class="traffic-print-subtitle">${escapeHtml(meta.subtitle)}</div>
                         </div>
+                        ${listKey === 'reschedule' ? `
+                            <div class="traffic-followup-tools">
+                                <label class="field-label" for="traffic-followup-date">Follow-up date</label>
+                                <input id="traffic-followup-date" type="date" class="form-input" value="${escapeHtml(dateInput?.value || @json($selectedDate))}">
+                            </div>
+                        ` : ''}
                         <table class="traffic-list-table">
                             <thead>
                                 <tr>
@@ -1179,7 +1332,10 @@
                                     <tr>
                                         <td>${index + 1}</td>
                                         <td>${escapeHtml(row.time)}</td>
-                                        <td>${escapeHtml(row.customer)}</td>
+                                        <td>
+                                            ${listKey === 'reschedule' ? `<label class="followup-check"><input type="checkbox" data-followup-id="${escapeHtml(row.id)}"> <span></span></label>` : ''}
+                                            <a href="${escapeHtml(row.booking_url || '#')}" class="traffic-customer-link">${escapeHtml(row.customer)}</a>
+                                        </td>
                                         <td>${escapeHtml(row.phone)}</td>
                                         <td>${escapeHtml(row.membership)}</td>
                                         <td>${escapeHtml(row.treatment)}</td>
@@ -1191,6 +1347,29 @@
                             </tbody>
                         </table>
                     `;
+                }
+
+                if (listKey === 'reschedule') {
+                    const datePicker = trafficListContent.querySelector('#traffic-followup-date');
+                    datePicker?.addEventListener('change', function () {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('mode', 'checkin');
+                        url.searchParams.set('status', 'reschedule');
+                        url.searchParams.set('date', datePicker.value);
+                        window.location.href = url.toString();
+                    });
+
+                    trafficListContent.querySelectorAll('[data-followup-id]').forEach((checkbox) => {
+                        const storageKey = `lindo-reschedule-followup:${checkbox.dataset.followupId}`;
+                        checkbox.checked = window.localStorage.getItem(storageKey) === '1';
+                        checkbox.addEventListener('change', function () {
+                            if (checkbox.checked) {
+                                window.localStorage.setItem(storageKey, '1');
+                            } else {
+                                window.localStorage.removeItem(storageKey);
+                            }
+                        });
+                    });
                 }
 
                 trafficListModal.classList.remove('hidden');
@@ -1255,7 +1434,7 @@
                     const dosageValue = dosageGroup ? (dosageGroup.values || []).find((value) => value.id === dosageValueId) : null;
 
                     if (dosageValue) {
-                        displayLabel = `Tirze ${dosageValue.label}`;
+                        displayLabel = `Consult Tirze ${dosageValue.label}`;
                     }
                 }
 
@@ -1386,7 +1565,7 @@
                     card.innerHTML = `
                         <div class="service-picker-card__title">${service.name}</div>
                         <div class="service-picker-card__meta">${service.display_category_path}</div>
-                        <div class="service-picker-card__meta">${service.duration_minutes} mins${formatMoney(service.price) ? ` | ${formatMoney(service.price)}` : ''}</div>
+                        ${formatMoney(service.price) ? `<div class="service-picker-card__meta">${formatMoney(service.price)}</div>` : ''}
                     `;
                     card.addEventListener('click', () => handleServicePick(service));
                     serviceGrid.appendChild(card);
@@ -1512,6 +1691,16 @@
             }
 
             function getVisibleStaffRows() {
+                if (breakModeEnabled) {
+                    return allStaff.filter((staff) => plannerSlots.some((slot) => {
+                        const occupancy = boardOccupancy?.[staff.id]?.[slot.time];
+                        const existingCount = Number(occupancy?.count || 0);
+                        const blockCount = Array.isArray(occupancy?.blocks) ? occupancy.blocks.length : 0;
+
+                        return (existingCount + blockCount) < capacityPerSlot;
+                    }));
+                }
+
                 if (!selectedServices.length) {
                     return [];
                 }
@@ -1536,6 +1725,7 @@
             function buildSlotBoxes(staff, slot) {
                 const occupancy = boardOccupancy?.[staff.id]?.[slot.time] || { count: 0, appointments: [] };
                 const existingAppointments = Array.isArray(occupancy.appointments) ? occupancy.appointments : [];
+                const existingBlocks = Array.isArray(occupancy.blocks) ? occupancy.blocks : [];
                 const draftAssignments = Object.values(assignments)
                     .filter((assignment) => assignment.staff_id === staff.id && assignment.start_time === slot.time)
                     .sort((left, right) => left.slot_index - right.slot_index);
@@ -1552,7 +1742,18 @@
                         continue;
                     }
 
-                    const draft = draftAssignments.find((assignment) => Number(assignment.slot_index) === slotIndex);
+                    const block = existingBlocks.find((row) => Number(row.slot_index) === slotIndex);
+
+                    if (block) {
+                        boxes.push({
+                            type: 'blocked',
+                            slot_index: slotIndex,
+                            reason: block.reason,
+                        });
+                        continue;
+                    }
+
+                    const draft = draftAssignments.find((assignment) => Number(assignment.slot_index) === slotIndex || assignment.span_slots);
 
                     if (draft) {
                         boxes.push({
@@ -1607,7 +1808,7 @@
                 plannerBoardContainer.innerHTML = '';
                 const visibleStaffRows = getVisibleStaffRows();
 
-                if (!selectedServices.length) {
+                if (!selectedServices.length && !breakModeEnabled) {
                     plannerBoardContainer.innerHTML = '<div class="small-note">Select at least one service to load the staff board.</div>';
                     return;
                 }
@@ -1648,6 +1849,13 @@
                                     <div class="planner-slot-box__title">${box.appointment.customer_name}</div>
                                     <div>${box.appointment.service_name}</div>
                                 `;
+                            } else if (box.type === 'blocked') {
+                                boxButton.className = 'planner-slot-box is-blocked';
+                                boxButton.disabled = true;
+                                boxButton.innerHTML = `
+                                    <div class="planner-slot-box__title">Blocked</div>
+                                    <div>${escapeHtml(box.reason || 'Break')}</div>
+                                `;
                             } else if (box.type === 'assigned') {
                                 boxButton.className = 'planner-slot-box is-assigned';
                                 boxButton.innerHTML = `
@@ -1655,10 +1863,43 @@
                                     <div>${box.service?.selected_option_labels?.join(' | ') || 'Draft booking'}</div>
                                 `;
                                 boxButton.addEventListener('click', () => {
-                                    activeInstanceId = box.assignment.instance_id;
-                                    renderSelectedServices();
+                                    window.clearTimeout(assignmentClickTimer);
+                                    assignmentClickTimer = window.setTimeout(() => {
+                                        openConfirmRemoveModal({
+                                        title: 'Remove staff assignment?',
+                                        subtitle: `${box.service?.display_label || 'Selected service'} - ${staff.full_name}`,
+                                        copy: `This will remove the booking from ${staff.full_name} at ${slot.label} and return the service to your selected services list.`,
+                                        approveLabel: 'Remove assignment',
+                                        onApprove: () => {
+                                            delete assignments[box.assignment.instance_id];
+                                            activeInstanceId = box.assignment.instance_id;
+                                            renderSelectedServices();
+                                            renderPlannerBoard();
+                                        },
+                                        });
+                                    }, 240);
                                 });
-                                boxButton.addEventListener('dblclick', () => {
+                                boxButton.addEventListener('dblclick', (event) => {
+                                    event.preventDefault();
+                                    window.clearTimeout(assignmentClickTimer);
+                                    const slotBoxes = buildSlotBoxes(staff, slot);
+                                    const canMerge = slotBoxes.every((slotBox) => {
+                                        return slotBox.type === 'empty'
+                                            || (slotBox.type === 'assigned' && slotBox.assignment.instance_id === box.assignment.instance_id);
+                                    });
+
+                                    if (!canMerge) {
+                                        window.alert('This hour already has another booking or block, so it cannot be merged.');
+                                        return;
+                                    }
+
+                                    assignments[box.assignment.instance_id] = {
+                                        ...box.assignment,
+                                        slot_index: 1,
+                                        span_slots: true,
+                                    };
+                                    renderPlannerBoard();
+                                    return;
                                     openConfirmRemoveModal({
                                         title: 'Remove staff assignment?',
                                         subtitle: `${box.service?.display_label || 'Selected service'} • ${staff.full_name}`,
@@ -1678,7 +1919,14 @@
                                     <div class="planner-slot-box__title">Empty box</div>
                                     <div>${activeInstanceId ? 'Click to assign active service here' : 'Choose a selected service first'}</div>
                                 `;
-                                boxButton.addEventListener('click', () => assignActiveServiceToBox(staff, slot, box.slot_index));
+                                boxButton.addEventListener('click', () => {
+                                    if (breakModeEnabled) {
+                                        blockStaffSlot(staff, slot, box.slot_index);
+                                        return;
+                                    }
+
+                                    assignActiveServiceToBox(staff, slot, box.slot_index);
+                                });
                             }
 
                             row.appendChild(boxButton);
@@ -1693,6 +1941,55 @@
                 persistDraft();
             }
 
+            async function blockStaffSlot(staff, slot, slotIndex) {
+                const reason = window.prompt(`Reason for blocking ${staff.full_name} at ${slot.label}?`);
+
+                if (!reason || !reason.trim()) {
+                    window.alert('Please enter a reason before blocking a slot.');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(slotBlockUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            staff_id: staff.id,
+                            date: dateInput?.value || @json($selectedDate),
+                            start_time: slot.time,
+                            slot_index: slotIndex,
+                            reason: reason.trim(),
+                        }),
+                    });
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const errors = Object.values(result.errors || {}).flat();
+                        window.alert(errors[0] || result.message || 'Unable to block this slot.');
+                        return;
+                    }
+
+                    const occupancy = boardOccupancy[staff.id]?.[slot.time] || { count: 0, appointments: [], blocks: [] };
+                    occupancy.blocks = Array.isArray(occupancy.blocks) ? occupancy.blocks : [];
+                    occupancy.blocks.push({
+                        id: result.id,
+                        slot_index: result.slot_index,
+                        reason: result.reason,
+                    });
+                    boardOccupancy[staff.id] = boardOccupancy[staff.id] || {};
+                    boardOccupancy[staff.id][slot.time] = occupancy;
+                    renderPlannerBoard();
+                } catch (error) {
+                    window.alert('Unable to block this slot. Please try again.');
+                }
+            }
+
             function buildPayloadForSubmit() {
                 return {
                     services: selectedServices.map((service) => ({
@@ -1705,6 +2002,7 @@
                         staff_id: assignment.staff_id,
                         start_time: assignment.start_time,
                         slot_index: assignment.slot_index,
+                        span_slots: !!assignment.span_slots,
                     })),
                 };
             }
@@ -1804,6 +2102,7 @@
                                 staff_name: allStaff.find((staff) => staff.id === row.staff_id)?.full_name || 'Staff',
                                 start_time: row.start_time,
                                 slot_index: Number(row.slot_index || 1),
+                                span_slots: !!row.span_slots,
                             }])
                     );
 
@@ -2034,6 +2333,11 @@
             });
 
             serviceSearchInput?.addEventListener('input', renderServiceGrid);
+            breakModeToggle?.addEventListener('change', function () {
+                breakModeEnabled = breakModeToggle.checked;
+                document.body.classList.toggle('break-mode-active', breakModeEnabled);
+                renderPlannerBoard();
+            });
 
             viewDateBoardButton?.addEventListener('click', openCalendarBoardModal);
 
@@ -2227,6 +2531,10 @@
                     membership_type: '',
                     current_package: '',
                 });
+            }
+
+            if (prefillCustomer && customerNameInput && !customerNameInput.value) {
+                selectCustomer(prefillCustomer);
             }
 
             if (oldDraft && Array.isArray(oldDraft.services)) {

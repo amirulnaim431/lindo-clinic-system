@@ -5,6 +5,8 @@ namespace App\Http\Controllers\App;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
+use App\Models\AppointmentSlotBlock;
+use App\Models\ClinicSetting;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,6 +52,7 @@ class CalendarController extends Controller
             ->where('is_active', true)
             ->get(['id', 'full_name', 'role_key', 'job_title', 'department', 'operational_role']);
         $activeStaff = Staff::sortForPicSelector($activeStaff);
+        $schedule = ClinicSetting::appointmentSchedule();
 
         $groupedByStaff = $items
             ->groupBy(fn (AppointmentItem $item) => (string) ($item->staff_id ?: 'unassigned'))
@@ -74,7 +77,7 @@ class CalendarController extends Controller
             ->all();
 
         $availabilitySections = $activeStaff
-            ->map(function (Staff $staff) use ($items, $selectedDate) {
+            ->map(function (Staff $staff) use ($items, $selectedDate, $schedule) {
                 $staffItems = $items
                     ->filter(fn (AppointmentItem $item) => (string) $item->staff_id === (string) $staff->id)
                     ->groupBy(fn (AppointmentItem $item) => $item->starts_at?->format('H:i') ?: 'unknown');
@@ -84,8 +87,8 @@ class CalendarController extends Controller
                     'staff_name' => $this->formatPicName($staff->full_name),
                     'staff_role' => $staff->job_title ?: ($staff->role_key ?: null),
                     'sort_rank' => $this->picSortRank($staff),
-                    'booking_windows' => 9,
-                    'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems),
+                    'booking_windows' => $this->bookingWindowCount($selectedDate, $schedule),
+                    'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems, $schedule, $staff),
                 ];
             })
             ->sortBy(fn (array $section) => sprintf('%02d-%s', $section['sort_rank'], mb_strtolower($section['staff_name'])))
@@ -200,6 +203,8 @@ class CalendarController extends Controller
                     'item_id' => $group->pluck('id')->filter()->implode(','),
                     'time' => $first->starts_at?->format('g:i A') ?: '-',
                     'client' => $customer?->full_name ?: 'Customer',
+                    'phone' => $customer?->phone ?: '',
+                    'date_label' => $first->starts_at?->format('j M Y') ?: $selectedDate->format('j M Y'),
                     'membership' => $this->formatMembershipCell($customer, $isNewCustomer),
                     'treatment' => $group
                         ->map(fn (AppointmentItem $item) => $this->formatTreatmentCell($item))
@@ -245,28 +250,37 @@ class CalendarController extends Controller
         return $staff instanceof Staff ? 50 + Staff::appointmentGroupRankForStaff($staff) : 99;
     }
 
-    private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems): array
+    private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems, array $schedule, Staff $staff): array
     {
         $rows = [];
-        $cursor = $selectedDate->copy()->setTime(10, 0);
-        $cutoff = $selectedDate->copy()->setTime(19, 0);
+        $cursor = $this->timeOnDate($selectedDate, $schedule['start_time']);
+        $cutoff = $this->timeOnDate($selectedDate, $schedule['end_time']);
+        $slotDuration = (int) $schedule['slot_duration_minutes'];
+        $slotStep = (int) $schedule['slot_step_minutes'];
+        $capacity = (int) $schedule['boxes_per_slot'];
+        $blocks = AppointmentSlotBlock::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $selectedDate->toDateString())
+            ->get()
+            ->groupBy(fn (AppointmentSlotBlock $block) => substr((string) $block->start_time, 0, 5));
 
-        while ($cursor->copy()->addMinutes(45)->lte($cutoff)) {
-            $slotEnd = $cursor->copy()->addMinutes(45);
+        while ($cursor->copy()->addMinutes($slotDuration)->lte($cutoff)) {
+            $slotEnd = $cursor->copy()->addMinutes($slotDuration);
             $slotItems = collect($staffItems->get($cursor->format('H:i'), []))->values();
+            $slotBlocks = collect($blocks->get($cursor->format('H:i'), []))->values();
 
             $rows[] = [
                 'label' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
-                'boxes' => $this->buildAvailabilityBoxes($slotItems),
+                'boxes' => $this->buildAvailabilityBoxes($slotItems, $slotBlocks, $capacity),
             ];
 
-            $cursor->addHour();
+            $cursor->addMinutes($slotStep);
         }
 
         return $rows;
     }
 
-    private function buildAvailabilityBoxes($slotItems): array
+    private function buildAvailabilityBoxes($slotItems, $slotBlocks, int $capacity): array
     {
         $occupiedBoxes = $slotItems
             ->groupBy(function (AppointmentItem $item) {
@@ -289,10 +303,22 @@ class CalendarController extends Controller
                         ->implode(' | '),
                 ];
             })
-            ->take(2)
+            ->take($capacity)
             ->values();
 
-        while ($occupiedBoxes->count() < 2) {
+        foreach ($slotBlocks as $block) {
+            if ($occupiedBoxes->count() >= $capacity) {
+                break;
+            }
+
+            $occupiedBoxes->push([
+                'type' => 'blocked',
+                'title' => 'Blocked',
+                'body' => $block->reason,
+            ]);
+        }
+
+        while ($occupiedBoxes->count() < $capacity) {
             $occupiedBoxes->push([
                 'type' => 'empty',
                 'title' => 'Empty box',
@@ -301,6 +327,27 @@ class CalendarController extends Controller
         }
 
         return $occupiedBoxes->all();
+    }
+
+    private function bookingWindowCount(Carbon $selectedDate, array $schedule): int
+    {
+        $count = 0;
+        $cursor = $this->timeOnDate($selectedDate, $schedule['start_time']);
+        $cutoff = $this->timeOnDate($selectedDate, $schedule['end_time']);
+
+        while ($cursor->copy()->addMinutes((int) $schedule['slot_duration_minutes'])->lte($cutoff)) {
+            $count++;
+            $cursor->addMinutes((int) $schedule['slot_step_minutes']);
+        }
+
+        return $count;
+    }
+
+    private function timeOnDate(Carbon $date, string $time): Carbon
+    {
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+
+        return $date->copy()->setTime($hour, $minute);
     }
 
     private function formatMembershipCell($customer, bool $isNewCustomer): string

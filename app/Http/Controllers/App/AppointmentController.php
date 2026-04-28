@@ -6,7 +6,9 @@ use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
+use App\Models\AppointmentSlotBlock;
 use App\Models\AppointmentSlotReservation;
+use App\Models\ClinicSetting;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\Staff;
@@ -120,6 +122,13 @@ class AppointmentController extends Controller
         $appointmentGroups = $appointmentGroupsQuery->get();
 
         $plannerBoard = $this->buildPlannerBoard(Carbon::parse($filters['date']), $staffList);
+        $prefillCustomer = null;
+
+        if (! empty($filters['customer_id'])) {
+            $prefillCustomer = Customer::query()
+                ->select('id', 'full_name', 'phone')
+                ->find($filters['customer_id']);
+        }
 
         $statusOptions = AppointmentStatus::cases();
 
@@ -132,11 +141,14 @@ class AppointmentController extends Controller
             'plannerBoard',
             'appointmentGroups',
             'statusOptions',
+            'prefillCustomer',
         ));
     }
 
     public function store(Request $request)
     {
+        $schedule = $this->appointmentSchedule();
+        $slotCapacity = (int) $schedule['boxes_per_slot'];
         $validated = $request->validate([
             'customer_id' => ['nullable', 'string', Rule::exists('customers', 'id')],
             'date' => ['required', 'date_format:Y-m-d'],
@@ -169,13 +181,14 @@ class AppointmentController extends Controller
 
         $assignments = collect($payload['assignments'] ?? [])
             ->filter(fn ($row) => is_array($row) && filled($row['instance_id'] ?? null) && filled($row['staff_id'] ?? null) && filled($row['start_time'] ?? null))
-            ->map(function (array $row) use ($validated) {
+            ->map(function (array $row) use ($validated, $slotCapacity) {
                 return [
                     'instance_id' => (string) $row['instance_id'],
                     'staff_id' => (string) $row['staff_id'],
                     'date' => $validated['date'],
                     'start_time' => (string) $row['start_time'],
-                    'slot_index' => max(1, min(self::PLANNER_SLOT_CAPACITY, (int) ($row['slot_index'] ?? 1))),
+                    'slot_index' => max(1, min($slotCapacity, (int) ($row['slot_index'] ?? 1))),
+                    'span_slots' => (bool) ($row['span_slots'] ?? false),
                 ];
             })
             ->values();
@@ -199,14 +212,22 @@ class AppointmentController extends Controller
             ]);
         }
 
-        $duplicateBoxes = $assignments
-            ->map(fn (array $assignment) => implode('|', [
+        $assignmentBoxKeys = $assignments->flatMap(function (array $assignment) use ($slotCapacity) {
+            $slotIndexes = [$assignment['slot_index']];
+
+            if ($assignment['span_slots'] && $slotCapacity > 1) {
+                $slotIndexes = range(1, $slotCapacity);
+            }
+
+            return collect($slotIndexes)->map(fn (int $slotIndex) => implode('|', [
                 $assignment['staff_id'],
                 $assignment['date'],
                 $assignment['start_time'],
-                $assignment['slot_index'],
-            ]))
-            ->duplicates();
+                $slotIndex,
+            ]));
+        });
+
+        $duplicateBoxes = $assignmentBoxKeys->duplicates();
 
         if ($duplicateBoxes->isNotEmpty()) {
             throw ValidationException::withMessages([
@@ -261,9 +282,9 @@ class AppointmentController extends Controller
             }
 
             $start = Carbon::createFromFormat('Y-m-d H:i', $assignment['date'].' '.$assignment['start_time']);
-            $end = $start->copy()->addMinutes(max(30, (int) ($service->duration_minutes ?: self::PLANNER_SLOT_DURATION_MINUTES)));
-            $clinicStart = $start->copy()->setTime(self::PLANNER_START_HOUR, 0);
-            $clinicEnd = $start->copy()->setTime(self::PLANNER_END_HOUR, 0);
+            $end = $start->copy()->addMinutes($this->slotDurationMinutes());
+            $clinicStart = $this->timeOnDate($start, $this->appointmentSchedule()['start_time']);
+            $clinicEnd = $this->timeOnDate($start, $this->appointmentSchedule()['end_time']);
 
             if ($start->lt($clinicStart) || $end->gt($clinicEnd)) {
                 throw ValidationException::withMessages([
@@ -277,9 +298,10 @@ class AppointmentController extends Controller
                         && $row['start']->lt($end)
                         && $row['end']->gt($start);
                 })
-                ->count();
+                ->sum(fn (array $row) => ! empty($row['span_slots']) ? $slotCapacity : 1);
+            $assignmentWeight = $assignment['span_slots'] ? $slotCapacity : 1;
 
-            if ($draftOverlapCount >= self::PLANNER_SLOT_CAPACITY) {
+            if (($draftOverlapCount + $assignmentWeight) > $slotCapacity) {
                 throw ValidationException::withMessages([
                     'booking_payload' => "{$staff->full_name} has too many selected services in the same time window. Pick another empty box.",
                 ]);
@@ -292,19 +314,42 @@ class AppointmentController extends Controller
                 'start' => $start,
                 'end' => $end,
                 'slot_index' => $assignment['slot_index'],
+                'span_slots' => $assignment['span_slots'],
             ];
         }
 
         $visitStart = collect($resolvedAssignments)->min(fn (array $row) => $row['start']) ?? Carbon::parse($validated['date'])->setTime(self::PLANNER_START_HOUR, 0);
-        $visitEnd = collect($resolvedAssignments)->max(fn (array $row) => $row['end']) ?? $visitStart->copy()->addMinutes(self::PLANNER_SLOT_DURATION_MINUTES);
+        $visitEnd = collect($resolvedAssignments)->max(fn (array $row) => $row['end']) ?? $visitStart->copy()->addMinutes($this->slotDurationMinutes());
 
         try {
-            DB::transaction(function () use ($validated, $visitStart, $visitEnd, $resolvedAssignments, $resolvedSelections) {
+            DB::transaction(function () use ($validated, $visitStart, $visitEnd, $resolvedAssignments, $resolvedSelections, $slotCapacity) {
                 foreach ($resolvedAssignments as $assignment) {
                     $this->assertStaffCapacityAvailable(
                         $assignment['staff'],
                         $assignment['start'],
                         $assignment['end']
+                    );
+                    $this->assertSlotNotBlocked(
+                        $assignment['staff'],
+                        $assignment['start'],
+                        $assignment['slot_index']
+                    );
+                    if ($assignment['span_slots']) {
+                        foreach (range(1, $slotCapacity) as $slotIndex) {
+                            if ((int) $slotIndex === (int) $assignment['slot_index']) {
+                                continue;
+                            }
+
+                            $this->assertSlotBoxFree(
+                                $assignment['staff'],
+                                $assignment['start'],
+                                $slotIndex
+                            );
+                        }
+                    }
+                    $this->assertMedexMachineAvailable(
+                        $assignment['service'],
+                        $assignment['start']
                     );
                 }
 
@@ -362,6 +407,10 @@ class AppointmentController extends Controller
 
                     $this->reserveStaffTimeBox($appointmentItem, $assignedStaff, $assignment['start'], $assignment['slot_index']);
 
+                    if ($assignment['span_slots']) {
+                        $this->blockMergedSlot($appointmentItem, $assignedStaff, $assignment['start'], $assignment['slot_index']);
+                    }
+
                     $appointmentItem->optionSelections()->createMany(
                         collect($resolvedSelections[$serviceInstanceId] ?? [])
                             ->map(fn (array $selection) => [
@@ -400,11 +449,83 @@ class AppointmentController extends Controller
             ->lockForUpdate()
             ->count();
 
-        if ($existingCount >= self::PLANNER_SLOT_CAPACITY) {
+        if ($existingCount >= (int) $this->appointmentSchedule()['boxes_per_slot']) {
             throw ValidationException::withMessages([
                 'booking_payload' => "{$staff->full_name} is already full in that time window. Pick another empty box.",
             ]);
         }
+    }
+
+    private function assertSlotNotBlocked(Staff $staff, Carbon $start, int $slotIndex): void
+    {
+        $block = AppointmentSlotBlock::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->where('slot_index', $slotIndex)
+            ->lockForUpdate()
+            ->first();
+
+        if ($block) {
+            throw ValidationException::withMessages([
+                'booking_payload' => "{$staff->full_name}'s {$start->format('g:i A')} box is blocked: {$block->reason}",
+            ]);
+        }
+    }
+
+    private function assertSlotBoxFree(Staff $staff, Carbon $start, int $slotIndex): void
+    {
+        $reserved = AppointmentSlotReservation::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->where('slot_index', $slotIndex)
+            ->lockForUpdate()
+            ->exists();
+
+        if ($reserved) {
+            throw ValidationException::withMessages([
+                'booking_payload' => "{$staff->full_name}'s {$start->format('g:i A')} box is already booked.",
+            ]);
+        }
+
+        $this->assertSlotNotBlocked($staff, $start, $slotIndex);
+    }
+
+    private function assertMedexMachineAvailable(Service $service, Carbon $start): void
+    {
+        if (! $this->isMedexService($service)) {
+            return;
+        }
+
+        $existing = AppointmentItem::query()
+            ->with(['group.customer:id,full_name', 'staff:id,full_name', 'service:id,name,service_code'])
+            ->where('starts_at', $start)
+            ->where(function ($query) {
+                $query
+                    ->where('service_name_snapshot', 'like', '%Medex%')
+                    ->orWhereHas('service', function ($serviceQuery) {
+                        $serviceQuery
+                            ->where('name', 'like', '%Medex%')
+                            ->orWhere('service_code', 'like', '%medex%');
+                    });
+            })
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing) {
+            $customer = $existing->group?->customer?->full_name ?: 'another customer';
+            $staff = $existing->staff?->full_name ?: 'assigned staff';
+
+            throw ValidationException::withMessages([
+                'booking_payload' => "Medex machine is already booked at {$start->format('g:i A')} for {$customer} with {$staff}. Choose another time slot.",
+            ]);
+        }
+    }
+
+    private function isMedexService(Service $service): bool
+    {
+        return str_contains(mb_strtolower($service->name.' '.$service->service_code), 'medex');
     }
 
     private function reserveStaffTimeBox(AppointmentItem $appointmentItem, Staff $staff, Carbon $start, int $slotIndex): void
@@ -414,8 +535,28 @@ class AppointmentController extends Controller
             'staff_id' => $staff->id,
             'slot_date' => $start->toDateString(),
             'start_time' => $start->format('H:i:s'),
-            'slot_index' => max(1, min(self::PLANNER_SLOT_CAPACITY, $slotIndex)),
+            'slot_index' => max(1, min((int) $this->appointmentSchedule()['boxes_per_slot'], $slotIndex)),
         ]);
+    }
+
+    private function blockMergedSlot(AppointmentItem $appointmentItem, Staff $staff, Carbon $start, int $primarySlotIndex): void
+    {
+        $slotCapacity = (int) $this->appointmentSchedule()['boxes_per_slot'];
+
+        foreach (range(1, $slotCapacity) as $slotIndex) {
+            if ((int) $slotIndex === (int) $primarySlotIndex) {
+                continue;
+            }
+
+            AppointmentSlotBlock::query()->create([
+                'staff_id' => $staff->id,
+                'slot_date' => $start->toDateString(),
+                'start_time' => $start->format('H:i:s'),
+                'slot_index' => $slotIndex,
+                'reason' => 'Merged full-slot booking for '.$appointmentItem->displayServiceName(),
+                'created_by' => auth()->id(),
+            ]);
+        }
     }
 
     private function syncStaffTimeBoxReservation(AppointmentItem $appointmentItem, ?Staff $staff, Carbon $start): void
@@ -447,7 +588,7 @@ class AppointmentController extends Controller
     {
         $takenSlotIndexes = AppointmentSlotReservation::query()
             ->where('staff_id', $staff->id)
-            ->where('slot_date', $start->toDateString())
+            ->whereDate('slot_date', $start->toDateString())
             ->where('start_time', $start->format('H:i:s'))
             ->when($exceptAppointmentItemId, fn ($query) => $query->where('appointment_item_id', '!=', $exceptAppointmentItemId))
             ->lockForUpdate()
@@ -455,13 +596,14 @@ class AppointmentController extends Controller
             ->map(fn ($slotIndex) => (int) $slotIndex)
             ->all();
 
-        $preferredSlotIndex = $preferredSlotIndex ? max(1, min(self::PLANNER_SLOT_CAPACITY, $preferredSlotIndex)) : null;
+        $slotCapacity = (int) $this->appointmentSchedule()['boxes_per_slot'];
+        $preferredSlotIndex = $preferredSlotIndex ? max(1, min($slotCapacity, $preferredSlotIndex)) : null;
 
         if ($preferredSlotIndex && ! in_array($preferredSlotIndex, $takenSlotIndexes, true)) {
             return $preferredSlotIndex;
         }
 
-        for ($slotIndex = 1; $slotIndex <= self::PLANNER_SLOT_CAPACITY; $slotIndex++) {
+        for ($slotIndex = 1; $slotIndex <= $slotCapacity; $slotIndex++) {
             if (! in_array($slotIndex, $takenSlotIndexes, true)) {
                 return $slotIndex;
             }
@@ -487,13 +629,17 @@ class AppointmentController extends Controller
 
     private function buildPlannerBoard(Carbon $date, Collection $staffList): array
     {
+        $schedule = $this->appointmentSchedule();
         $slots = collect();
-        $cursor = $date->copy()->setTime(self::PLANNER_START_HOUR, 0);
-        $cutoff = $date->copy()->setTime(self::PLANNER_END_HOUR, 0);
+        $cursor = $this->timeOnDate($date, $schedule['start_time']);
+        $cutoff = $this->timeOnDate($date, $schedule['end_time']);
+        $slotDuration = (int) $schedule['slot_duration_minutes'];
+        $slotStep = (int) $schedule['slot_step_minutes'];
+        $slotCapacity = (int) $schedule['boxes_per_slot'];
 
-        while ($cursor->copy()->addMinutes(self::PLANNER_SLOT_DURATION_MINUTES)->lte($cutoff)) {
+        while ($cursor->copy()->addMinutes($slotDuration)->lte($cutoff)) {
             $slotStart = $cursor->copy();
-            $slotEnd = $cursor->copy()->addMinutes(self::PLANNER_SLOT_DURATION_MINUTES);
+            $slotEnd = $cursor->copy()->addMinutes($slotDuration);
 
             $slots->push([
                 'time' => $slotStart->format('H:i'),
@@ -502,13 +648,16 @@ class AppointmentController extends Controller
                 'end' => $slotEnd,
             ]);
 
-            $cursor->addMinutes(self::PLANNER_SLOT_STEP_MINUTES);
+            $cursor->addMinutes($slotStep);
         }
 
         $items = AppointmentItem::query()
             ->with(['group.customer:id,full_name,phone', 'service:id,name', 'optionSelections'])
             ->where('starts_at', '<=', $date->copy()->endOfDay())
             ->where('ends_at', '>=', $date->copy()->startOfDay())
+            ->get();
+        $blocks = AppointmentSlotBlock::query()
+            ->whereDate('slot_date', $date->toDateString())
             ->get();
 
         $occupancy = [];
@@ -537,6 +686,15 @@ class AppointmentController extends Controller
                             'service_name' => $item->displayServiceName().($optionSuffix !== '' ? ' | '.$optionSuffix : ''),
                         ];
                     })->all(),
+                    'blocks' => $blocks
+                        ->filter(fn (AppointmentSlotBlock $block) => (string) $block->staff_id === (string) $staff->id && substr((string) $block->start_time, 0, 5) === $slot['time'])
+                        ->map(fn (AppointmentSlotBlock $block) => [
+                            'id' => (string) $block->id,
+                            'slot_index' => (int) $block->slot_index,
+                            'reason' => $block->reason,
+                        ])
+                        ->values()
+                        ->all(),
                 ];
             }
         }
@@ -546,7 +704,7 @@ class AppointmentController extends Controller
                 'time' => $slot['time'],
                 'label' => $slot['label'],
             ])->all(),
-            'capacity_per_slot' => self::PLANNER_SLOT_CAPACITY,
+            'capacity_per_slot' => $slotCapacity,
             'staff' => $staffList->map(function (Staff $staff) {
                 return [
                     'id' => (string) $staff->id,
@@ -560,6 +718,76 @@ class AppointmentController extends Controller
             })->values()->all(),
             'occupancy' => $occupancy,
         ];
+    }
+
+    public function storeSlotBlock(Request $request): JsonResponse
+    {
+        $schedule = $this->appointmentSchedule();
+        $validated = $request->validate([
+            'staff_id' => ['required', 'string', Rule::exists('staff', 'id')],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'slot_index' => ['required', 'integer', 'min:1', 'max:'.((int) $schedule['boxes_per_slot'])],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $staff = Staff::query()->where('is_active', true)->findOrFail($validated['staff_id']);
+        $start = Carbon::createFromFormat('Y-m-d H:i', $validated['date'].' '.$validated['start_time']);
+        $slotIndex = (int) $validated['slot_index'];
+
+        $occupied = AppointmentSlotReservation::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->where('slot_index', $slotIndex)
+            ->exists();
+
+        if ($occupied) {
+            throw ValidationException::withMessages([
+                'slot_index' => 'This box already has a customer appointment.',
+            ]);
+        }
+
+        try {
+            $block = AppointmentSlotBlock::query()->create([
+                'staff_id' => $staff->id,
+                'slot_date' => $start->toDateString(),
+                'start_time' => $start->format('H:i:s'),
+                'slot_index' => $slotIndex,
+                'reason' => trim($validated['reason']),
+                'created_by' => $request->user()?->id,
+            ]);
+        } catch (QueryException $exception) {
+            throw ValidationException::withMessages([
+                'slot_index' => 'This box is already blocked. Refresh the board to see the latest state.',
+            ]);
+        }
+
+        return response()->json([
+            'id' => (string) $block->id,
+            'staff_id' => (string) $staff->id,
+            'date' => $start->toDateString(),
+            'start_time' => $start->format('H:i'),
+            'slot_index' => $slotIndex,
+            'reason' => $block->reason,
+        ]);
+    }
+
+    private function appointmentSchedule(): array
+    {
+        return ClinicSetting::appointmentSchedule();
+    }
+
+    private function slotDurationMinutes(): int
+    {
+        return (int) $this->appointmentSchedule()['slot_duration_minutes'];
+    }
+
+    private function timeOnDate(Carbon $date, string $time): Carbon
+    {
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+
+        return $date->copy()->setTime($hour, $minute);
     }
 
     private function resolveServiceInstanceOptions(Collection $serviceInstances, Collection $servicesById): array
@@ -625,7 +853,7 @@ class AppointmentController extends Controller
             ->firstWhere('group_name', 'Dosage');
 
         return $dosage && filled($dosage['value_label'] ?? null)
-            ? 'Tirze '.$dosage['value_label']
+            ? 'Consult Tirze '.$dosage['value_label']
             : $service->name;
     }
 

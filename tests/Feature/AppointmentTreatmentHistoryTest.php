@@ -448,4 +448,133 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $response->assertOk();
         $this->assertGreaterThanOrEqual(5, count($response->json('customers')));
     }
+
+    public function test_medex_machine_cannot_be_double_booked_in_same_time_slot(): void
+    {
+        $admin = $this->createAdmin();
+        $firstStaff = $this->createStaff();
+        $secondStaff = $this->createStaff([
+            'full_name' => 'Emma',
+            'employee_code' => 'LND-4002',
+            'operational_role' => 'beautician',
+            'role_key' => 'beautician',
+            'role' => 'beautician',
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'medex_full_face',
+            'name' => 'Medex Full Face Lifting',
+            'category_key' => 'beauty_spa',
+            'default_staff_role' => 'beautician',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $service->staff()->sync([$firstStaff->id, $secondStaff->id]);
+
+        $makePayload = fn (string $instanceId, Staff $staff) => json_encode([
+            'services' => [[
+                'instance_id' => $instanceId,
+                'service_id' => $service->id,
+                'selected_options' => [],
+            ]],
+            'assignments' => [[
+                'instance_id' => $instanceId,
+                'staff_id' => $staff->id,
+                'start_time' => '10:00',
+                'slot_index' => 1,
+            ]],
+        ]);
+
+        $this->actingAs($admin)->post(route('app.appointments.store'), [
+            'date' => '2026-04-28',
+            'customer_full_name' => 'Medex First',
+            'customer_phone' => '0100000001',
+            'booking_payload' => $makePayload('medex-a', $firstStaff),
+        ])->assertRedirect();
+
+        $response = $this->actingAs($admin)->from(route('app.appointments.index'))->post(route('app.appointments.store'), [
+            'date' => '2026-04-28',
+            'customer_full_name' => 'Medex Second',
+            'customer_phone' => '0100000002',
+            'booking_payload' => $makePayload('medex-b', $secondStaff),
+        ]);
+
+        $response->assertRedirect(route('app.appointments.index'));
+        $response->assertSessionHasErrors('booking_payload');
+        $this->assertDatabaseCount('appointment_groups', 1);
+    }
+
+    public function test_break_blocks_and_merged_services_protect_staff_boxes(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff();
+        $service = Service::query()->create([
+            'service_code' => 'consult_tirze',
+            'name' => 'Consult Tirze',
+            'category_key' => 'consultations',
+            'consultation_category_key' => 'wellness',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $service->staff()->sync([$staff->id]);
+
+        $this->actingAs($admin)->postJson(route('app.appointments.slot-blocks.store'), [
+            'staff_id' => $staff->id,
+            'date' => '2026-04-28',
+            'start_time' => '10:00',
+            'slot_index' => 1,
+            'reason' => 'Lunch break',
+        ])->assertOk();
+
+        $blockedResponse = $this->actingAs($admin)->from(route('app.appointments.index'))->post(route('app.appointments.store'), [
+            'date' => '2026-04-28',
+            'customer_full_name' => 'Blocked Customer',
+            'customer_phone' => '0100000003',
+            'booking_payload' => json_encode([
+                'services' => [[
+                    'instance_id' => 'blocked-service',
+                    'service_id' => $service->id,
+                    'selected_options' => [],
+                ]],
+                'assignments' => [[
+                    'instance_id' => 'blocked-service',
+                    'staff_id' => $staff->id,
+                    'start_time' => '10:00',
+                    'slot_index' => 1,
+                ]],
+            ]),
+        ]);
+
+        $blockedResponse->assertRedirect(route('app.appointments.index'));
+        $blockedResponse->assertSessionHasErrors('booking_payload');
+
+        $mergedResponse = $this->actingAs($admin)->post(route('app.appointments.store'), [
+            'date' => '2026-04-28',
+            'customer_full_name' => 'Merged Customer',
+            'customer_phone' => '0100000004',
+            'booking_payload' => json_encode([
+                'services' => [[
+                    'instance_id' => 'merged-service',
+                    'service_id' => $service->id,
+                    'selected_options' => [],
+                ]],
+                'assignments' => [[
+                    'instance_id' => 'merged-service',
+                    'staff_id' => $staff->id,
+                    'start_time' => '11:00',
+                    'slot_index' => 1,
+                    'span_slots' => true,
+                ]],
+            ]),
+        ]);
+
+        $mergedResponse->assertRedirect();
+        $this->assertDatabaseHas('appointment_slot_blocks', [
+            'staff_id' => $staff->id,
+            'start_time' => '11:00:00',
+            'slot_index' => 2,
+        ]);
+    }
 }

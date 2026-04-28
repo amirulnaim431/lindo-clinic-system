@@ -77,7 +77,7 @@
                         <div class="planner-slot-row calendar-reference-row">
                             <div class="planner-slot-label">{{ $row['label'] }}</div>
                             @foreach ($row['boxes'] as $box)
-                                <div class="planner-slot-box {{ $box['type'] === 'occupied' ? 'is-occupied' : 'is-empty' }}">
+                                <div class="planner-slot-box {{ $box['type'] === 'occupied' ? 'is-occupied' : ($box['type'] === 'blocked' ? 'is-blocked' : 'is-empty') }}">
                                     <div class="planner-slot-box__title">{{ $box['title'] }}</div>
                                     <div>{{ $box['body'] }}</div>
                                 </div>
@@ -121,10 +121,16 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($section['rows'] as $rowIndex => $row)
-                                        <tr>
+                                        <tr class="calendar-client-row"
+                                            data-phone="{{ $row['phone'] }}"
+                                            data-time="{{ $row['time'] }}"
+                                            data-date="{{ $row['date_label'] }}"
+                                            data-treatment="{{ $row['treatment'] }}"
+                                            data-pic="{{ $row['pic'] }}"
+                                        >
                                             <td>{{ collect($scheduleSections)->take($sectionIndex)->sum('count') + $rowIndex + 1 }}</td>
                                             <td>{{ $row['time'] }}</td>
-                                            <td>{{ $row['client'] }}</td>
+                                            <td class="calendar-client-name">{{ $row['client'] }}</td>
                                             <td>{{ $row['membership'] }}</td>
                                             <td>{{ $row['treatment'] }}</td>
                                             <td>{{ $row['pic'] }}</td>
@@ -148,6 +154,30 @@
             </section>
         @endforelse
     @endif
+</div>
+
+<div id="whatsapp-reminder-modal" class="modal-shell hidden screen-only" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-stage">
+        <div class="modal-card whatsapp-reminder-modal">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-kicker">WhatsApp reminder</div>
+                    <h3 class="modal-title" id="whatsapp-reminder-title">Appointment reminder</h3>
+                    <p class="modal-subtitle" id="whatsapp-reminder-subtitle"></p>
+                </div>
+                <button type="button" class="modal-close" id="whatsapp-reminder-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body stack">
+                <div class="confirm-remove-copy" id="whatsapp-reminder-details"></div>
+                <textarea id="whatsapp-reminder-copy" class="form-input booking-textarea" rows="7" readonly></textarea>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="whatsapp-reminder-copy-button">Copy message</button>
+                    <button type="button" class="btn btn-secondary" id="whatsapp-reminder-cancel">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -357,6 +387,13 @@
         color: rgba(26, 19, 23, 0.7);
     }
 
+    .planner-slot-box.is-blocked {
+        border-style: solid;
+        border-color: rgba(151, 51, 63, 0.25);
+        background: #fff0f1;
+        color: #7f2f3b;
+    }
+
     .planner-slot-box__title {
         font-weight: 700;
         color: #1a1317;
@@ -364,6 +401,18 @@
 
     .screen-only {
         display: initial;
+    }
+
+    .calendar-client-row {
+        cursor: pointer;
+    }
+
+    .calendar-client-row:hover td {
+        background: #fff8fa;
+    }
+
+    .whatsapp-reminder-modal {
+        width: min(620px, calc(100vw - 32px));
     }
 
     .schedule-section-head {
@@ -585,3 +634,57 @@
         }
     }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('whatsapp-reminder-modal');
+        const closeButtons = [
+            document.getElementById('whatsapp-reminder-close'),
+            document.getElementById('whatsapp-reminder-cancel'),
+        ];
+        const title = document.getElementById('whatsapp-reminder-title');
+        const subtitle = document.getElementById('whatsapp-reminder-subtitle');
+        const details = document.getElementById('whatsapp-reminder-details');
+        const copyBox = document.getElementById('whatsapp-reminder-copy');
+        const copyButton = document.getElementById('whatsapp-reminder-copy-button');
+
+        function closeReminder() {
+            modal?.classList.add('hidden');
+            modal?.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+        }
+
+        document.querySelectorAll('.calendar-client-row').forEach((row) => {
+            row.addEventListener('click', function () {
+                const customerName = row.querySelector('.calendar-client-name')?.textContent?.trim() || 'Customer';
+                const reminder = `Hi ${customerName}, this is a friendly reminder for your appointment at Lindo Clinic on ${row.dataset.date || 'your appointment date'} at ${row.dataset.time || 'your appointment time'}. Your treatment is ${row.dataset.treatment || 'your treatment'} with ${row.dataset.pic || 'our team'}. If you need help or need to reschedule, just reply to this message. We look forward to seeing you soon.`;
+
+                title.textContent = customerName;
+                subtitle.textContent = row.dataset.phone ? `Phone: ${row.dataset.phone}` : 'No phone number saved';
+                details.textContent = `${row.dataset.time || '-'} | ${row.dataset.treatment || '-'} | PIC: ${row.dataset.pic || '-'}`;
+                copyBox.value = reminder;
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+                window.setTimeout(() => copyBox?.select(), 80);
+            });
+        });
+
+        closeButtons.forEach((button) => button?.addEventListener('click', closeReminder));
+        modal?.addEventListener('click', function (event) {
+            if (event.target === modal || event.target === modal.firstElementChild) {
+                closeReminder();
+            }
+        });
+        copyButton?.addEventListener('click', async function () {
+            copyBox.select();
+            try {
+                await navigator.clipboard.writeText(copyBox.value);
+                copyButton.textContent = 'Copied';
+                window.setTimeout(() => copyButton.textContent = 'Copy message', 1200);
+            } catch (error) {
+                document.execCommand('copy');
+            }
+        });
+    });
+</script>

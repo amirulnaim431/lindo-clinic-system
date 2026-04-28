@@ -6,6 +6,7 @@ use App\Http\Controllers\App\CustomerController;
 use App\Http\Controllers\App\CustomerImportController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\HrScheduleController;
+use App\Http\Controllers\App\ClinicSettingController;
 use App\Http\Controllers\App\LogViewerController;
 use App\Http\Controllers\App\ServiceController;
 use App\Http\Controllers\App\StaffController;
@@ -76,6 +77,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::patch('/appointments/{appointmentGroup}/status', [AppointmentController::class, 'updateStatus'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.status');
+        Route::post('/appointments/slot-blocks', [AppointmentController::class, 'storeSlotBlock'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.slot-blocks.store');
         Route::patch('/appointments/{appointmentGroup}', [AppointmentController::class, 'updateFromCalendar'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.update');
@@ -90,6 +94,13 @@ Route::middleware(['auth', 'staff_or_admin'])
             ->name('hr.schedule.leaves.store');
         Route::patch('/hr/staff-schedule/leaves/{staffLeave}', [HrScheduleController::class, 'reviewLeave'])
             ->name('hr.schedule.leaves.review');
+
+        Route::get('/settings', [ClinicSettingController::class, 'edit'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('settings.edit');
+        Route::put('/settings', [ClinicSettingController::class, 'update'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('settings.update');
 
         Route::get('/staff', [StaffController::class, 'index'])
             ->middleware('app_permission:staff.view')
