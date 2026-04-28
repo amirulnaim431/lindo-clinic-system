@@ -60,11 +60,6 @@
                         </div>
 
                         <div class="col-3 field-block">
-                            <label class="field-label" for="duration_minutes">Duration (mins)</label>
-                            <input id="duration_minutes" name="duration_minutes" type="number" min="15" max="480" class="form-input" value="{{ old('duration_minutes', $service->duration_minutes ?? 60) }}" required>
-                        </div>
-
-                        <div class="col-3 field-block">
                             <label class="field-label" for="price">Standard price</label>
                             <input id="price" name="price" type="number" min="0" class="form-input" value="{{ old('price', $service->price) }}">
                         </div>

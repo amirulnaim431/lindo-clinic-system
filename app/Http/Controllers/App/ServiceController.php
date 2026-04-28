@@ -184,7 +184,6 @@ class ServiceController extends Controller
             'consultation_category_key' => ['nullable', 'string', Rule::in(array_keys(Service::consultationCategoryOptions()))],
             'default_staff_role' => ['nullable', 'string', Rule::in(array_keys(Staff::operationalRoleOptions()))],
             'description' => ['nullable', 'string', 'max:4000'],
-            'duration_minutes' => ['required', 'integer', 'min:15', 'max:480'],
             'price' => ['nullable', 'integer', 'min:0'],
             'promo_price' => ['nullable', 'integer', 'min:0'],
             'display_order' => ['nullable', 'integer', 'min:0', 'max:999'],
@@ -201,6 +200,7 @@ class ServiceController extends Controller
         $data['is_active'] = $request->boolean('is_active');
         $data['is_promo'] = $request->boolean('is_promo');
         $data['display_order'] = (int) ($data['display_order'] ?? 0);
+        $data['duration_minutes'] = (int) ($service?->duration_minutes ?: 60);
         $data['consultation_category_key'] = $data['category_key'] === 'consultations'
             ? ($data['consultation_category_key'] ?? null)
             : null;
