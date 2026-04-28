@@ -156,6 +156,9 @@ class AppointmentController extends Controller
             'customer_phone' => ['required', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'booking_payload' => ['required', 'string'],
+            'followup_id' => ['nullable', 'string'],
+            'return_to' => ['nullable', 'string', Rule::in(['reschedule'])],
+            'return_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $payload = json_decode($validated['booking_payload'], true);
@@ -433,6 +436,17 @@ class AppointmentController extends Controller
             }
 
             throw $exception;
+        }
+
+        if (($validated['return_to'] ?? null) === 'reschedule' && filled($validated['followup_id'] ?? null)) {
+            return redirect()
+                ->to(route('app.appointments.index', [
+                    'mode' => 'checkin',
+                    'status' => 'reschedule',
+                    'date' => $validated['return_date'] ?: $validated['date'],
+                    'followup_done' => $validated['followup_id'],
+                ]))
+                ->with('success', 'Appointment created. Follow-up marked as done.');
         }
 
         return redirect()

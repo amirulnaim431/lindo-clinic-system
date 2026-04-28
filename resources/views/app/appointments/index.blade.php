@@ -87,6 +87,9 @@
             'booking_url' => route('app.appointments.index', array_filter([
                 'date' => $group->starts_at?->format('Y-m-d'),
                 'customer_id' => $customer?->id,
+                'followup_id' => (string) $group->id,
+                'return_to' => 'reschedule',
+                'return_date' => $selectedDate,
             ])),
         ];
     })->values();
@@ -313,6 +316,9 @@
             <input type="hidden" name="customer_phone" id="submit_customer_phone">
             <input type="hidden" name="notes" id="submit_notes">
             <input type="hidden" name="booking_payload" id="booking_payload">
+            <input type="hidden" name="followup_id" id="submit_followup_id">
+            <input type="hidden" name="return_to" id="submit_return_to">
+            <input type="hidden" name="return_date" id="submit_return_date">
         </form>
     </div>
 
@@ -1089,6 +1095,26 @@
             text-decoration: none;
         }
 
+        .traffic-booking-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 0.45rem;
+            padding: 0.38rem 0.7rem;
+            border: 1px solid rgba(198, 124, 154, 0.32);
+            border-radius: 999px;
+            color: #7a3f57;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-decoration: none;
+            background: rgba(255, 247, 250, 0.92);
+        }
+
+        .traffic-booking-action:hover {
+            border-color: rgba(198, 124, 154, 0.7);
+            background: #fff;
+        }
+
         .followup-check {
             margin-right: 0.35rem;
         }
@@ -1228,6 +1254,14 @@
             const submitCustomerNameInput = document.getElementById('submit_customer_full_name');
             const submitCustomerPhoneInput = document.getElementById('submit_customer_phone');
             const submitNotesInput = document.getElementById('submit_notes');
+            const submitFollowupIdInput = document.getElementById('submit_followup_id');
+            const submitReturnToInput = document.getElementById('submit_return_to');
+            const submitReturnDateInput = document.getElementById('submit_return_date');
+            const urlParams = new URLSearchParams(window.location.search);
+            const rescheduleFollowupId = urlParams.get('followup_id') || '';
+            const returnToList = urlParams.get('return_to') || '';
+            const returnDate = urlParams.get('return_date') || '';
+            const completedFollowupId = urlParams.get('followup_done') || '';
 
             const customerIdInput = document.getElementById('customer_id');
             const customerNameInput = document.getElementById('customer_full_name');
@@ -1392,13 +1426,13 @@
                                 <tr>
                                     <th style="width:5%;">No.</th>
                                     <th style="width:9%;">Time</th>
-                                    <th style="width:17%;">Customer</th>
+                                    <th style="width:20%;">Customer</th>
                                     <th style="width:11%;">Phone</th>
                                     <th style="width:11%;">Package</th>
-                                    <th style="width:19%;">Treatment</th>
+                                    <th style="width:18%;">Treatment</th>
                                     <th style="width:13%;">PIC</th>
-                                    <th style="width:8%;">Booked By</th>
-                                    <th style="width:17%;">Remark</th>
+                                    <th style="width:7%;">Booked By</th>
+                                    <th style="width:15%;">Remark</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1409,6 +1443,7 @@
                                         <td>
                                             ${listKey === 'reschedule' ? `<label class="followup-check"><input type="checkbox" data-followup-id="${escapeHtml(row.id)}"> <span></span></label>` : ''}
                                             <a href="${escapeHtml(row.booking_url || '#')}" class="traffic-customer-link">${escapeHtml(row.customer)}</a>
+                                            ${listKey === 'reschedule' ? `<br><a href="${escapeHtml(row.booking_url || '#')}" class="traffic-booking-action" data-followup-booking="${escapeHtml(row.id)}">Book again</a>` : ''}
                                         </td>
                                         <td>${escapeHtml(row.phone)}</td>
                                         <td>${escapeHtml(row.membership)}</td>
@@ -1435,6 +1470,9 @@
 
                     trafficListContent.querySelectorAll('[data-followup-id]').forEach((checkbox) => {
                         const storageKey = `lindo-reschedule-followup:${checkbox.dataset.followupId}`;
+                        if (completedFollowupId && completedFollowupId === checkbox.dataset.followupId) {
+                            window.localStorage.setItem(storageKey, '1');
+                        }
                         checkbox.checked = window.localStorage.getItem(storageKey) === '1';
                         checkbox.addEventListener('change', function () {
                             if (checkbox.checked) {
@@ -2630,6 +2668,9 @@
                 submitCustomerNameInput.value = customerNameInput?.value || '';
                 submitCustomerPhoneInput.value = customerPhoneInput?.value || '';
                 submitNotesInput.value = notesInput?.value || '';
+                submitFollowupIdInput.value = rescheduleFollowupId;
+                submitReturnToInput.value = returnToList;
+                submitReturnDateInput.value = returnDate || dateInput?.value || '';
                 bookingPayloadInput.value = JSON.stringify(buildPayloadForSubmit());
                 isSubmittingAppointment = true;
                 clearPersistedDraft();
