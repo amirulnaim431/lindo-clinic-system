@@ -67,7 +67,7 @@
         'completed' => $appointmentGroups->filter(fn ($group) => ($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status) === 'completed')->count(),
         'reschedule' => $appointmentGroups->filter(fn ($group) => in_array(($group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status), ['cancelled', 'no_show'], true))->count(),
     ];
-    $trafficListRows = $appointmentGroups->map(function ($group) {
+    $trafficListRows = $appointmentGroups->map(function ($group) use ($selectedDate) {
         $statusValue = $group->status instanceof \BackedEnum ? $group->status->value : (string) $group->status;
         $customer = $group->customer;
         $membership = $customer?->current_package ?: ($customer?->membership_type ?: ($customer?->membership_code ?: '-'));
