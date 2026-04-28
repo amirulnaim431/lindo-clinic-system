@@ -362,6 +362,34 @@
         </div>
     </div>
 
+    <div id="break-remark-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card break-remark-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Block time</div>
+                        <h3 class="modal-title" id="break-remark-title">Add break remark</h3>
+                        <p class="modal-subtitle" id="break-remark-subtitle">Tell the team why this slot is unavailable.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="break-remark-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="break-remark-context" id="break-remark-context"></div>
+                    <label class="field-block" for="break-remark-input">
+                        <span class="field-label">Remark / reason</span>
+                        <textarea id="break-remark-input" class="form-input booking-textarea" rows="4" placeholder="Example: lunch break, machine cleaning, staff prayer break"></textarea>
+                    </label>
+                    <p class="form-error hidden" id="break-remark-error">Please enter a remark before blocking this slot.</p>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="break-remark-save">Block slot</button>
+                        <button type="button" class="btn btn-secondary" id="break-remark-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="calendar-board-modal" class="modal-shell hidden" aria-hidden="true">
         <div class="modal-backdrop"></div>
         <div class="modal-stage modal-stage--wide">
@@ -666,7 +694,8 @@
         }
 
         .booking-option-modal .modal-header,
-        .confirm-remove-modal .modal-header {
+        .confirm-remove-modal .modal-header,
+        .break-remark-modal .modal-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
@@ -674,13 +703,15 @@
         }
 
         .booking-option-modal .modal-header > :first-child,
-        .confirm-remove-modal .modal-header > :first-child {
+        .confirm-remove-modal .modal-header > :first-child,
+        .break-remark-modal .modal-header > :first-child {
             min-width: 0;
             flex: 1 1 auto;
         }
 
         .booking-option-modal .modal-close,
-        .confirm-remove-modal .modal-close {
+        .confirm-remove-modal .modal-close,
+        .break-remark-modal .modal-close {
             flex: 0 0 auto;
             align-self: flex-start;
             margin-left: auto;
@@ -693,6 +724,36 @@
                 linear-gradient(180deg, #fffdfd 0%, #fff7fa 100%);
             border: 1px solid rgba(198, 139, 154, 0.2);
             box-shadow: 0 28px 70px rgba(92, 58, 69, 0.16);
+        }
+
+        .break-remark-modal {
+            width: min(620px, calc(100vw - 32px));
+            background:
+                radial-gradient(circle at 88% 8%, rgba(198, 139, 154, 0.2), transparent 36%),
+                linear-gradient(145deg, #fffdfd 0%, #fff7fa 58%, #fff 100%);
+            border: 1px solid rgba(198, 139, 154, 0.22);
+            box-shadow: 0 32px 80px rgba(78, 43, 55, 0.18);
+        }
+
+        .break-remark-context {
+            border: 1px solid rgba(198, 139, 154, 0.18);
+            background: rgba(255, 255, 255, 0.86);
+            border-radius: 22px;
+            padding: 1rem 1.1rem;
+            color: rgba(26, 19, 23, 0.76);
+            line-height: 1.55;
+            margin-bottom: 1rem;
+        }
+
+        .break-remark-modal .booking-textarea {
+            min-height: 118px;
+            resize: vertical;
+        }
+
+        .form-error {
+            margin: 0.65rem 0 0;
+            color: #9b2f42;
+            font-size: 0.95rem;
         }
 
         .confirm-remove-copy {
@@ -1207,6 +1268,15 @@
             const checkinRemarkClose = document.getElementById('checkin-remark-close');
             const checkinRemarkCancel = document.getElementById('checkin-remark-cancel');
             const breakModeToggle = document.getElementById('break-mode-toggle');
+            const breakRemarkModal = document.getElementById('break-remark-modal');
+            const breakRemarkTitle = document.getElementById('break-remark-title');
+            const breakRemarkSubtitle = document.getElementById('break-remark-subtitle');
+            const breakRemarkContext = document.getElementById('break-remark-context');
+            const breakRemarkInput = document.getElementById('break-remark-input');
+            const breakRemarkError = document.getElementById('break-remark-error');
+            const breakRemarkSave = document.getElementById('break-remark-save');
+            const breakRemarkClose = document.getElementById('break-remark-close');
+            const breakRemarkCancel = document.getElementById('break-remark-cancel');
 
             let activeCategoryKey = serviceCategories[0]?.key || 'consultations';
             let activeConsultationDepartment = serviceCategories.find((group) => group.key === 'consultations')?.consultation_groups?.[0]?.key || 'wellness';
@@ -1219,6 +1289,7 @@
             let pendingRemovalAction = null;
             let breakModeEnabled = false;
             let assignmentClickTimer = null;
+            let pendingBreakRemarkResolve = null;
 
             const capacityPerSlot = Number(plannerBoard.capacity_per_slot || 2);
             const boardOccupancy = plannerBoard.occupancy || {};
@@ -1631,6 +1702,40 @@
                 document.body.classList.remove('overflow-hidden');
             }
 
+            function openBreakRemarkModal(staff, slot) {
+                return new Promise((resolve) => {
+                    if (!breakRemarkModal || !breakRemarkInput) {
+                        resolve(null);
+                        return;
+                    }
+
+                    pendingBreakRemarkResolve = resolve;
+                    breakRemarkTitle.textContent = 'Block staff time';
+                    breakRemarkSubtitle.textContent = 'A remark is required so the team knows why this box is unavailable.';
+                    breakRemarkContext.innerHTML = `
+                        <strong>${escapeHtml(staff.full_name)}</strong><br>
+                        ${escapeHtml(slot.label)}
+                    `;
+                    breakRemarkInput.value = '';
+                    breakRemarkError?.classList.add('hidden');
+                    breakRemarkModal.classList.remove('hidden');
+                    breakRemarkModal.setAttribute('aria-hidden', 'false');
+                    document.body.classList.add('overflow-hidden');
+                    window.setTimeout(() => breakRemarkInput.focus(), 80);
+                });
+            }
+
+            function closeBreakRemarkModal(value = null) {
+                breakRemarkModal?.classList.add('hidden');
+                breakRemarkModal?.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+
+                if (pendingBreakRemarkResolve) {
+                    pendingBreakRemarkResolve(value);
+                    pendingBreakRemarkResolve = null;
+                }
+            }
+
             function handleServicePick(service) {
                 if (Array.isArray(service.option_groups) && service.option_groups.length > 0) {
                     openOptionModal(service);
@@ -1942,10 +2047,9 @@
             }
 
             async function blockStaffSlot(staff, slot, slotIndex) {
-                const reason = window.prompt(`Reason for blocking ${staff.full_name} at ${slot.label}?`);
+                const reason = await openBreakRemarkModal(staff, slot);
 
                 if (!reason || !reason.trim()) {
-                    window.alert('Please enter a reason before blocking a slot.');
                     return;
                 }
 
@@ -2397,6 +2501,34 @@
                 action?.();
             });
 
+            [breakRemarkClose, breakRemarkCancel].forEach((button) => {
+                button?.addEventListener('click', () => closeBreakRemarkModal(null));
+            });
+
+            breakRemarkSave?.addEventListener('click', function () {
+                const reason = breakRemarkInput?.value.trim() || '';
+
+                if (!reason) {
+                    breakRemarkError?.classList.remove('hidden');
+                    breakRemarkInput?.focus();
+                    return;
+                }
+
+                closeBreakRemarkModal(reason);
+            });
+
+            breakRemarkInput?.addEventListener('input', function () {
+                if (this.value.trim()) {
+                    breakRemarkError?.classList.add('hidden');
+                }
+            });
+
+            breakRemarkInput?.addEventListener('keydown', function (event) {
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                    breakRemarkSave?.click();
+                }
+            });
+
             modal?.addEventListener('click', function (event) {
                 if (event.target === modal || event.target === modal.firstElementChild) {
                     closeOptionModal();
@@ -2406,6 +2538,12 @@
             confirmRemoveModal?.addEventListener('click', function (event) {
                 if (event.target === confirmRemoveModal || event.target === confirmRemoveModal.firstElementChild) {
                     closeConfirmRemoveModal();
+                }
+            });
+
+            breakRemarkModal?.addEventListener('click', function (event) {
+                if (event.target === breakRemarkModal || event.target === breakRemarkModal.firstElementChild) {
+                    closeBreakRemarkModal(null);
                 }
             });
 
