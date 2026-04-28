@@ -11,6 +11,16 @@ use Illuminate\Http\Request;
 
 class CalendarController extends Controller
 {
+    private const PIC_ORDER = [
+        'aqilah' => 1,
+        'adila' => 2,
+        'amanda' => 3,
+        'farhana' => 4,
+        'emma' => 5,
+        'sora' => 6,
+        'monica' => 7,
+    ];
+
     public function index(Request $request)
     {
         $selectedDate = $this->resolveSelectedDate($request);
@@ -45,31 +55,16 @@ class CalendarController extends Controller
             ->groupBy(fn (AppointmentItem $item) => (string) ($item->staff_id ?: 'unassigned'))
             ->map(function ($group, $staffId) use ($customerVisitStats, $selectedDate) {
                 $staff = $group->first()?->staff;
+                $staffName = $staff?->full_name ?: ($group->first()?->staff_name_snapshot ?: 'Unassigned');
+                $rows = $this->buildMergedScheduleRows($group, $customerVisitStats, $selectedDate);
 
                 return [
                     'staff_id' => $staffId,
-                    'staff_name' => $this->formatPicName($staff?->full_name ?: ($group->first()?->staff_name_snapshot ?: 'Unassigned')),
+                    'staff_name' => $this->formatPicName($staffName),
                     'staff_role' => $staff?->job_title ?: ($staff?->role_key ?: $group->first()?->staff_role_snapshot),
-                    'sort_rank' => $staff ? Staff::appointmentGroupRankForStaff($staff) : 99,
-                    'count' => $group->count(),
-                    'rows' => $group->sortBy('starts_at')->values()->map(function (AppointmentItem $item) use ($customerVisitStats, $selectedDate) {
-                        $customer = $item->group?->customer;
-                        $customerStats = $customer ? $customerVisitStats->get($customer->id) : null;
-                        $isNewCustomer = $customerStats
-                            ? ((int) ($customerStats->total_visits ?? 0) <= 1 || Carbon::parse($customerStats->first_visit_at)->isSameDay($selectedDate))
-                            : false;
-
-                        return [
-                            'item_id' => (string) $item->id,
-                            'time' => $item->starts_at?->format('g:i A') ?: '-',
-                            'client' => $customer?->full_name ?: 'Customer',
-                            'membership' => $this->formatMembershipCell($customer, $isNewCustomer),
-                            'treatment' => $this->formatTreatmentCell($item),
-                            'pic' => $this->formatPicName($item->displayStaffName()),
-                            'remarks' => $item->group?->notes ?: '',
-                            'manage_url' => route('app.appointments.index', ['date' => $item->starts_at?->format('Y-m-d') ?: $selectedDate->toDateString()]),
-                        ];
-                    })->all(),
+                    'sort_rank' => $this->picSortRank($staff ?: $staffName),
+                    'count' => count($rows),
+                    'rows' => $rows,
                 ];
             });
 
@@ -88,7 +83,7 @@ class CalendarController extends Controller
                     'staff_id' => (string) $staff->id,
                     'staff_name' => $this->formatPicName($staff->full_name),
                     'staff_role' => $staff->job_title ?: ($staff->role_key ?: null),
-                    'sort_rank' => Staff::appointmentGroupRankForStaff($staff),
+                    'sort_rank' => $this->picSortRank($staff),
                     'booking_windows' => 9,
                     'rows' => $this->buildAvailabilityRowsForStaff($selectedDate, $staffItems),
                 ];
@@ -178,15 +173,76 @@ class CalendarController extends Controller
             : now()->startOfDay();
     }
 
+    private function buildMergedScheduleRows($items, $customerVisitStats, Carbon $selectedDate): array
+    {
+        return $items
+            ->sortBy(fn (AppointmentItem $item) => sprintf('%s-%s', $item->starts_at?->format('H:i') ?: '99:99', $item->group?->customer?->full_name ?: ''))
+            ->groupBy(function (AppointmentItem $item) {
+                $customer = $item->group?->customer;
+                $customerKey = $customer?->id
+                    ?: mb_strtolower(trim(($customer?->full_name ?: 'Customer').'|'.($customer?->phone ?: '')));
+
+                return implode('|', [
+                    $item->starts_at?->format('H:i') ?: 'unknown',
+                    $customerKey,
+                ]);
+            })
+            ->values()
+            ->map(function ($group) use ($customerVisitStats, $selectedDate) {
+                $first = $group->first();
+                $customer = $first->group?->customer;
+                $customerStats = $customer ? $customerVisitStats->get($customer->id) : null;
+                $isNewCustomer = $customerStats
+                    ? ((int) ($customerStats->total_visits ?? 0) <= 1 || Carbon::parse($customerStats->first_visit_at)->isSameDay($selectedDate))
+                    : false;
+
+                return [
+                    'item_id' => $group->pluck('id')->filter()->implode(','),
+                    'time' => $first->starts_at?->format('g:i A') ?: '-',
+                    'client' => $customer?->full_name ?: 'Customer',
+                    'membership' => $this->formatMembershipCell($customer, $isNewCustomer),
+                    'treatment' => $group
+                        ->map(fn (AppointmentItem $item) => $this->formatTreatmentCell($item))
+                        ->filter()
+                        ->unique()
+                        ->implode(' | '),
+                    'pic' => $this->formatPicName($first->displayStaffName()),
+                    'remarks' => $group
+                        ->map(fn (AppointmentItem $item) => $item->group?->notes)
+                        ->filter()
+                        ->unique()
+                        ->implode(' | '),
+                    'manage_url' => route('app.appointments.index', ['date' => $first->starts_at?->format('Y-m-d') ?: $selectedDate->toDateString()]),
+                ];
+            })
+            ->all();
+    }
+
     private function formatPicName(string $name): string
     {
         $normalized = trim(preg_replace('/\s+/', ' ', $name));
 
         return match ($normalized) {
-            "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad" => 'Dr Syarifah',
+            "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad" => 'Dr Aqilah',
             'Dr. Amanda Binti Elli' => 'Dr Amanda',
+            'Nur Adilla Binti Mohd Ali' => 'Adila',
+            'Nur Farhanna Binti Abdul Malek' => 'Farhana',
             default => $normalized,
         };
+    }
+
+    private function picSortRank(Staff|string|null $staff): int
+    {
+        $name = $staff instanceof Staff ? $staff->full_name : (string) $staff;
+        $normalized = mb_strtolower($name);
+
+        foreach (self::PIC_ORDER as $needle => $rank) {
+            if (str_contains($normalized, $needle)) {
+                return $rank;
+            }
+        }
+
+        return $staff instanceof Staff ? 50 + Staff::appointmentGroupRankForStaff($staff) : 99;
     }
 
     private function buildAvailabilityRowsForStaff(Carbon $selectedDate, $staffItems): array
@@ -201,29 +257,50 @@ class CalendarController extends Controller
 
             $rows[] = [
                 'label' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
-                'boxes' => collect(range(0, 1))->map(function (int $index) use ($slotItems) {
-                    $item = $slotItems->get($index);
-
-                    if (! $item) {
-                        return [
-                            'type' => 'empty',
-                            'title' => 'Empty box',
-                            'body' => 'Available',
-                        ];
-                    }
-
-                    return [
-                        'type' => 'occupied',
-                        'title' => $item->group?->customer?->full_name ?: 'Customer',
-                        'body' => $this->formatTreatmentCell($item),
-                    ];
-                })->all(),
+                'boxes' => $this->buildAvailabilityBoxes($slotItems),
             ];
 
             $cursor->addHour();
         }
 
         return $rows;
+    }
+
+    private function buildAvailabilityBoxes($slotItems): array
+    {
+        $occupiedBoxes = $slotItems
+            ->groupBy(function (AppointmentItem $item) {
+                $customer = $item->group?->customer;
+
+                return $customer?->id
+                    ?: mb_strtolower(trim(($customer?->full_name ?: 'Customer').'|'.($customer?->phone ?: '')));
+            })
+            ->values()
+            ->map(function ($group) {
+                $first = $group->first();
+
+                return [
+                    'type' => 'occupied',
+                    'title' => $first->group?->customer?->full_name ?: 'Customer',
+                    'body' => $group
+                        ->map(fn (AppointmentItem $item) => $this->formatTreatmentCell($item))
+                        ->filter()
+                        ->unique()
+                        ->implode(' | '),
+                ];
+            })
+            ->take(2)
+            ->values();
+
+        while ($occupiedBoxes->count() < 2) {
+            $occupiedBoxes->push([
+                'type' => 'empty',
+                'title' => 'Empty box',
+                'body' => 'Available',
+            ]);
+        }
+
+        return $occupiedBoxes->all();
     }
 
     private function formatMembershipCell($customer, bool $isNewCustomer): string
@@ -244,7 +321,7 @@ class CalendarController extends Controller
 
     private function formatTreatmentCell(AppointmentItem $item): string
     {
-        $parts = [$item->displayServiceName()];
+        $parts = [$this->formatCalendarServiceName($item)];
 
         $optionLabels = $item->optionSelections
             ->map(fn ($selection) => $selection->option_value_label)
@@ -257,5 +334,17 @@ class CalendarController extends Controller
         }
 
         return implode(' | ', array_filter($parts));
+    }
+
+    private function formatCalendarServiceName(AppointmentItem $item): string
+    {
+        $name = trim($item->displayServiceName());
+        $categoryKey = (string) ($item->service_category_key_snapshot ?: $item->service?->category_key ?: '');
+
+        if ($categoryKey === 'consultations' && ! str_starts_with(mb_strtolower($name), 'consult ')) {
+            return 'Consult '.$name;
+        }
+
+        return $name;
     }
 }

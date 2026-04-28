@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AppointmentStatus;
+use App\Models\AppointmentGroup;
+use App\Models\AppointmentItem;
+use App\Models\AppointmentItemOptionSelection;
+use App\Models\Customer;
 use App\Models\Service;
 use App\Models\ServiceOptionGroup;
 use App\Models\ServiceOptionValue;
 use App\Models\Staff;
 use App\Models\User;
-use App\Models\Customer;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -265,6 +270,149 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $response->assertSee('10:00 AM - 10:45 AM');
         $response->assertSee('Empty box');
         $response->assertSee('Available');
+    }
+
+    public function test_calendar_merges_services_for_same_customer_time_and_pic(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff([
+            'full_name' => "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad",
+        ]);
+        $customer = Customer::query()->create([
+            'full_name' => 'Lily Salina Binti Baharudin',
+            'phone' => '0123454901',
+            'current_package' => 'Bronze',
+        ]);
+        $start = Carbon::parse('2026-04-28 11:00:00');
+        $group = AppointmentGroup::query()->create([
+            'customer_id' => $customer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+            'notes' => 'test',
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'consult_tirze_calendar',
+            'name' => 'Tirze',
+            'category_key' => 'consultations',
+            'consultation_category_key' => 'wellness',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $secondService = Service::query()->create([
+            'service_code' => 'consult_tirze_10mg_calendar',
+            'name' => 'Tirze 10MG',
+            'category_key' => 'consultations',
+            'consultation_category_key' => 'wellness',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 2,
+        ]);
+
+        $firstItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Tirze',
+            'service_category_key_snapshot' => 'consultations',
+            'service_category_label_snapshot' => 'Consultation',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+        $secondItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $secondService->id,
+            'service_name_snapshot' => 'Tirze 10MG',
+            'service_category_key_snapshot' => 'consultations',
+            'service_category_label_snapshot' => 'Consultation',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+        AppointmentItemOptionSelection::query()->create([
+            'appointment_item_id' => $secondItem->id,
+            'option_group_name' => 'Session',
+            'option_value_label' => 'Session 4',
+            'display_order' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('app.calendar', [
+            'date' => '2026-04-28',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('PIC: Dr Aqilah');
+        $response->assertSee('Consult Tirze | Consult Tirze 10MG | Session 4');
+        $this->assertSame(1, substr_count($response->getContent(), 'Lily Salina Binti Baharudin'));
+    }
+
+    public function test_calendar_keeps_same_customer_separate_under_different_pics_and_pdf_order(): void
+    {
+        $admin = $this->createAdmin();
+        $drAmanda = $this->createStaff([
+            'full_name' => 'Dr. Amanda Binti Elli',
+            'employee_code' => 'LND-3002',
+        ]);
+        $drAqilah = $this->createStaff([
+            'full_name' => "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad",
+            'employee_code' => 'LND-3003',
+        ]);
+        $customer = Customer::query()->create([
+            'full_name' => 'Nur Test Customer',
+            'phone' => '0120000000',
+            'current_package' => 'Bronze',
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'calendar_pdf_order_service',
+            'name' => 'Facial Treatment',
+            'category_key' => 'aesthetics',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $start = Carbon::parse('2026-04-28 10:00:00');
+
+        foreach ([$drAmanda, $drAqilah] as $staff) {
+            $group = AppointmentGroup::query()->create([
+                'customer_id' => $customer->id,
+                'starts_at' => $start,
+                'ends_at' => $start->copy()->addMinutes(45),
+                'status' => AppointmentStatus::Booked,
+            ]);
+
+            AppointmentItem::query()->create([
+                'appointment_group_id' => $group->id,
+                'service_id' => $service->id,
+                'service_name_snapshot' => 'Facial Treatment',
+                'service_category_key_snapshot' => 'aesthetics',
+                'service_category_label_snapshot' => 'Aesthetic',
+                'staff_id' => $staff->id,
+                'staff_name_snapshot' => $staff->full_name,
+                'staff_role_snapshot' => 'doctor',
+                'starts_at' => $start,
+                'ends_at' => $start->copy()->addMinutes(45),
+            ]);
+        }
+
+        $response = $this->actingAs($admin)->get(route('app.calendar', [
+            'date' => '2026-04-28',
+        ]));
+        $content = $response->getContent();
+
+        $response->assertOk();
+        $this->assertLessThan(
+            strpos($content, 'PIC: Dr Amanda'),
+            strpos($content, 'PIC: Dr Aqilah')
+        );
+        $this->assertSame(2, substr_count($content, 'Nur Test Customer'));
     }
 
     public function test_appointment_builder_does_not_offer_9am_slots(): void
