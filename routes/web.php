@@ -140,6 +140,12 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::get('/customers', [CustomerController::class, 'index'])
             ->middleware('app_permission:customers.view')
             ->name('customers.index');
+        Route::get('/customers/membership-entry', [CustomerController::class, 'membershipEntry'])
+            ->middleware('app_permission:customers.manage')
+            ->name('customers.membership-entry');
+        Route::patch('/customers/{customer}/membership-entry', [CustomerController::class, 'updateMembershipEntry'])
+            ->middleware('app_permission:customers.manage')
+            ->name('customers.membership-entry.update');
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])
             ->middleware('app_permission:customers.view')
             ->name('customers.show');

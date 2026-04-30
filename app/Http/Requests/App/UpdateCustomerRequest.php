@@ -46,6 +46,8 @@ class UpdateCustomerRequest extends FormRequest
             'membership_type' => ['nullable', 'string', 'max:100'],
             'current_package' => ['nullable', 'string', 'max:150'],
             'current_package_since' => ['nullable', 'date'],
+            'membership_package_value' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'membership_balance' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
 
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
@@ -73,6 +75,21 @@ class UpdateCustomerRequest extends FormRequest
         ]);
     }
 
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated($key, $default);
+
+        if ($key !== null) {
+            return $validated;
+        }
+
+        $validated['membership_package_value_cents'] = $this->moneyToCents($validated['membership_package_value'] ?? null);
+        $validated['membership_balance_cents'] = $this->moneyToCents($validated['membership_balance'] ?? null);
+        unset($validated['membership_package_value'], $validated['membership_balance']);
+
+        return $validated;
+    }
+
     protected function cleanString(mixed $value): ?string
     {
         if ($value === null) {
@@ -93,5 +110,14 @@ class UpdateCustomerRequest extends FormRequest
         $value = trim((string) $value);
 
         return $value === '' ? null : preg_replace("/\r\n|\r/", "\n", $value);
+    }
+
+    protected function moneyToCents(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) round(((float) $value) * 100);
     }
 }

@@ -30,6 +30,8 @@ class Customer extends Model
         'membership_type',
         'current_package',
         'current_package_since',
+        'membership_package_value_cents',
+        'membership_balance_cents',
         'weight',
         'height',
         'allergies',
@@ -39,6 +41,8 @@ class Customer extends Model
     protected $casts = [
         'dob' => 'date',
         'current_package_since' => 'date',
+        'membership_package_value_cents' => 'integer',
+        'membership_balance_cents' => 'integer',
         'weight' => 'decimal:2',
         'height' => 'decimal:2',
     ];
@@ -67,5 +71,19 @@ class Customer extends Model
             'id',
             'id'
         );
+    }
+
+    public function getMembershipPackageValueAttribute(): ?float
+    {
+        return $this->membership_package_value_cents === null
+            ? null
+            : $this->membership_package_value_cents / 100;
+    }
+
+    public function getMembershipBalanceAttribute(): ?float
+    {
+        return $this->membership_balance_cents === null
+            ? null
+            : $this->membership_balance_cents / 100;
     }
 }

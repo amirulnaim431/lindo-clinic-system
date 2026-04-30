@@ -82,6 +82,8 @@
                             <div class="field-block"><label for="membership_type" class="field-label">Membership type</label><input id="membership_type" name="membership_type" type="text" value="{{ old('membership_type', $customer->membership_type) }}" class="form-input"></div>
                             <div class="field-block"><label for="current_package" class="field-label">Current package</label><input id="current_package" name="current_package" type="text" value="{{ old('current_package', $customer->current_package) }}" class="form-input"></div>
                             <div class="field-block"><label for="current_package_since" class="field-label">Current package since</label><input id="current_package_since" name="current_package_since" type="date" value="{{ old('current_package_since', $customer->current_package_since?->format('Y-m-d')) }}" class="form-input"></div>
+                            <div class="field-block"><label for="membership_package_value" class="field-label">Package value (RM)</label><input id="membership_package_value" name="membership_package_value" type="number" min="0" step="0.01" value="{{ old('membership_package_value', $customer->membership_package_value !== null ? number_format($customer->membership_package_value, 2, '.', '') : '') }}" class="form-input"></div>
+                            <div class="field-block"><label for="membership_balance" class="field-label">Balance left (RM)</label><input id="membership_balance" name="membership_balance" type="number" min="0" step="0.01" value="{{ old('membership_balance', $customer->membership_balance !== null ? number_format($customer->membership_balance, 2, '.', '') : '') }}" class="form-input"></div>
                         </div>
                     </div>
 

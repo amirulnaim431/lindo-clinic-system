@@ -39,6 +39,8 @@ class StaffSeeder extends Seeder
             $staff->save();
         }
 
-        $this->call(LindoClinicCatalogSeeder::class);
+        if ((bool) env('LINDO_SEED_CATALOG_WITH_STAFF', false)) {
+            $this->call(LindoClinicCatalogSeeder::class);
+        }
     }
 }

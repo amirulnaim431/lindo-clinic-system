@@ -33,6 +33,7 @@
         $canCalendar = $can('calendar.view');
         $appointmentsMode = request()->input('mode') === 'checkin' ? 'checkin' : 'booking';
         $canCustomers = $can('customers.view');
+        $canCustomerManage = $can('customers.manage');
         $canCustomerImport = $can('customers.import');
         $canStaff = $can('staff.view');
         $canHrSchedule = $user && method_exists($user, 'canAccessHrSchedule') ? $user->canAccessHrSchedule() : false;
@@ -112,7 +113,7 @@
                     </div>
                 </div>
 
-                @if ($canCustomers || $canCustomerImport)
+                @if ($canCustomers || $canCustomerImport || $canCustomerManage)
                     <div class="app-nav-section">
                         <div class="app-nav-group {{ $customersNavActive ? 'is-open' : '' }}">
                             <button
@@ -131,6 +132,13 @@
                                     <a href="{{ $r('app.customers.index') }}" class="app-nav-sublink {{ $is('app.customers.index') || $is('app.customers.show') || $is('app.customers.edit') ? 'is-active' : '' }}">
                                         <span class="app-nav-subicon" aria-hidden="true">&#8981;</span>
                                         <span>Customer Directory</span>
+                                    </a>
+                                @endif
+
+                                @if ($canCustomerManage)
+                                    <a href="{{ $r('app.customers.membership-entry') }}" class="app-nav-sublink {{ $is('app.customers.membership-entry') ? 'is-active' : '' }}">
+                                        <span class="app-nav-subicon" aria-hidden="true">&#9671;</span>
+                                        <span>Membership Entry</span>
                                     </a>
                                 @endif
 

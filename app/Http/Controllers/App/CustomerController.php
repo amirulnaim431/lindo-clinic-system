@@ -28,6 +28,8 @@ class CustomerController extends Controller
                 'membership_type',
                 'current_package',
                 'current_package_since',
+                'membership_package_value_cents',
+                'membership_balance_cents',
                 'created_at',
             ])
             ->when($search !== '', function (Builder $query) use ($search) {
@@ -91,6 +93,90 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function membershipEntry(Request $request): View
+    {
+        $this->ensureAdmin();
+
+        $search = trim((string) $request->string('search'));
+        $customers = collect();
+
+        if ($search !== '') {
+            $customers = Customer::query()
+                ->select([
+                    'id',
+                    'full_name',
+                    'phone',
+                    'ic_passport',
+                    'membership_code',
+                    'membership_type',
+                    'current_package',
+                    'current_package_since',
+                    'membership_package_value_cents',
+                    'membership_balance_cents',
+                ])
+                ->where(function (Builder $query) use ($search) {
+                    $like = '%' . $search . '%';
+                    $digits = preg_replace('/\D+/', '', $search);
+
+                    $query
+                        ->where('full_name', 'like', $like)
+                        ->orWhere('phone', 'like', $like)
+                        ->orWhere('ic_passport', 'like', $like)
+                        ->orWhere('membership_code', 'like', $like);
+
+                    if ($digits !== '') {
+                        $query->orWhereRaw(
+                            'REPLACE(REPLACE(REPLACE(phone, "+", ""), "-", ""), " ", "") like ?',
+                            ['%' . $digits . '%']
+                        );
+                    }
+                })
+                ->orderByRaw("CASE WHEN full_name IS NULL OR full_name = '' THEN 1 ELSE 0 END")
+                ->orderBy('full_name')
+                ->limit(12)
+                ->get();
+        }
+
+        return view('app.customers.membership-entry', [
+            'customers' => $customers,
+            'search' => $search,
+            'tiers' => $this->membershipTierOptions(),
+        ]);
+    }
+
+    public function updateMembershipEntry(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'membership_type' => ['nullable', 'string', 'max:100'],
+            'membership_code' => ['nullable', 'string', 'max:100'],
+            'current_package' => ['nullable', 'string', 'max:150'],
+            'current_package_since' => ['nullable', 'date'],
+            'membership_package_value' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'membership_balance' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+        ]);
+
+        $membershipType = $this->cleanString($validated['membership_type'] ?? null);
+        $currentPackage = $this->cleanString($validated['current_package'] ?? null) ?: $membershipType;
+
+        $customer->update([
+            'membership_type' => $membershipType,
+            'membership_code' => $this->cleanString($validated['membership_code'] ?? null),
+            'current_package' => $currentPackage,
+            'current_package_since' => $currentPackage
+                ? ($validated['current_package_since'] ?? now()->toDateString())
+                : null,
+            'membership_package_value_cents' => $this->moneyToCents($validated['membership_package_value'] ?? null),
+            'membership_balance_cents' => $this->moneyToCents($validated['membership_balance'] ?? null),
+        ]);
+
+        return redirect()
+            ->route('app.customers.membership-entry', ['search' => $validated['search'] ?? ''])
+            ->with('success', 'Membership updated for '.$customer->full_name.'.');
+    }
+
     public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
     {
         $this->ensureAdmin();
@@ -107,6 +193,36 @@ class CustomerController extends Controller
         $user = auth()->user();
 
         abort_unless($user && method_exists($user, 'isAdmin') && $user->isAdmin(), 403, 'Unauthorized.');
+    }
+
+    private function membershipTierOptions(): array
+    {
+        return [
+            '' => 'No membership',
+            'Bronze' => 'Bronze',
+            'Silver' => 'Silver',
+            'Black' => 'Black',
+        ];
+    }
+
+    private function cleanString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function moneyToCents(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) round(((float) $value) * 100);
     }
 
     /**

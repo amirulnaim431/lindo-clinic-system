@@ -227,11 +227,13 @@
                 </div>
 
                 <div class="panel">
-                    <div class="panel-header"><div class="panel-title">Membership</div></div>
+                    <div class="panel-header"><div class="panel-title">Membership / Package Balance</div></div>
                     <div class="panel-body stack">
                         <div class="summary-card"><div class="micro-label">Membership code</div><div class="selection-card__title mt-2">{{ $customer->membership_code ?: '-' }}</div></div>
                         <div class="summary-card"><div class="micro-label">Membership type</div><div class="selection-card__title mt-2">{{ $customer->membership_type ?: '-' }}</div></div>
                         <div class="summary-card"><div class="micro-label">Current package</div><div class="selection-card__title mt-2">{{ $customer->current_package ?: '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Package value</div><div class="selection-card__title mt-2">{{ $customer->membership_package_value !== null ? 'RM '.number_format($customer->membership_package_value, 2) : '-' }}</div></div>
+                        <div class="summary-card"><div class="micro-label">Balance left</div><div class="selection-card__title mt-2">{{ $customer->membership_balance !== null ? 'RM '.number_format($customer->membership_balance, 2) : '-' }}</div></div>
                         <div class="summary-card"><div class="micro-label">Current package since</div><div class="selection-card__title mt-2">{{ $customer->current_package_since ? \Illuminate\Support\Carbon::parse($customer->current_package_since)->format('d M Y') : '-' }}</div></div>
                     </div>
                 </div>
