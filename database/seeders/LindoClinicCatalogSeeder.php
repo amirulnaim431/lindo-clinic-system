@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class LindoClinicCatalogSeeder extends Seeder
 {
+    private bool $preserveExisting;
+
+    private array $newServiceCodes = [];
+
     public function run(): void
     {
         $catalog = config('lindo_service_catalog');
@@ -19,6 +23,9 @@ class LindoClinicCatalogSeeder extends Seeder
         if (! is_array($catalog)) {
             return;
         }
+
+        $this->preserveExisting = ! (bool) env('LINDO_SEED_OVERWRITE_EXISTING', false);
+        $this->newServiceCodes = [];
 
         DB::transaction(function () use ($catalog) {
             $this->syncStaff($catalog['staff'] ?? []);
@@ -33,6 +40,10 @@ class LindoClinicCatalogSeeder extends Seeder
     {
         foreach ($rows as $row) {
             $staff = Staff::query()->firstOrNew(['full_name' => $row['full_name']]);
+
+            if ($this->preserveExisting && $staff->exists) {
+                continue;
+            }
 
             $staff->fill([
                 'job_title' => $row['job_title'] ?? null,
@@ -61,34 +72,40 @@ class LindoClinicCatalogSeeder extends Seeder
             ->values()
             ->all();
 
-        if ($activeCodes !== []) {
+        if (! $this->preserveExisting && $activeCodes !== []) {
             ServiceOptionGroup::query()
                 ->whereNotIn('code', $activeCodes)
                 ->update(['is_active' => false]);
         }
 
         foreach ($groups as $groupIndex => $group) {
-            $optionGroup = ServiceOptionGroup::query()->updateOrCreate(
-                ['code' => $group['code']],
-                [
+            $optionGroup = ServiceOptionGroup::query()->firstOrNew(['code' => $group['code']]);
+
+            if (! $this->preserveExisting || ! $optionGroup->exists) {
+                $optionGroup->fill([
                     'name' => $group['name'],
                     'selection_mode' => $group['selection_mode'] ?? 'single',
                     'is_active' => true,
                     'display_order' => $groupIndex + 1,
-                ]
-            );
+                ]);
+
+                $optionGroup->save();
+            }
 
             foreach (($group['values'] ?? []) as $valueIndex => $label) {
-                ServiceOptionValue::query()->updateOrCreate(
-                    [
-                        'service_option_group_id' => $optionGroup->id,
-                        'value_code' => Str::slug((string) $label, '_'),
-                    ],
-                    [
+                $optionValue = ServiceOptionValue::query()->firstOrNew([
+                    'service_option_group_id' => $optionGroup->id,
+                    'value_code' => Str::slug((string) $label, '_'),
+                ]);
+
+                if (! $this->preserveExisting || ! $optionValue->exists) {
+                    $optionValue->fill([
                         'label' => $label,
                         'display_order' => $valueIndex + 1,
-                    ]
-                );
+                    ]);
+
+                    $optionValue->save();
+                }
             }
 
             $allowedValueCodes = collect($group['values'] ?? [])
@@ -96,12 +113,14 @@ class LindoClinicCatalogSeeder extends Seeder
                 ->values()
                 ->all();
 
-            ServiceOptionValue::query()
-                ->where('service_option_group_id', $optionGroup->id)
-                ->when($allowedValueCodes !== [], function ($query) use ($allowedValueCodes) {
-                    $query->whereNotIn('value_code', $allowedValueCodes);
-                })
-                ->delete();
+            if (! $this->preserveExisting) {
+                ServiceOptionValue::query()
+                    ->where('service_option_group_id', $optionGroup->id)
+                    ->when($allowedValueCodes !== [], function ($query) use ($allowedValueCodes) {
+                        $query->whereNotIn('value_code', $allowedValueCodes);
+                    })
+                    ->delete();
+            }
 
             $result[$group['code']] = $optionGroup->fresh('values');
         }
@@ -114,9 +133,11 @@ class LindoClinicCatalogSeeder extends Seeder
         $result = [];
 
         foreach ($services as $index => $service) {
-            $record = Service::query()->updateOrCreate(
-                ['service_code' => $service['code']],
-                [
+            $record = Service::query()->firstOrNew(['service_code' => $service['code']]);
+            $isNew = ! $record->exists;
+
+            if (! $this->preserveExisting || $isNew) {
+                $record->fill([
                     'name' => $service['name'],
                     'category_key' => $service['category_key'],
                     'consultation_category_key' => $service['consultation_category_key'] ?? null,
@@ -128,8 +149,14 @@ class LindoClinicCatalogSeeder extends Seeder
                     'is_promo' => (bool) ($service['is_promo'] ?? false),
                     'is_active' => true,
                     'display_order' => $service['display_order'] ?? ($index + 1),
-                ]
-            );
+                ]);
+
+                $record->save();
+            }
+
+            if ($isNew) {
+                $this->newServiceCodes[] = $service['code'];
+            }
 
             $result[$service['code']] = $record;
         }
@@ -145,6 +172,10 @@ class LindoClinicCatalogSeeder extends Seeder
             $serviceRecord = $serviceRecords[$service['code']] ?? null;
 
             if (! $serviceRecord) {
+                continue;
+            }
+
+            if ($this->preserveExisting && ! in_array($service['code'], $this->newServiceCodes, true)) {
                 continue;
             }
 
@@ -199,7 +230,7 @@ class LindoClinicCatalogSeeder extends Seeder
             ->values()
             ->all();
 
-        if ($codes === []) {
+        if ($this->preserveExisting || $codes === []) {
             return;
         }
 
