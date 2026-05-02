@@ -2819,8 +2819,10 @@
                 activeInstanceId = selectedServices.find((service) => !assignments[service.instance_id])?.instance_id || selectedServices[0]?.instance_id || null;
             }
 
-            if (!selectedServices.length) {
+            if (!selectedServices.length && urlParams.get('restore_draft') === '1') {
                 restorePersistedDraft();
+            } else if (!selectedServices.length) {
+                clearPersistedDraft();
             }
 
             renderCategoryTabs();
