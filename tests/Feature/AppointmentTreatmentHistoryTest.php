@@ -353,6 +353,59 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $this->assertSame(1, substr_count($response->getContent(), 'Lily Salina Binti Baharudin'));
     }
 
+    public function test_calendar_hides_cancelled_or_rescheduled_appointments(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff([
+            'full_name' => "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad",
+        ]);
+        $customer = Customer::query()->create([
+            'full_name' => 'Cancelled Calendar Customer',
+            'phone' => '0123000000',
+            'current_package' => 'Bronze',
+        ]);
+        $start = Carbon::parse('2026-04-28 11:00:00');
+        $group = AppointmentGroup::query()->create([
+            'customer_id' => $customer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Cancelled,
+            'notes' => 'requested another date',
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'cancelled_calendar_service',
+            'name' => 'Consult Tirze',
+            'category_key' => 'consultations',
+            'consultation_category_key' => 'wellness',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+
+        AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Consult Tirze',
+            'service_category_key_snapshot' => 'consultations',
+            'service_category_label_snapshot' => 'Consultation',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('app.calendar', [
+            'date' => '2026-04-28',
+        ]));
+
+        $response->assertOk();
+        $response->assertDontSee('Cancelled Calendar Customer');
+        $response->assertDontSee('requested another date');
+        $response->assertSee('No appointments yet');
+    }
+
     public function test_calendar_keeps_same_customer_separate_under_different_pics_and_pdf_order(): void
     {
         $admin = $this->createAdmin();

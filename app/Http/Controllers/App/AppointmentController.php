@@ -457,6 +457,7 @@ class AppointmentController extends Controller
     private function assertStaffCapacityAvailable(Staff $staff, Carbon $start, Carbon $end): void
     {
         $existingCount = AppointmentItem::query()
+            ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('staff_id', $staff->id)
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
@@ -490,6 +491,7 @@ class AppointmentController extends Controller
     private function assertSlotBoxFree(Staff $staff, Carbon $start, int $slotIndex): void
     {
         $reserved = AppointmentSlotReservation::query()
+            ->whereHas('appointmentItem.group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('staff_id', $staff->id)
             ->whereDate('slot_date', $start->toDateString())
             ->where('start_time', $start->format('H:i:s'))
@@ -514,6 +516,7 @@ class AppointmentController extends Controller
 
         $existing = AppointmentItem::query()
             ->with(['group.customer:id,full_name', 'staff:id,full_name', 'service:id,name,service_code'])
+            ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', $start)
             ->where(function ($query) {
                 $query
@@ -601,6 +604,7 @@ class AppointmentController extends Controller
     private function findAvailableSlotIndex(Staff $staff, Carbon $start, ?int $preferredSlotIndex = null, ?string $exceptAppointmentItemId = null): int
     {
         $takenSlotIndexes = AppointmentSlotReservation::query()
+            ->whereHas('appointmentItem.group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('staff_id', $staff->id)
             ->whereDate('slot_date', $start->toDateString())
             ->where('start_time', $start->format('H:i:s'))
@@ -667,6 +671,7 @@ class AppointmentController extends Controller
 
         $items = AppointmentItem::query()
             ->with(['group.customer:id,full_name,phone', 'service:id,name', 'optionSelections'])
+            ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', '<=', $date->copy()->endOfDay())
             ->where('ends_at', '>=', $date->copy()->startOfDay())
             ->get();
@@ -750,6 +755,7 @@ class AppointmentController extends Controller
         $slotIndex = (int) $validated['slot_index'];
 
         $occupied = AppointmentSlotReservation::query()
+            ->whereHas('appointmentItem.group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('staff_id', $staff->id)
             ->whereDate('slot_date', $start->toDateString())
             ->where('start_time', $start->format('H:i:s'))
@@ -983,6 +989,12 @@ class AppointmentController extends Controller
         }
         $appointmentGroup->save();
 
+        if ($this->isInactiveAppointmentStatus($appointmentGroup->status)) {
+            $appointmentGroup->items()->with('slotReservation')->get()->each(function (AppointmentItem $item) {
+                $item->slotReservation?->delete();
+            });
+        }
+
         return back()->with('success', 'Status updated.');
     }
 
@@ -1094,6 +1106,7 @@ class AppointmentController extends Controller
         foreach ($preparedItems as $index => $current) {
             if ($current['staff_id']) {
                 $hasConflict = AppointmentItem::query()
+                    ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
                     ->where('staff_id', $current['staff_id'])
                     ->where('id', '!=', $current['item']->id)
                     ->where('starts_at', '<', $current['end'])
@@ -1247,6 +1260,7 @@ class AppointmentController extends Controller
             }
 
             $hasConflict = AppointmentItem::query()
+                ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
                 ->where('staff_id', $staffId)
                 ->where('appointment_group_id', '!=', $appointmentGroup->id)
                 ->where('starts_at', '<', $schedule['end'])
@@ -1320,6 +1334,7 @@ class AppointmentController extends Controller
 
         if ($appointmentItem->staff_id) {
             $hasConflict = AppointmentItem::query()
+                ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
                 ->where('staff_id', $appointmentItem->staff_id)
                 ->where('id', '!=', $appointmentItem->id)
                 ->where('starts_at', '<', $newEnd)
@@ -1855,6 +1870,26 @@ class AppointmentController extends Controller
         }
 
         return $normalized === 'reschedule' ? 'reschedule' : $normalized;
+    }
+
+    private function activeAppointmentStatuses(): array
+    {
+        return [
+            AppointmentStatus::Booked->value,
+            AppointmentStatus::Confirmed->value,
+            AppointmentStatus::CheckedIn->value,
+            AppointmentStatus::Completed->value,
+        ];
+    }
+
+    private function isInactiveAppointmentStatus(mixed $status): bool
+    {
+        $statusValue = $status instanceof \BackedEnum ? $status->value : (string) $status;
+
+        return in_array($statusValue, [
+            AppointmentStatus::Cancelled->value,
+            AppointmentStatus::NoShow->value,
+        ], true);
     }
 
     private function normalizeSelectedOptionsInput(mixed $input): array

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\App;
 
+use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
@@ -36,6 +37,7 @@ class CalendarController extends Controller
                 'staff:id,full_name,role_key,job_title,department,operational_role',
                 'optionSelections',
             ])
+            ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', '>=', $selectedDate->copy()->startOfDay())
             ->where('starts_at', '<=', $selectedDate->copy()->endOfDay())
             ->orderBy('starts_at')
@@ -103,6 +105,7 @@ class CalendarController extends Controller
             ->all();
 
         $appointmentGroups = AppointmentGroup::query()
+            ->whereIn('status', $this->activeAppointmentStatuses())
             ->where('starts_at', '<=', $selectedDate->copy()->endOfDay())
             ->where('ends_at', '>=', $selectedDate->copy()->startOfDay())
             ->get(['id', 'status']);
@@ -181,6 +184,16 @@ class CalendarController extends Controller
         return $dateInput !== ''
             ? Carbon::parse($dateInput)->startOfDay()
             : now()->startOfDay();
+    }
+
+    private function activeAppointmentStatuses(): array
+    {
+        return [
+            AppointmentStatus::Booked->value,
+            AppointmentStatus::Confirmed->value,
+            AppointmentStatus::CheckedIn->value,
+            AppointmentStatus::Completed->value,
+        ];
     }
 
     private function buildMergedScheduleRows($items, $customerVisitStats, Carbon $selectedDate): array
