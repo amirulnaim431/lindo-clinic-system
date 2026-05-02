@@ -1210,10 +1210,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const isCheckInMode = @json($isCheckInMode);
+            const appointmentRoute = @json(route('app.appointments.index'));
             const calendarRoute = @json(route('app.calendar'));
             const customerSearchUrl = @json(route('app.appointments.customer-search'));
             const slotBlockUrl = @json(route('app.appointments.slot-blocks.store'));
             const csrfToken = @json(csrf_token());
+            const selectedDate = @json($selectedDate);
             const prefillCustomer = @json($prefillCustomerPayload);
             const serviceCatalog = @json($serviceCatalog);
             const serviceCategories = @json($serviceCategoryMeta);
@@ -1332,16 +1334,59 @@
             const plannerSlots = Array.isArray(plannerBoard.slots) ? plannerBoard.slots : [];
 
             function getDraftStorageKey() {
-                return `lindo-appointment-builder-v2:${dateInput?.value || @json($selectedDate)}`;
+                return `lindo-appointment-builder-v2:${dateInput?.value || selectedDate}`;
             }
 
             function buildCalendarBoardUrl() {
                 const params = new URLSearchParams();
-                params.set('date', dateInput?.value || @json($selectedDate));
+                params.set('date', dateInput?.value || selectedDate);
                 params.set('embedded', '1');
                 params.set('compact', '1');
 
                 return `${calendarRoute}?${params.toString()}`;
+            }
+
+            function reloadBookingBoardForSelectedDate() {
+                const nextDate = dateInput?.value || '';
+
+                if (!nextDate || nextDate === selectedDate || isCheckInMode) {
+                    return false;
+                }
+
+                const url = new URL(appointmentRoute, window.location.origin);
+                url.searchParams.set('date', nextDate);
+
+                if (customerIdInput?.value) {
+                    url.searchParams.set('customer_id', customerIdInput.value);
+                }
+
+                if (customerNameInput?.value) {
+                    url.searchParams.set('customer_full_name', customerNameInput.value);
+                }
+
+                if (customerPhoneInput?.value) {
+                    url.searchParams.set('customer_phone', customerPhoneInput.value);
+                }
+
+                if (notesInput?.value) {
+                    url.searchParams.set('notes', notesInput.value);
+                }
+
+                if (rescheduleFollowupId) {
+                    url.searchParams.set('followup_id', rescheduleFollowupId);
+                }
+
+                if (returnToList) {
+                    url.searchParams.set('return_to', returnToList);
+                }
+
+                if (returnDate) {
+                    url.searchParams.set('return_date', returnDate);
+                }
+
+                window.location.href = url.toString();
+
+                return true;
             }
 
             function openCalendarBoardModal() {
@@ -2641,6 +2686,10 @@
             dateInput?.addEventListener('input', persistDraft);
             dateInput?.addEventListener('change', function () {
                 persistDraft();
+
+                if (reloadBookingBoardForSelectedDate()) {
+                    return;
+                }
 
                 if (calendarBoardModal && !calendarBoardModal.classList.contains('hidden') && calendarBoardFrame) {
                     calendarBoardFrame.src = buildCalendarBoardUrl();
