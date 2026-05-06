@@ -134,7 +134,14 @@
                                             <td>{{ $row['membership'] }}</td>
                                             <td>{{ $row['treatment'] }}</td>
                                             <td>{{ $row['pic'] }}</td>
-                                            <td>{{ $row['remarks'] ?: '-' }}</td>
+                                            <td>
+                                                <div class="calendar-remark-cell">
+                                                    <span>{{ $row['remarks'] ?: '-' }}</span>
+                                                    @if (!empty($row['edit_url']))
+                                                        <a href="{{ $row['edit_url'] }}" class="btn btn-secondary calendar-edit-button" onclick="event.stopPropagation();">Edit</a>
+                                                    @endif
+                                                </div>
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -411,6 +418,20 @@
         background: #fff8fa;
     }
 
+    .calendar-remark-cell {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .calendar-edit-button {
+        flex: 0 0 auto;
+        min-height: 32px;
+        padding: 0.42rem 0.75rem;
+        font-size: 0.84rem;
+    }
+
     .whatsapp-reminder-modal {
         width: min(620px, calc(100vw - 32px));
     }
@@ -530,6 +551,10 @@
         .page-header,
         .small-note.screen-only,
         .calendar-stats-grid {
+            display: none !important;
+        }
+
+        .calendar-edit-button {
             display: none !important;
         }
 

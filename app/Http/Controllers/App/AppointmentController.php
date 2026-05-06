@@ -651,6 +651,116 @@ class AppointmentController extends Controller
             );
     }
 
+    public function edit(AppointmentGroup $appointmentGroup)
+    {
+        $appointmentGroup->loadMissing([
+            'customer',
+            'items.service',
+            'items.staff',
+            'items.optionSelections',
+        ]);
+
+        return view('app.appointments.edit', [
+            'appointmentGroup' => $appointmentGroup,
+            'statusLabel' => $appointmentGroup->status instanceof AppointmentStatus
+                ? $appointmentGroup->status->label()
+                : str((string) $appointmentGroup->status)->replace('_', ' ')->title()->toString(),
+        ]);
+    }
+
+    public function updateTiming(Request $request, AppointmentGroup $appointmentGroup)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $appointmentGroup->loadMissing([
+            'items:id,appointment_group_id,staff_id,starts_at,ends_at',
+            'items.staff:id,full_name',
+        ]);
+
+        if (! $appointmentGroup->starts_at || $appointmentGroup->items->isEmpty()) {
+            throw ValidationException::withMessages([
+                'start_time' => 'This appointment is missing schedule details and cannot be edited here.',
+            ]);
+        }
+
+        $newGroupStart = Carbon::createFromFormat('Y-m-d H:i', $validated['date'].' '.$validated['start_time']);
+        $preparedItems = $appointmentGroup->items
+            ->filter(fn (AppointmentItem $item) => $item->starts_at && $item->ends_at)
+            ->map(function (AppointmentItem $item) use ($appointmentGroup, $newGroupStart) {
+                $offsetMinutes = $appointmentGroup->starts_at->diffInMinutes($item->starts_at, false);
+                $durationMinutes = max(1, $item->starts_at->diffInMinutes($item->ends_at));
+                $start = $newGroupStart->copy()->addMinutes($offsetMinutes);
+                $end = $start->copy()->addMinutes($durationMinutes);
+
+                return [
+                    'item' => $item,
+                    'staff_id' => $item->staff_id ? (string) $item->staff_id : null,
+                    'staff' => $item->staff,
+                    'start' => $start,
+                    'end' => $end,
+                ];
+            })
+            ->values();
+
+        foreach ($preparedItems as $current) {
+            $clinicStart = $current['start']->copy()->setTime(self::PLANNER_START_HOUR, 0);
+            $clinicEnd = $current['start']->copy()->setTime(self::PLANNER_END_HOUR, 0);
+
+            if ($current['start']->lt($clinicStart) || $current['end']->gt($clinicEnd)) {
+                throw ValidationException::withMessages([
+                    'start_time' => 'Appointments can only be scheduled within clinic hours from 10:00 to 19:00.',
+                ]);
+            }
+
+            if (! $current['staff_id']) {
+                continue;
+            }
+
+            $hasConflict = AppointmentItem::query()
+                ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
+                ->where('staff_id', $current['staff_id'])
+                ->where('appointment_group_id', '!=', $appointmentGroup->id)
+                ->where('starts_at', '<', $current['end'])
+                ->where('ends_at', '>', $current['start'])
+                ->exists();
+
+            if ($hasConflict) {
+                $staffName = $current['staff']?->full_name ?? 'Assigned staff';
+
+                throw ValidationException::withMessages([
+                    'start_time' => "{$staffName} is already occupied in that time block. Choose another time.",
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($appointmentGroup, $preparedItems, $validated) {
+            foreach ($preparedItems as $preparedItem) {
+                $preparedItem['item']->update([
+                    'starts_at' => $preparedItem['start'],
+                    'ends_at' => $preparedItem['end'],
+                ]);
+
+                $this->syncStaffTimeBoxReservation(
+                    $preparedItem['item']->fresh('slotReservation'),
+                    $preparedItem['staff'],
+                    $preparedItem['start']
+                );
+            }
+
+            $appointmentGroup->notes = $validated['notes'] ?? null;
+            $appointmentGroup->save();
+            $this->syncAppointmentGroupWindow($appointmentGroup);
+        });
+
+        return redirect()
+            ->route('app.appointments.edit', $appointmentGroup)
+            ->with('success', 'Appointment timing and remark updated.');
+    }
+
     private function buildPlannerBoard(Carbon $date, Collection $staffList): array
     {
         $schedule = $this->appointmentSchedule();

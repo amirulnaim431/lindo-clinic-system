@@ -120,9 +120,12 @@
                                                 <div class="selection-card__title">{{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date unavailable' }}</div>
                                                 <div class="small-note">{{ $group->ends_at ? 'Until '.$group->ends_at->format('h:i A') : 'End time unavailable' }}</div>
                                             </div>
-                                            @if($status)
-                                                <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
-                                            @endif
+                                            <div class="btn-row" style="justify-content:flex-end;">
+                                                @if($status)
+                                                    <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
+                                                @endif
+                                                <a href="{{ route('app.appointments.edit', $group) }}" class="btn btn-secondary">Edit</a>
+                                            </div>
                                         </div>
                                         <div class="stack mt-3">
                                             @forelse($group->items as $item)
@@ -173,9 +176,12 @@
                                                 <div class="selection-card__title">{{ $group->starts_at ? $group->starts_at->format('d M Y, h:i A') : 'Date unavailable' }}</div>
                                                 <div class="small-note">{{ $group->ends_at ? 'Until '.$group->ends_at->format('h:i A') : 'End time unavailable' }}</div>
                                             </div>
-                                            @if($status)
-                                                <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
-                                            @endif
+                                            <div class="btn-row" style="justify-content:flex-end;">
+                                                @if($status)
+                                                    <x-status-pill :label="ucfirst($status)" :tone="$badgeTone($status)" />
+                                                @endif
+                                                <a href="{{ route('app.appointments.edit', $group) }}" class="btn btn-secondary">Edit</a>
+                                            </div>
                                         </div>
                                         <div class="stack mt-3">
                                             @forelse($group->items as $item)

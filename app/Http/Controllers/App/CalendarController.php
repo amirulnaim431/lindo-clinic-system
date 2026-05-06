@@ -220,6 +220,7 @@ class CalendarController extends Controller
                     : false;
 
                 return [
+                    'group_id' => (string) $first->appointment_group_id,
                     'item_id' => $group->pluck('id')->filter()->implode(','),
                     'time' => $first->starts_at?->format('g:i A') ?: '-',
                     'client' => $customer?->full_name ?: 'Customer',
@@ -237,6 +238,7 @@ class CalendarController extends Controller
                         ->filter()
                         ->unique()
                         ->implode(' | '),
+                    'edit_url' => $first->group ? route('app.appointments.edit', $first->group) : null,
                     'manage_url' => route('app.appointments.index', ['date' => $first->starts_at?->format('Y-m-d') ?: $selectedDate->toDateString()]),
                 ];
             })

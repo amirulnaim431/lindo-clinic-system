@@ -406,6 +406,69 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $response->assertSee('No appointments yet');
     }
 
+    public function test_appointment_edit_page_updates_timing_and_remark(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff([
+            'full_name' => 'Dr. Amanda Binti Elli',
+        ]);
+        $customer = Customer::query()->create([
+            'full_name' => 'Timing Edit Customer',
+            'phone' => '0123334444',
+        ]);
+        $start = Carbon::parse('2026-04-28 10:00:00');
+        $group = AppointmentGroup::query()->create([
+            'customer_id' => $customer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+            'notes' => 'Original note',
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'timing_edit_service',
+            'name' => 'Facial Treatment',
+            'category_key' => 'aesthetics',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Facial Treatment',
+            'service_category_key_snapshot' => 'aesthetics',
+            'service_category_label_snapshot' => 'Aesthetic',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('app.appointments.edit', $group))
+            ->assertOk()
+            ->assertSee('Edit Appointment')
+            ->assertSee('Only the appointment date, time, and remark can be edited here.');
+
+        $this->actingAs($admin)
+            ->patch(route('app.appointments.timing.update', $group), [
+                'date' => '2026-04-29',
+                'start_time' => '13:00',
+                'notes' => 'Customer requested afternoon slot',
+            ])
+            ->assertRedirect(route('app.appointments.edit', $group));
+
+        $group->refresh();
+        $item = $group->items()->first();
+
+        $this->assertSame('2026-04-29 13:00:00', $group->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-04-29 13:45:00', $group->ends_at->format('Y-m-d H:i:s'));
+        $this->assertSame('Customer requested afternoon slot', $group->notes);
+        $this->assertSame('2026-04-29 13:00:00', $item->starts_at->format('Y-m-d H:i:s'));
+    }
+
     public function test_calendar_keeps_same_customer_separate_under_different_pics_and_pdf_order(): void
     {
         $admin = $this->createAdmin();
