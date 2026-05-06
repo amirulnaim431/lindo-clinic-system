@@ -27,8 +27,8 @@ class BookingController extends Controller
 
         $staff = Staff::query()
             ->where('is_active', true)
-            ->orderBy('full_name')
             ->get(['id', 'full_name', 'role_key']);
+        $staff = Staff::sortForPicSelector($staff);
 
         return view('booking.index', [
             'services' => $services,

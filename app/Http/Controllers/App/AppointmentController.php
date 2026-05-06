@@ -62,6 +62,9 @@ class AppointmentController extends Controller
         $services = $servicesQuery
             ->orderBy('name')
             ->get();
+        $services->each(function (Service $service) {
+            $service->setRelation('staff', Staff::sortForPicSelector($service->staff));
+        });
 
         $serviceCategories = collect(Service::categoryOptions())
             ->map(function (string $label, string $key) use ($services) {
@@ -253,6 +256,9 @@ class AppointmentController extends Controller
         $selectedServices = $selectedServicesQuery
             ->orderBy('name')
             ->get();
+        $selectedServices->each(function (Service $service) {
+            $service->setRelation('staff', Staff::sortForPicSelector($service->staff));
+        });
 
         if ($selectedServices->count() !== $serviceInstances->pluck('service_id')->unique()->count()) {
             throw ValidationException::withMessages([

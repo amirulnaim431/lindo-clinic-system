@@ -41,8 +41,8 @@ class AppointmentAvailabilityService
             $staffByRole[$role] = Staff::query()
                 ->where('is_active', true)
                 ->where('role', $role)
-                ->orderBy('full_name')
                 ->get();
+            $staffByRole[$role] = Staff::sortForPicSelector($staffByRole[$role]);
         }
 
         // Busy windows for staff for that date

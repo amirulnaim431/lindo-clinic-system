@@ -48,6 +48,11 @@ class ServiceController extends Controller
                 ->orderBy('name')
                 ->paginate(24)
                 ->withQueryString();
+            $services->setCollection($services->getCollection()->map(function (Service $service) {
+                $service->setRelation('staff', Staff::sortForPicSelector($service->staff));
+
+                return $service;
+            }));
         } else {
             $services = new LengthAwarePaginator([], 0, 24, 1, [
                 'path' => route('app.services.index'),
@@ -66,10 +71,7 @@ class ServiceController extends Controller
             'categoryOptions' => Service::categoryOptions(),
             'consultationCategoryOptions' => Service::consultationCategoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
-            'staffOptions' => Staff::query()
-                ->where('is_active', true)
-                ->orderBy('full_name')
-                ->get(['id', 'full_name', 'role_key']),
+            'staffOptions' => $this->activeStaffOptions(),
         ]);
     }
 
@@ -144,10 +146,7 @@ class ServiceController extends Controller
             'categoryOptions' => Service::categoryOptions(),
             'consultationCategoryOptions' => Service::consultationCategoryOptions(),
             'roleOptions' => Staff::operationalRoleOptions(),
-            'staffOptions' => Staff::query()
-                ->where('is_active', true)
-                ->orderBy('full_name')
-                ->get(['id', 'full_name', 'role_key']),
+            'staffOptions' => $this->activeStaffOptions(),
             'optionGroups' => ServiceOptionGroup::query()
                 ->with('values')
                 ->where('is_active', true)
@@ -169,6 +168,15 @@ class ServiceController extends Controller
                 ? $service->staff()->pluck('staff.id')->map(fn ($id) => (string) $id)->all()
                 : [],
         ]);
+    }
+
+    private function activeStaffOptions()
+    {
+        return Staff::sortForPicSelector(
+            Staff::query()
+                ->where('is_active', true)
+                ->get(['id', 'full_name', 'role_key', 'job_title', 'department', 'operational_role'])
+        );
     }
 
     private function validatedData(Request $request, ?Service $service = null): array

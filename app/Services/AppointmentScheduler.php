@@ -118,8 +118,8 @@ class AppointmentScheduler
             ->whereHas('services', function ($q) use ($serviceIds) {
                 $q->whereIn('services.id', $serviceIds);
             }, '=', count($serviceIds))
-            ->orderBy('full_name')
             ->get();
+        $candidates = Staff::sortForPicSelector($candidates);
 
         foreach ($candidates as $staff) {
             if ($this->isStaffAvailable($staff->id, $start, $end)) {
