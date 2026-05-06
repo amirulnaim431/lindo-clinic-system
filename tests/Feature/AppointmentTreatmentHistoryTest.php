@@ -409,6 +409,10 @@ class AppointmentTreatmentHistoryTest extends TestCase
     public function test_calendar_keeps_same_customer_separate_under_different_pics_and_pdf_order(): void
     {
         $admin = $this->createAdmin();
+        $adila = $this->createStaff([
+            'full_name' => 'Adila',
+            'employee_code' => 'LND-3001',
+        ]);
         $drAmanda = $this->createStaff([
             'full_name' => 'Dr. Amanda Binti Elli',
             'employee_code' => 'LND-3002',
@@ -416,6 +420,14 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $drAqilah = $this->createStaff([
             'full_name' => "Dr. Syarifah Munira 'Aaqilah Binti Al Sayed Mohamad",
             'employee_code' => 'LND-3003',
+        ]);
+        $emma = $this->createStaff([
+            'full_name' => 'Emma',
+            'employee_code' => 'LND-3004',
+        ]);
+        $farhana = $this->createStaff([
+            'full_name' => 'Farhana',
+            'employee_code' => 'LND-3005',
         ]);
         $customer = Customer::query()->create([
             'full_name' => 'Nur Test Customer',
@@ -433,7 +445,7 @@ class AppointmentTreatmentHistoryTest extends TestCase
         ]);
         $start = Carbon::parse('2026-04-28 10:00:00');
 
-        foreach ([$drAmanda, $drAqilah] as $staff) {
+        foreach ([$emma, $drAmanda, $farhana, $drAqilah, $adila] as $staff) {
             $group = AppointmentGroup::query()->create([
                 'customer_id' => $customer->id,
                 'starts_at' => $start,
@@ -462,10 +474,18 @@ class AppointmentTreatmentHistoryTest extends TestCase
 
         $response->assertOk();
         $this->assertLessThan(
-            strpos($content, 'PIC: Dr Amanda'),
-            strpos($content, 'PIC: Dr Aqilah')
+            strpos($content, 'schedule-section-head__pic">PIC: Dr Amanda'),
+            strpos($content, 'schedule-section-head__pic">PIC: Dr Aqilah')
         );
-        $this->assertSame(2, substr_count($content, 'Nur Test Customer'));
+        $this->assertLessThan(
+            strpos($content, 'schedule-section-head__pic">PIC: Dr Amanda'),
+            strpos($content, 'schedule-section-head__pic">PIC: Adila')
+        );
+        $this->assertLessThan(
+            strpos($content, 'schedule-section-head__pic">PIC: Emma'),
+            strpos($content, 'schedule-section-head__pic">PIC: Farhana')
+        );
+        $this->assertSame(5, substr_count($content, 'Nur Test Customer'));
     }
 
     public function test_appointment_builder_does_not_offer_9am_slots(): void

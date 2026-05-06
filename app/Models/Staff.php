@@ -90,12 +90,12 @@ class Staff extends Model
 
     private const APPOINTMENT_PIC_NAME_ORDER = [
         'aqilah' => 1,
-        'emma' => 2,
-        'farhana' => 3,
-        'amanda' => 4,
-        'adila' => 5,
-        'sora' => 6,
-        'monica' => 7,
+        'adila' => 2,
+        'amanda' => 3,
+        'farhana' => 4,
+        'emma' => 5,
+        'monica' => 6,
+        'sora' => 7,
     ];
 
     protected $table = 'staff';
