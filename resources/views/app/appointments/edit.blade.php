@@ -58,13 +58,13 @@
                 <x-section-heading kicker="When and remark" title="Update appointment" subtitle="Services and assigned PIC stay unchanged." />
             </div>
             <div class="panel-body stack">
-                <div class="form-grid">
-                    <div class="field-block">
+                <div class="appointment-edit-time-grid">
+                    <div class="field-block appointment-edit-field">
                         <label class="field-label" for="date">Appointment date</label>
                         <input id="date" name="date" type="date" value="{{ $appointmentDate }}" class="form-input" required>
                     </div>
 
-                    <div class="field-block">
+                    <div class="field-block appointment-edit-field">
                         <label class="field-label" for="start_time">Start time</label>
                         <input id="start_time" name="start_time" type="time" value="{{ $appointmentTime }}" class="form-input" required>
                         <div class="small-note mt-2">The existing treatment duration and spacing will be preserved.</div>
@@ -113,4 +113,30 @@
             </div>
         </form>
     </div>
+
+    <style>
+        .appointment-edit-time-grid {
+            display: grid;
+            grid-template-columns: minmax(240px, 340px) minmax(240px, 340px);
+            gap: 1.5rem;
+            align-items: start;
+            max-width: 760px;
+        }
+
+        .appointment-edit-field {
+            min-width: 0;
+        }
+
+        .appointment-edit-field .form-input {
+            width: 100%;
+            min-height: 58px;
+        }
+
+        @media (max-width: 720px) {
+            .appointment-edit-time-grid {
+                grid-template-columns: 1fr;
+                max-width: none;
+            }
+        }
+    </style>
 </x-internal-layout>
