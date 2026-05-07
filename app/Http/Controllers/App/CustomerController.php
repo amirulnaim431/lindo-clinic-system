@@ -64,6 +64,7 @@ class CustomerController extends Controller
         return view('app.customers.index', [
             'customers' => $customers,
             'search' => $search,
+            'membershipReport' => $this->buildMembershipDirectoryReport(),
         ]);
     }
 
@@ -218,6 +219,79 @@ class CustomerController extends Controller
         }
 
         return (int) round(((float) $value) * 100);
+    }
+
+    private function buildMembershipDirectoryReport(): array
+    {
+        $tiers = Customer::membershipTierOptions(false);
+        $summary = Customer::membershipTierSummaryDefaults();
+        $groups = collect($tiers)
+            ->mapWithKeys(fn (string $label, string $tier): array => [
+                mb_strtolower($tier) => [
+                    'key' => mb_strtolower($tier),
+                    'label' => $label,
+                    'count' => 0,
+                    'customers' => [],
+                ],
+            ])
+            ->all();
+
+        Customer::query()
+            ->select([
+                'id',
+                'full_name',
+                'phone',
+                'ic_passport',
+                'membership_code',
+                'membership_type',
+                'current_package',
+                'current_package_since',
+                'membership_package_value_cents',
+                'membership_balance_cents',
+            ])
+            ->where(function (Builder $query) {
+                $query
+                    ->whereNotNull('membership_type')
+                    ->orWhereNotNull('current_package');
+            })
+            ->orderByRaw("CASE WHEN full_name IS NULL OR full_name = '' THEN 1 ELSE 0 END")
+            ->orderBy('full_name')
+            ->get()
+            ->each(function (Customer $customer) use (&$summary, &$groups): void {
+                $tierKey = mb_strtolower(trim((string) ($customer->membership_type ?: $customer->current_package ?: '')));
+
+                if (! array_key_exists($tierKey, $groups)) {
+                    return;
+                }
+
+                $summary[$tierKey]++;
+                $groups[$tierKey]['count']++;
+                $groups[$tierKey]['customers'][] = [
+                    'name' => $customer->full_name ?: 'Unnamed customer',
+                    'phone' => $customer->phone ?: '-',
+                    'ic_passport' => $customer->ic_passport ?: '-',
+                    'membership_code' => $customer->membership_code ?: '-',
+                    'membership_type' => Customer::membershipTierLabel($customer->membership_type),
+                    'current_package' => $customer->current_package ?: '-',
+                    'package_since' => $customer->current_package_since?->format('d M Y') ?: '-',
+                    'package_value' => $this->formatMoneyCents($customer->membership_package_value_cents),
+                    'balance' => $this->formatMoneyCents($customer->membership_balance_cents),
+                    'profile_url' => route('app.customers.show', $customer),
+                ];
+            });
+
+        return [
+            'summary' => $summary,
+            'groups' => array_values($groups),
+            'generated_at' => now()->format('d M Y, h:i A'),
+        ];
+    }
+
+    private function formatMoneyCents(?int $amount): string
+    {
+        return $amount === null
+            ? '-'
+            : 'RM '.number_format($amount / 100, 2);
     }
 
     /**
