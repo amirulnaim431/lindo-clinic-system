@@ -13,6 +13,14 @@ class Customer extends Model
     use HasUlids;
     use SoftDeletes;
 
+    public const MEMBERSHIP_TIERS = [
+        'Bronze' => 'Bronze',
+        'Silver' => 'Silver',
+        'Gold' => 'Gold',
+        'Platinum' => 'Platinum',
+        'Black' => 'Black',
+    ];
+
     protected $fillable = [
         'full_name',
         'phone',
@@ -85,5 +93,39 @@ class Customer extends Model
         return $this->membership_balance_cents === null
             ? null
             : $this->membership_balance_cents / 100;
+    }
+
+    public static function membershipTierOptions(bool $includeEmpty = true): array
+    {
+        return ($includeEmpty ? ['' => 'No membership'] : []) + self::MEMBERSHIP_TIERS;
+    }
+
+    public static function membershipTierKeys(): array
+    {
+        return collect(array_keys(self::MEMBERSHIP_TIERS))
+            ->map(fn (string $tier): string => mb_strtolower($tier))
+            ->all();
+    }
+
+    public static function membershipTierSummaryDefaults(): array
+    {
+        return array_fill_keys(self::membershipTierKeys(), 0);
+    }
+
+    public static function membershipTierLabel(?string $value): string
+    {
+        $normalized = mb_strtolower(trim((string) $value));
+
+        if ($normalized === '') {
+            return 'None';
+        }
+
+        foreach (self::MEMBERSHIP_TIERS as $tier => $label) {
+            if (mb_strtolower($tier) === $normalized) {
+                return $label;
+            }
+        }
+
+        return str((string) $value)->headline()->toString();
     }
 }

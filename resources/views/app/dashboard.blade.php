@@ -13,7 +13,8 @@
              'staff_id' => $selectedStaffId,
          ]);
          $topFocus = $serviceFocus->first();
-         $membershipSummary = $membershipSummary ?? ['bronze' => 0, 'silver' => 0, 'black' => 0];
+         $membershipTiers = \App\Models\Customer::membershipTierOptions(false);
+         $membershipSummary = $membershipSummary ?? \App\Models\Customer::membershipTierSummaryDefaults();
          $customerDrilldowns = $customerDrilldowns ?? [];
          $membershipInsight = $membershipInsight ?? ['payload' => ['key' => 'membership', 'label' => 'Membership', 'amount' => 0, 'details' => []]];
          $revenueBreakdown = $revenueBreakdown ?? ['total' => 0, 'groups' => collect()];
@@ -109,18 +110,13 @@
             <button type="button" class="stat-card stat-card--membership stat-card--interactive metric-card-button" data-metric-card='@json($membershipPayload)'>
                 <div class="metric-label">Membership</div>
                 <div class="membership-stat-list">
-                    <div class="membership-stat-row">
-                        <span class="membership-stat-row__label">Bronze</span>
-                        <span class="membership-stat-row__value">{{ $membershipSummary['bronze'] ?? 0 }}</span>
-                    </div>
-                    <div class="membership-stat-row">
-                        <span class="membership-stat-row__label">Silver</span>
-                        <span class="membership-stat-row__value">{{ $membershipSummary['silver'] ?? 0 }}</span>
-                    </div>
-                    <div class="membership-stat-row">
-                        <span class="membership-stat-row__label">Black</span>
-                        <span class="membership-stat-row__value">{{ $membershipSummary['black'] ?? 0 }}</span>
-                    </div>
+                    @foreach ($membershipTiers as $tierValue => $tierLabel)
+                        @php $tierKey = mb_strtolower($tierValue); @endphp
+                        <div class="membership-stat-row">
+                            <span class="membership-stat-row__label">{{ $tierLabel }}</span>
+                            <span class="membership-stat-row__value">{{ $membershipSummary[$tierKey] ?? 0 }}</span>
+                        </div>
+                    @endforeach
                 </div>
             </button>
             <x-stat-card label="Top Focus" :value="$topFocus['service_name'] ?? '-'" :meta="($topFocus['appointments'] ?? 0).' service items'" />

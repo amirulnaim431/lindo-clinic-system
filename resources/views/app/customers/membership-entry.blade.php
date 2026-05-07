@@ -6,7 +6,7 @@
                     <x-section-heading
                         kicker="Bulk data entry"
                         title="Membership Entry"
-                        subtitle="Search one customer, choose Bronze/Silver/Black, enter package balance if available, then save." />
+                        subtitle="Search one customer, choose Bronze/Silver/Gold/Platinum/Black, enter package balance if available, then save." />
 
                     <div class="page-actions">
                         <a href="{{ route('app.customers.index') }}" class="btn btn-secondary">Customer Directory</a>

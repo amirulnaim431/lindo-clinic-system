@@ -197,12 +197,7 @@ class CustomerController extends Controller
 
     private function membershipTierOptions(): array
     {
-        return [
-            '' => 'No membership',
-            'Bronze' => 'Bronze',
-            'Silver' => 'Silver',
-            'Black' => 'Black',
-        ];
+        return Customer::membershipTierOptions();
     }
 
     private function cleanString(mixed $value): ?string

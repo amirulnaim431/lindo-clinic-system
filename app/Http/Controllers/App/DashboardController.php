@@ -5,6 +5,7 @@ namespace App\Http\Controllers\App;
 use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentGroup;
+use App\Models\Customer;
 use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -371,11 +372,7 @@ class DashboardController extends Controller
 
     private function buildMembershipInsight(Collection $groups): array
     {
-        $tiers = [
-            'bronze' => 0,
-            'silver' => 0,
-            'black' => 0,
-        ];
+        $tiers = Customer::membershipTierSummaryDefaults();
 
         $details = $groups
             ->filter(fn ($group) => ! empty($group->customer_id))
@@ -383,7 +380,11 @@ class DashboardController extends Controller
             ->map(function (Collection $customerGroups) {
                 $firstGroup = $customerGroups->sortBy('starts_at')->first();
                 $latestGroup = $customerGroups->sortByDesc('starts_at')->first();
-                $membershipType = mb_strtolower(trim((string) ($firstGroup?->customer?->membership_type ?: '')));
+                $membershipType = mb_strtolower(trim((string) (
+                    $firstGroup?->customer?->membership_type
+                    ?: $firstGroup?->customer?->current_package
+                    ?: ''
+                )));
 
                 return [
                     'customer_name' => $firstGroup?->customer?->full_name ?: 'Unknown customer',
@@ -494,14 +495,7 @@ class DashboardController extends Controller
 
     private function formatMembershipLabel(?string $membershipType): string
     {
-        $normalized = mb_strtolower(trim((string) $membershipType));
-
-        return match ($normalized) {
-            'bronze' => 'Bronze',
-            'silver' => 'Silver',
-            'black' => 'Black',
-            default => 'None',
-        };
+        return Customer::membershipTierLabel($membershipType);
     }
 
     private function metricExportLabel(string $metric): string
