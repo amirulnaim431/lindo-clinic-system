@@ -16,8 +16,6 @@ class Customer extends Model
     public const MEMBERSHIP_TIERS = [
         'Bronze' => 'Bronze',
         'Silver' => 'Silver',
-        'Gold' => 'Gold',
-        'Platinum' => 'Platinum',
         'Black' => 'Black',
     ];
 

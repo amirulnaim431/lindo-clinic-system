@@ -242,14 +242,6 @@
             background: linear-gradient(135deg, rgba(176, 186, 196, 0.24), rgba(255, 255, 255, 0.94));
         }
 
-        .membership-report-card--gold {
-            background: linear-gradient(135deg, rgba(218, 165, 32, 0.24), rgba(255, 255, 255, 0.94));
-        }
-
-        .membership-report-card--platinum {
-            background: linear-gradient(135deg, rgba(188, 205, 214, 0.32), rgba(255, 255, 255, 0.94));
-        }
-
         .membership-report-card--black {
             background: linear-gradient(135deg, rgba(40, 32, 37, 0.18), rgba(255, 255, 255, 0.94));
         }
