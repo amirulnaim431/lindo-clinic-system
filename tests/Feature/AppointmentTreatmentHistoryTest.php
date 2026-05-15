@@ -6,6 +6,7 @@ use App\Enums\AppointmentStatus;
 use App\Models\AppointmentGroup;
 use App\Models\AppointmentItem;
 use App\Models\AppointmentItemOptionSelection;
+use App\Models\AppointmentSlotReservation;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\ServiceOptionGroup;
@@ -151,6 +152,42 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $duplicateResponse->assertRedirect(route('app.appointments.index'));
         $duplicateResponse->assertSessionHasErrors('booking_payload');
         $this->assertDatabaseCount('appointment_groups', 1);
+
+        $secondSlotPayload = json_encode([
+            'services' => [
+                [
+                    'instance_id' => $instanceId,
+                    'service_id' => $service->id,
+                    'selected_options' => [
+                        $group->id => $value->id,
+                    ],
+                ],
+            ],
+            'assignments' => [
+                [
+                    'instance_id' => $instanceId,
+                    'staff_id' => $staff->id,
+                    'start_time' => '10:00',
+                    'slot_index' => 2,
+                ],
+            ],
+        ]);
+
+        $secondSlotResponse = $this->actingAs($admin)->post(route('app.appointments.store'), [
+            'date' => now()->toDateString(),
+            'customer_full_name' => 'Second Slot Customer',
+            'customer_phone' => '0188888888',
+            'notes' => 'Second half slot test',
+            'booking_payload' => $secondSlotPayload,
+        ]);
+
+        $secondSlotResponse->assertRedirect();
+        $this->assertDatabaseCount('appointment_groups', 2);
+        $this->assertDatabaseHas('appointment_slot_reservations', [
+            'staff_id' => $staff->id,
+            'start_time' => '10:00:00',
+            'slot_index' => 2,
+        ]);
 
         $customerId = DB::table('customers')->where('phone', '0123456789')->value('id');
         $historyResponse = $this->actingAs($admin)->get(route('app.customers.show', $customerId));
@@ -467,6 +504,104 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $this->assertSame('2026-04-29 13:45:00', $group->ends_at->format('Y-m-d H:i:s'));
         $this->assertSame('Customer requested afternoon slot', $group->notes);
         $this->assertSame('2026-04-29 13:00:00', $item->starts_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_appointment_remark_edit_allows_other_customer_in_second_slot(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff();
+        $service = Service::query()->create([
+            'service_code' => 'remark_second_slot_service',
+            'name' => 'Facial Treatment',
+            'category_key' => 'aesthetics',
+            'default_staff_role' => 'doctor',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $start = Carbon::parse('2026-04-29 11:00:00');
+        $firstCustomer = Customer::query()->create([
+            'full_name' => 'First Half Customer',
+            'phone' => '0111111111',
+        ]);
+        $secondCustomer = Customer::query()->create([
+            'full_name' => 'Second Half Customer',
+            'phone' => '0122222222',
+        ]);
+
+        $firstGroup = AppointmentGroup::query()->create([
+            'customer_id' => $firstCustomer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+            'notes' => 'Original remark',
+        ]);
+        $secondGroup = AppointmentGroup::query()->create([
+            'customer_id' => $secondCustomer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+        ]);
+
+        $firstItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $firstGroup->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Facial Treatment',
+            'service_category_key_snapshot' => 'aesthetics',
+            'service_category_label_snapshot' => 'Aesthetic',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+        $secondItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $secondGroup->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Facial Treatment',
+            'service_category_key_snapshot' => 'aesthetics',
+            'service_category_label_snapshot' => 'Aesthetic',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+
+        AppointmentSlotReservation::query()->create([
+            'appointment_item_id' => $firstItem->id,
+            'staff_id' => $staff->id,
+            'slot_date' => $start->toDateString(),
+            'start_time' => '11:00:00',
+            'slot_index' => 1,
+        ]);
+        AppointmentSlotReservation::query()->create([
+            'appointment_item_id' => $secondItem->id,
+            'staff_id' => $staff->id,
+            'slot_date' => $start->toDateString(),
+            'start_time' => '11:00:00',
+            'slot_index' => 2,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('app.appointments.timing.update', $firstGroup), [
+                'date' => '2026-04-29',
+                'start_time' => '11:00',
+                'notes' => 'Updated remark only',
+            ])
+            ->assertRedirect(route('app.appointments.edit', $firstGroup));
+
+        $firstGroup->refresh();
+
+        $this->assertSame('Updated remark only', $firstGroup->notes);
+        $this->assertDatabaseHas('appointment_slot_reservations', [
+            'appointment_item_id' => $firstItem->id,
+            'slot_index' => 1,
+        ]);
+        $this->assertDatabaseHas('appointment_slot_reservations', [
+            'appointment_item_id' => $secondItem->id,
+            'slot_index' => 2,
+        ]);
     }
 
     public function test_calendar_keeps_same_customer_separate_under_different_pics_and_pdf_order(): void

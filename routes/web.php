@@ -77,6 +77,9 @@ Route::middleware(['auth', 'staff_or_admin'])
         Route::patch('/appointments/{appointmentGroup}/timing', [AppointmentController::class, 'updateTiming'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.timing.update');
+        Route::delete('/appointments/{appointmentGroup}', [AppointmentController::class, 'destroy'])
+            ->middleware('app_permission:appointments.manage')
+            ->name('appointments.destroy');
         Route::patch('/appointments/{appointmentGroup}/reschedule', [AppointmentController::class, 'reschedule'])
             ->middleware('app_permission:appointments.manage')
             ->name('appointments.reschedule');

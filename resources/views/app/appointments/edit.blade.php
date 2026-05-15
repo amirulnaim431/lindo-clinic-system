@@ -24,7 +24,14 @@
                         subtitle="Only the appointment date, time, and remark can be edited here."
                     />
                     <div class="small-note mt-2">Only the appointment date, time, and remark can be edited here.</div>
-                    <a href="{{ route('app.calendar', ['date' => $appointmentGroup->starts_at?->format('Y-m-d') ?? now()->format('Y-m-d')]) }}" class="btn btn-secondary">Back to calendar</a>
+                    <div class="btn-row btn-row--end">
+                        <a href="{{ route('app.calendar', ['date' => $appointmentGroup->starts_at?->format('Y-m-d') ?? now()->format('Y-m-d')]) }}" class="btn btn-secondary">Back to calendar</a>
+                        <form method="POST" action="{{ route('app.appointments.destroy', $appointmentGroup) }}" onsubmit="return confirm('Delete this appointment from the active calendar board? This will free the staff time box.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-secondary appointment-delete-button">Delete appointment</button>
+                        </form>
+                    </div>
                 </div>
             </div>
             <div class="panel-body">
@@ -130,6 +137,17 @@
         .appointment-edit-field .form-input {
             width: 100%;
             min-height: 58px;
+        }
+
+        .appointment-delete-button {
+            border-color: rgba(181, 65, 86, 0.28);
+            color: #8f2f43;
+        }
+
+        .appointment-delete-button:hover {
+            background: rgba(181, 65, 86, 0.08);
+            border-color: rgba(181, 65, 86, 0.42);
+            color: #722234;
         }
 
         @media (max-width: 720px) {

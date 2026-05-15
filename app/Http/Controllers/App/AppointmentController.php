@@ -338,7 +338,7 @@ class AppointmentController extends Controller
                         $assignment['start'],
                         $assignment['end']
                     );
-                    $this->assertSlotNotBlocked(
+                    $this->assertSlotBoxFree(
                         $assignment['staff'],
                         $assignment['start'],
                         $assignment['slot_index']
@@ -619,16 +619,24 @@ class AppointmentController extends Controller
             ->pluck('slot_index')
             ->map(fn ($slotIndex) => (int) $slotIndex)
             ->all();
+        $blockedSlotIndexes = AppointmentSlotBlock::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->pluck('slot_index')
+            ->map(fn ($slotIndex) => (int) $slotIndex)
+            ->all();
+        $unavailableSlotIndexes = array_values(array_unique(array_merge($takenSlotIndexes, $blockedSlotIndexes)));
 
         $slotCapacity = (int) $this->appointmentSchedule()['boxes_per_slot'];
         $preferredSlotIndex = $preferredSlotIndex ? max(1, min($slotCapacity, $preferredSlotIndex)) : null;
 
-        if ($preferredSlotIndex && ! in_array($preferredSlotIndex, $takenSlotIndexes, true)) {
+        if ($preferredSlotIndex && ! in_array($preferredSlotIndex, $unavailableSlotIndexes, true)) {
             return $preferredSlotIndex;
         }
 
         for ($slotIndex = 1; $slotIndex <= $slotCapacity; $slotIndex++) {
-            if (! in_array($slotIndex, $takenSlotIndexes, true)) {
+            if (! in_array($slotIndex, $unavailableSlotIndexes, true)) {
                 return $slotIndex;
             }
         }
@@ -677,8 +685,9 @@ class AppointmentController extends Controller
         ]);
 
         $appointmentGroup->loadMissing([
-            'items:id,appointment_group_id,staff_id,starts_at,ends_at',
+            'items:id,appointment_group_id,staff_id,starts_at,ends_at,service_name_snapshot',
             'items.staff:id,full_name',
+            'items.slotReservation',
         ]);
 
         if (! $appointmentGroup->starts_at || $appointmentGroup->items->isEmpty()) {
@@ -702,6 +711,8 @@ class AppointmentController extends Controller
                     'staff' => $item->staff,
                     'start' => $start,
                     'end' => $end,
+                    'preferred_slot_index' => $item->slotReservation?->slot_index,
+                    'spans_slots' => $this->itemUsesMergedSlot($item),
                 ];
             })
             ->values();
@@ -720,15 +731,24 @@ class AppointmentController extends Controller
                 continue;
             }
 
-            $hasConflict = AppointmentItem::query()
-                ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
-                ->where('staff_id', $current['staff_id'])
-                ->where('appointment_group_id', '!=', $appointmentGroup->id)
-                ->where('starts_at', '<', $current['end'])
-                ->where('ends_at', '>', $current['start'])
-                ->exists();
+            try {
+                $slotIndex = $this->findAvailableSlotIndex(
+                    $current['staff'],
+                    $current['start'],
+                    $current['preferred_slot_index'],
+                    (string) $current['item']->id
+                );
 
-            if ($hasConflict) {
+                if ($current['spans_slots']) {
+                    foreach (range(1, (int) $this->appointmentSchedule()['boxes_per_slot']) as $spanSlotIndex) {
+                        if ((int) $spanSlotIndex === (int) $slotIndex) {
+                            continue;
+                        }
+
+                        $this->assertSlotBoxFreeForItem($current['staff'], $current['start'], $spanSlotIndex, $current['item']);
+                    }
+                }
+            } catch (ValidationException) {
                 $staffName = $current['staff']?->full_name ?? 'Assigned staff';
 
                 throw ValidationException::withMessages([
@@ -739,16 +759,29 @@ class AppointmentController extends Controller
 
         DB::transaction(function () use ($appointmentGroup, $preparedItems, $validated) {
             foreach ($preparedItems as $preparedItem) {
-                $preparedItem['item']->update([
+                $item = $preparedItem['item'];
+                $this->releaseMergedSlotBlocks($item);
+
+                $item->update([
                     'starts_at' => $preparedItem['start'],
                     'ends_at' => $preparedItem['end'],
                 ]);
 
                 $this->syncStaffTimeBoxReservation(
-                    $preparedItem['item']->fresh('slotReservation'),
+                    $item->fresh('slotReservation'),
                     $preparedItem['staff'],
                     $preparedItem['start']
                 );
+
+                if ($preparedItem['spans_slots']) {
+                    $freshItem = $item->fresh('slotReservation');
+                    $this->blockMergedSlot(
+                        $freshItem,
+                        $preparedItem['staff'],
+                        $preparedItem['start'],
+                        (int) ($freshItem->slotReservation?->slot_index ?: 1)
+                    );
+                }
             }
 
             $appointmentGroup->notes = $validated['notes'] ?? null;
@@ -759,6 +792,98 @@ class AppointmentController extends Controller
         return redirect()
             ->route('app.appointments.edit', $appointmentGroup)
             ->with('success', 'Appointment timing and remark updated.');
+    }
+
+    public function destroy(AppointmentGroup $appointmentGroup)
+    {
+        $appointmentGroup->loadMissing(['items.slotReservation']);
+        $redirectDate = $appointmentGroup->starts_at?->format('Y-m-d') ?: now()->format('Y-m-d');
+
+        DB::transaction(function () use ($appointmentGroup) {
+            foreach ($appointmentGroup->items as $item) {
+                $this->releaseMergedSlotBlocks($item);
+                $item->slotReservation?->delete();
+            }
+
+            $appointmentGroup->status = AppointmentStatus::Cancelled;
+            $appointmentGroup->save();
+        });
+
+        return redirect()
+            ->route('app.calendar', ['date' => $redirectDate])
+            ->with('success', 'Appointment deleted from the active calendar board.');
+    }
+
+    private function itemUsesMergedSlot(AppointmentItem $item): bool
+    {
+        if (! $item->staff_id || ! $item->starts_at) {
+            return false;
+        }
+
+        return $this->mergedSlotBlocksForItem($item)->exists();
+    }
+
+    private function releaseMergedSlotBlocks(AppointmentItem $item): void
+    {
+        if (! $item->staff_id || ! $item->starts_at) {
+            return;
+        }
+
+        $this->mergedSlotBlocksForItem($item)->delete();
+    }
+
+    private function mergedSlotBlocksForItem(AppointmentItem $item)
+    {
+        return AppointmentSlotBlock::query()
+            ->where('staff_id', $item->staff_id)
+            ->whereDate('slot_date', $item->starts_at->toDateString())
+            ->where('start_time', $item->starts_at->format('H:i:s'))
+            ->where('reason', 'like', 'Merged full-slot booking for%');
+    }
+
+    private function assertSlotBoxFreeForItem(Staff $staff, Carbon $start, int $slotIndex, AppointmentItem $item): void
+    {
+        $reserved = AppointmentSlotReservation::query()
+            ->whereHas('appointmentItem.group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->where('slot_index', $slotIndex)
+            ->where('appointment_item_id', '!=', $item->id)
+            ->lockForUpdate()
+            ->exists();
+
+        if ($reserved) {
+            throw ValidationException::withMessages([
+                'start_time' => "{$staff->full_name}'s {$start->format('g:i A')} box is already booked.",
+            ]);
+        }
+
+        $block = AppointmentSlotBlock::query()
+            ->where('staff_id', $staff->id)
+            ->whereDate('slot_date', $start->toDateString())
+            ->where('start_time', $start->format('H:i:s'))
+            ->where('slot_index', $slotIndex)
+            ->lockForUpdate()
+            ->first();
+
+        if ($block && ! $this->isOwnMergedSlotBlock($block, $item)) {
+            throw ValidationException::withMessages([
+                'start_time' => "{$staff->full_name}'s {$start->format('g:i A')} box is blocked: {$block->reason}",
+            ]);
+        }
+    }
+
+    private function isOwnMergedSlotBlock(AppointmentSlotBlock $block, AppointmentItem $item): bool
+    {
+        if (! $item->staff_id || ! $item->starts_at) {
+            return false;
+        }
+
+        return (string) $block->staff_id === (string) $item->staff_id
+            && $block->slot_date?->toDateString() === $item->starts_at->toDateString()
+            && substr((string) $block->start_time, 0, 5) === $item->starts_at->format('H:i')
+            && str_starts_with((string) $block->reason, 'Merged full-slot booking for');
     }
 
     private function buildPlannerBoard(Carbon $date, Collection $staffList): array
@@ -786,7 +911,7 @@ class AppointmentController extends Controller
         }
 
         $items = AppointmentItem::query()
-            ->with(['group.customer:id,full_name,phone', 'service:id,name', 'optionSelections'])
+            ->with(['group.customer:id,full_name,phone', 'service:id,name', 'optionSelections', 'slotReservation'])
             ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', '<=', $date->copy()->endOfDay())
             ->where('ends_at', '>=', $date->copy()->startOfDay())
@@ -817,6 +942,7 @@ class AppointmentController extends Controller
 
                         return [
                             'id' => (string) $item->id,
+                            'slot_index' => (int) ($item->slotReservation?->slot_index ?: 1),
                             'customer_name' => $item->group?->customer?->full_name ?: 'Customer',
                             'service_name' => $item->displayServiceName().($optionSuffix !== '' ? ' | '.$optionSuffix : ''),
                         ];

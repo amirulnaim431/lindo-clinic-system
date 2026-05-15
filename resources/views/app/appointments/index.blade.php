@@ -1924,11 +1924,13 @@
                 const boxes = [];
 
                 for (let slotIndex = 1; slotIndex <= capacityPerSlot; slotIndex++) {
-                    if (existingAppointments[slotIndex - 1]) {
+                    const existingAppointment = existingAppointments.find((appointment) => Number(appointment.slot_index || 1) === slotIndex);
+
+                    if (existingAppointment) {
                         boxes.push({
                             type: 'occupied',
                             slot_index: slotIndex,
-                            appointment: existingAppointments[slotIndex - 1],
+                            appointment: existingAppointment,
                         });
                         continue;
                     }
