@@ -787,22 +787,30 @@
             inset: auto 0 auto 0;
             top: calc(100% + 8px);
             z-index: 15;
-            display: grid;
-            gap: 0.45rem;
             background: #fff;
             border: 1px solid rgba(26, 19, 23, 0.1);
             border-radius: 22px;
             padding: 0.6rem;
             box-shadow: 0 20px 40px rgba(26, 19, 23, 0.12);
+            max-height: min(360px, 46vh);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         .customer-suggestion {
+            display: block;
+            width: 100%;
             border: 0;
             background: #fff;
             border-radius: 16px;
             padding: 0.8rem 0.9rem;
             text-align: left;
             cursor: pointer;
+        }
+
+        .customer-suggestion + .customer-suggestion {
+            margin-top: 0.45rem;
         }
 
         .customer-suggestion:hover,
@@ -1195,6 +1203,46 @@
 
             .traffic-list-table {
                 min-width: 920px;
+            }
+        }
+
+        @media (min-width: 721px) and (max-width: 1180px) {
+            .appointment-top-grid {
+                grid-template-columns: minmax(220px, 0.85fr) minmax(260px, 1.25fr);
+                gap: 1rem;
+            }
+
+            .appointment-top-grid__phone {
+                grid-column: 2;
+            }
+
+            .calendar-board-modal,
+            .traffic-list-modal {
+                width: min(100%, calc(100vw - 1.25rem));
+                max-height: calc(100dvh - 1.25rem);
+                border-radius: 24px;
+            }
+
+            .calendar-board-frame {
+                min-height: 70dvh;
+            }
+
+            .planner-slot-row {
+                grid-template-columns: minmax(110px, 140px) repeat(2, minmax(220px, 1fr));
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .planner-slot-box {
+                min-width: 220px;
+            }
+
+            .selection-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .checkin-card {
+                align-items: flex-start;
             }
         }
     </style>
@@ -2479,7 +2527,7 @@
                 });
 
                 customerNameInput?.addEventListener('blur', function () {
-                    window.setTimeout(hideCustomerSuggestions, 120);
+                    window.setTimeout(hideCustomerSuggestions, 220);
                 });
 
                 document.addEventListener('click', function (event) {
@@ -2673,7 +2721,7 @@
             });
 
             customerNameInput?.addEventListener('blur', function () {
-                window.setTimeout(hideCustomerSuggestions, 120);
+                window.setTimeout(hideCustomerSuggestions, 220);
             });
 
             customerPhoneInput?.addEventListener('input', function () {

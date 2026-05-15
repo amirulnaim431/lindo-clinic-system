@@ -940,7 +940,10 @@
         background:
             linear-gradient(180deg, rgba(255, 253, 253, 0.98), rgba(255, 247, 250, 0.98));
         box-shadow: var(--app-shadow-md);
-        overflow: hidden;
+        max-height: min(360px, 46vh);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
         backdrop-filter: blur(12px);
     }
 
@@ -3360,6 +3363,55 @@
 }
 
 @media (max-width: 1100px) {
+    :root {
+        --sidebar-width: 112px;
+    }
+
+    .app-shell:not(.app-shell--sidebar-minimized) {
+        --sidebar-width: 112px;
+    }
+
+    .app-sidebar {
+        width: var(--sidebar-width);
+    }
+
+    .app-sidebar__brand {
+        padding-inline: 1rem;
+    }
+
+    .app-brand {
+        justify-content: center;
+    }
+
+    .app-brand__image {
+        max-width: 56px;
+    }
+
+    .app-nav-section__label,
+    .app-nav-link span:not(.app-nav-icon),
+    .app-nav-group-head span:not(.app-nav-icon):not(.app-nav-toggle),
+    .app-nav-sublink span:not(.app-nav-subicon),
+    .user-card {
+        display: none;
+    }
+
+    .app-nav-subnav {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+    }
+
+    .app-nav-link,
+    .app-nav-group-head,
+    .app-nav-sublink {
+        justify-content: center;
+        padding-inline: 0.75rem;
+    }
+
+    .app-nav-toggle {
+        display: none;
+    }
+
     .auth-shell {
         grid-template-columns: 1fr;
     }
@@ -3480,6 +3532,61 @@
 
     .staff-pill-button {
         max-width: none;
+    }
+}
+
+@media (min-width: 721px) and (max-width: 1180px) {
+    .app-topbar__inner,
+    .app-content {
+        width: min(100%, calc(100% - 1.5rem));
+    }
+
+    .app-topbar__inner {
+        align-items: center;
+        padding-block: 1rem;
+    }
+
+    .page-title {
+        font-size: clamp(1.75rem, 3.6vw, 2.25rem);
+    }
+
+    .panel-header,
+    .panel-body,
+    .panel-footer {
+        padding: 1.15rem;
+    }
+
+    .table-wrap,
+    .traffic-list-body,
+    .modal-body {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    .modal-stage {
+        align-items: flex-start;
+        min-height: 100dvh;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+
+    .modal-card {
+        max-height: calc(100dvh - 2rem);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-body {
+        overflow: auto;
+    }
+
+    .topbar-badges,
+    .page-actions,
+    .btn-row {
+        flex-wrap: wrap;
     }
 }
 
