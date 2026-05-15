@@ -460,13 +460,14 @@ class AppointmentController extends Controller
             ->with('success', 'Appointment created.');
     }
 
-    private function assertStaffCapacityAvailable(Staff $staff, Carbon $start, Carbon $end): void
+    private function assertStaffCapacityAvailable(Staff $staff, Carbon $start, Carbon $end, array $exceptAppointmentItemIds = []): void
     {
         $existingCount = AppointmentItem::query()
             ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('staff_id', $staff->id)
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
+            ->when($exceptAppointmentItemIds !== [], fn ($query) => $query->whereNotIn('id', $exceptAppointmentItemIds))
             ->lockForUpdate()
             ->count();
 
@@ -494,7 +495,7 @@ class AppointmentController extends Controller
         }
     }
 
-    private function assertSlotBoxFree(Staff $staff, Carbon $start, int $slotIndex): void
+    private function assertSlotBoxFree(Staff $staff, Carbon $start, int $slotIndex, array $exceptAppointmentItemIds = []): void
     {
         $reserved = AppointmentSlotReservation::query()
             ->whereHas('appointmentItem.group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
@@ -502,6 +503,7 @@ class AppointmentController extends Controller
             ->whereDate('slot_date', $start->toDateString())
             ->where('start_time', $start->format('H:i:s'))
             ->where('slot_index', $slotIndex)
+            ->when($exceptAppointmentItemIds !== [], fn ($query) => $query->whereNotIn('appointment_item_id', $exceptAppointmentItemIds))
             ->lockForUpdate()
             ->exists();
 
@@ -514,7 +516,7 @@ class AppointmentController extends Controller
         $this->assertSlotNotBlocked($staff, $start, $slotIndex);
     }
 
-    private function assertMedexMachineAvailable(Service $service, Carbon $start): void
+    private function assertMedexMachineAvailable(Service $service, Carbon $start, array $exceptAppointmentItemIds = []): void
     {
         if (! $this->isMedexService($service)) {
             return;
@@ -524,6 +526,7 @@ class AppointmentController extends Controller
             ->with(['group.customer:id,full_name', 'staff:id,full_name', 'service:id,name,service_code'])
             ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', $start)
+            ->when($exceptAppointmentItemIds !== [], fn ($query) => $query->whereNotIn('id', $exceptAppointmentItemIds))
             ->where(function ($query) {
                 $query
                     ->where('service_name_snapshot', 'like', '%Medex%')
@@ -666,13 +669,25 @@ class AppointmentController extends Controller
             'items.service',
             'items.staff',
             'items.optionSelections',
+            'items.slotReservation',
         ]);
+        $editableServices = Service::query()
+            ->with(['optionGroups.values', 'staff' => fn ($query) => $query->where('is_active', true)->orderBy('full_name')])
+            ->where('is_active', true)
+            ->orderBy('category_key')
+            ->orderBy('name')
+            ->get();
+        $editableServices->each(function (Service $service) {
+            $service->setRelation('staff', Staff::sortForPicSelector($service->staff));
+        });
 
         return view('app.appointments.edit', [
             'appointmentGroup' => $appointmentGroup,
             'statusLabel' => $appointmentGroup->status instanceof AppointmentStatus
                 ? $appointmentGroup->status->label()
                 : str((string) $appointmentGroup->status)->replace('_', ' ')->title()->toString(),
+            'editableServices' => $editableServices,
+            'slotCapacity' => (int) $this->appointmentSchedule()['boxes_per_slot'],
         ]);
     }
 
@@ -682,10 +697,18 @@ class AppointmentController extends Controller
             'date' => ['required', 'date_format:Y-m-d'],
             'start_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'existing_items' => ['nullable', 'array'],
+            'existing_items.*.keep' => ['nullable', 'boolean'],
+            'new_items' => ['nullable', 'array'],
+            'new_items.*.service_id' => ['nullable', 'string', Rule::exists('services', 'id')],
+            'new_items.*.staff_id' => ['nullable', 'string', Rule::exists('staff', 'id')],
+            'new_items.*.slot_index' => ['nullable', 'integer', 'min:1', 'max:'.((int) $this->appointmentSchedule()['boxes_per_slot'])],
+            'new_options' => ['nullable', 'array'],
         ]);
 
         $appointmentGroup->loadMissing([
-            'items:id,appointment_group_id,staff_id,starts_at,ends_at,service_name_snapshot',
+            'items:id,appointment_group_id,service_id,staff_id,starts_at,ends_at,service_name_snapshot',
+            'items.service',
             'items.staff:id,full_name',
             'items.slotReservation',
         ]);
@@ -697,7 +720,25 @@ class AppointmentController extends Controller
         }
 
         $newGroupStart = Carbon::createFromFormat('Y-m-d H:i', $validated['date'].' '.$validated['start_time']);
+        $existingItemInputs = collect($validated['existing_items'] ?? []);
+        $removedItems = $appointmentGroup->items
+            ->filter(fn (AppointmentItem $item) => $existingItemInputs->has((string) $item->id) && ! (bool) ($existingItemInputs[(string) $item->id]['keep'] ?? false))
+            ->values();
+        $keptItems = $appointmentGroup->items
+            ->reject(fn (AppointmentItem $item) => $removedItems->contains(fn (AppointmentItem $removed) => (string) $removed->id === (string) $item->id))
+            ->values();
+        $newItemInputs = collect($validated['new_items'] ?? [])
+            ->filter(fn ($row) => is_array($row) && filled($row['service_id'] ?? null))
+            ->values();
+
+        if ($keptItems->isEmpty() && $newItemInputs->isEmpty()) {
+            throw ValidationException::withMessages([
+                'new_items' => 'Keep or add at least one service before saving this appointment.',
+            ]);
+        }
+
         $preparedItems = $appointmentGroup->items
+            ->filter(fn (AppointmentItem $item) => $keptItems->contains(fn (AppointmentItem $kept) => (string) $kept->id === (string) $item->id))
             ->filter(fn (AppointmentItem $item) => $item->starts_at && $item->ends_at)
             ->map(function (AppointmentItem $item) use ($appointmentGroup, $newGroupStart) {
                 $offsetMinutes = $appointmentGroup->starts_at->diffInMinutes($item->starts_at, false);
@@ -717,6 +758,59 @@ class AppointmentController extends Controller
             })
             ->values();
 
+        $newServices = Service::query()
+            ->with('optionGroups.values')
+            ->with(['staff' => fn ($query) => $query->where('is_active', true)])
+            ->whereIn('id', $newItemInputs->pluck('service_id')->filter()->unique()->all())
+            ->where('is_active', true)
+            ->get()
+            ->keyBy(fn (Service $service) => (string) $service->id);
+        $newServiceInstances = $newItemInputs
+            ->map(function (array $row, int $index) use ($validated) {
+                return [
+                    'instance_id' => 'new_'.$index,
+                    'service_id' => (string) ($row['service_id'] ?? ''),
+                    'selected_options' => $this->normalizeSelectedOptionsInput([
+                        'new_'.$index => $validated['new_options'][$index] ?? [],
+                    ])['new_'.$index] ?? [],
+                ];
+            })
+            ->values();
+        $resolvedNewSelections = $this->resolveServiceInstanceOptions($newServiceInstances, $newServices);
+        $newPreparedItems = $newItemInputs
+            ->map(function (array $row, int $index) use ($newServices, $newGroupStart) {
+                $service = $newServices->get((string) ($row['service_id'] ?? ''));
+                $staff = $service?->staff->firstWhere('id', $row['staff_id'] ?? null);
+
+                if (! $service) {
+                    throw ValidationException::withMessages([
+                        'new_items' => 'One of the added services is no longer available.',
+                    ]);
+                }
+
+                if (! $staff) {
+                    throw ValidationException::withMessages([
+                        'new_items' => "{$service->name} can only be assigned to eligible staff.",
+                    ]);
+                }
+
+                return [
+                    'index' => $index,
+                    'service' => $service,
+                    'staff_id' => (string) $staff->id,
+                    'staff' => $staff,
+                    'start' => $newGroupStart->copy(),
+                    'end' => $newGroupStart->copy()->addMinutes($this->slotDurationMinutes()),
+                    'slot_index' => (int) ($row['slot_index'] ?? 1),
+                    'spans_slots' => false,
+                ];
+            })
+            ->values();
+        $removedItemIds = $removedItems
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
         foreach ($preparedItems as $current) {
             $clinicStart = $current['start']->copy()->setTime(self::PLANNER_START_HOUR, 0);
             $clinicEnd = $current['start']->copy()->setTime(self::PLANNER_END_HOUR, 0);
@@ -732,6 +826,10 @@ class AppointmentController extends Controller
             }
 
             try {
+                if ($current['item']->service) {
+                    $this->assertMedexMachineAvailable($current['item']->service, $current['start'], array_merge($removedItemIds, [(string) $current['item']->id]));
+                }
+
                 $slotIndex = $this->findAvailableSlotIndex(
                     $current['staff'],
                     $current['start'],
@@ -757,7 +855,47 @@ class AppointmentController extends Controller
             }
         }
 
-        DB::transaction(function () use ($appointmentGroup, $preparedItems, $validated) {
+        foreach ($newPreparedItems as $current) {
+            $clinicStart = $current['start']->copy()->setTime(self::PLANNER_START_HOUR, 0);
+            $clinicEnd = $current['start']->copy()->setTime(self::PLANNER_END_HOUR, 0);
+
+            if ($current['start']->lt($clinicStart) || $current['end']->gt($clinicEnd)) {
+                throw ValidationException::withMessages([
+                    'start_time' => 'Appointments can only be scheduled within clinic hours from 10:00 to 19:00.',
+                ]);
+            }
+
+            $this->assertStaffCapacityAvailable($current['staff'], $current['start'], $current['end'], $removedItemIds);
+            $this->assertSlotBoxFree($current['staff'], $current['start'], $current['slot_index'], $removedItemIds);
+            $this->assertMedexMachineAvailable($current['service'], $current['start'], $removedItemIds);
+        }
+
+        $boxKeys = $preparedItems
+            ->filter(fn (array $item) => filled($item['staff_id']))
+            ->map(fn (array $item) => implode('|', [
+                $item['staff_id'],
+                $item['start']->format('Y-m-d H:i'),
+                $item['preferred_slot_index'] ?: 1,
+            ]))
+            ->concat($newPreparedItems->map(fn (array $item) => implode('|', [
+                $item['staff_id'],
+                $item['start']->format('Y-m-d H:i'),
+                $item['slot_index'],
+            ])));
+
+        if ($boxKeys->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'new_items' => 'Two services are assigned to the same staff half-slot. Choose another empty box.',
+            ]);
+        }
+
+        DB::transaction(function () use ($appointmentGroup, $preparedItems, $removedItems, $newPreparedItems, $resolvedNewSelections, $validated) {
+            foreach ($removedItems as $removedItem) {
+                $this->releaseMergedSlotBlocks($removedItem);
+                $removedItem->slotReservation?->delete();
+                $removedItem->delete();
+            }
+
             foreach ($preparedItems as $preparedItem) {
                 $item = $preparedItem['item'];
                 $this->releaseMergedSlotBlocks($item);
@@ -782,6 +920,41 @@ class AppointmentController extends Controller
                         (int) ($freshItem->slotReservation?->slot_index ?: 1)
                     );
                 }
+            }
+
+            foreach ($newPreparedItems as $preparedItem) {
+                $service = $preparedItem['service'];
+                $staff = $preparedItem['staff'];
+                $instanceId = 'new_'.$preparedItem['index'];
+                $selections = $resolvedNewSelections[$instanceId] ?? [];
+                $appointmentItem = AppointmentItem::query()->create([
+                    'appointment_group_id' => $appointmentGroup->id,
+                    'service_id' => $service->id,
+                    'service_name_snapshot' => $this->buildServiceSnapshotName($service, $selections),
+                    'service_category_key_snapshot' => $service->category_key,
+                    'service_category_label_snapshot' => $service->category_label,
+                    'staff_id' => $staff->id,
+                    'staff_name_snapshot' => $staff->full_name,
+                    'staff_role_snapshot' => $staff->role_key,
+                    'required_role' => $staff->role_key,
+                    'starts_at' => $preparedItem['start'],
+                    'ends_at' => $preparedItem['end'],
+                ]);
+
+                $this->reserveStaffTimeBox($appointmentItem, $staff, $preparedItem['start'], $preparedItem['slot_index']);
+
+                $appointmentItem->optionSelections()->createMany(
+                    collect($selections)
+                        ->map(fn (array $selection) => [
+                            'service_option_group_id' => $selection['group_id'],
+                            'service_option_value_id' => $selection['value_id'],
+                            'option_group_name' => $selection['group_name'],
+                            'option_value_label' => $selection['value_label'],
+                            'display_order' => $selection['display_order'],
+                        ])
+                        ->values()
+                        ->all()
+                );
             }
 
             $appointmentGroup->notes = $validated['notes'] ?? null;

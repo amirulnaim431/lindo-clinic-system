@@ -487,7 +487,8 @@ class AppointmentTreatmentHistoryTest extends TestCase
             ->get(route('app.appointments.edit', $group))
             ->assertOk()
             ->assertSee('Edit Appointment')
-            ->assertSee('Only the appointment date, time, and remark can be edited here.');
+            ->assertSee('Keep or remove existing treatments')
+            ->assertSee('Add another treatment into this appointment window');
 
         $this->actingAs($admin)
             ->patch(route('app.appointments.timing.update', $group), [
@@ -504,6 +505,156 @@ class AppointmentTreatmentHistoryTest extends TestCase
         $this->assertSame('2026-04-29 13:45:00', $group->ends_at->format('Y-m-d H:i:s'));
         $this->assertSame('Customer requested afternoon slot', $group->notes);
         $this->assertSame('2026-04-29 13:00:00', $item->starts_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_appointment_edit_page_can_add_service_to_available_second_box(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff(['full_name' => 'Dr. Aqilah']);
+        $customer = Customer::query()->create([
+            'full_name' => 'Add Service Customer',
+            'phone' => '0123335555',
+        ]);
+        $start = Carbon::parse('2026-04-29 10:00:00');
+        $group = AppointmentGroup::query()->create([
+            'customer_id' => $customer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+        ]);
+        $existingService = Service::query()->create([
+            'service_code' => 'existing_edit_service',
+            'name' => 'Consult Tirze',
+            'category_key' => 'consultations',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $addedService = Service::query()->create([
+            'service_code' => 'added_edit_service',
+            'name' => 'Liver Detox',
+            'category_key' => 'wellness',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 2,
+        ]);
+        $addedService->staff()->attach($staff->id);
+        $existingItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $existingService->id,
+            'service_name_snapshot' => 'Consult Tirze',
+            'service_category_key_snapshot' => 'consultations',
+            'service_category_label_snapshot' => 'Consultation',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+        AppointmentSlotReservation::query()->create([
+            'appointment_item_id' => $existingItem->id,
+            'staff_id' => $staff->id,
+            'slot_date' => $start->toDateString(),
+            'start_time' => '10:00:00',
+            'slot_index' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('app.appointments.timing.update', $group), [
+                'date' => '2026-04-29',
+                'start_time' => '10:00',
+                'existing_items' => [
+                    $existingItem->id => ['keep' => '1'],
+                ],
+                'new_items' => [
+                    ['service_id' => $addedService->id, 'staff_id' => $staff->id, 'slot_index' => 2],
+                ],
+            ])
+            ->assertRedirect(route('app.appointments.edit', $group));
+
+        $addedItem = $group->items()->where('service_id', $addedService->id)->first();
+
+        $this->assertNotNull($addedItem);
+        $this->assertDatabaseHas('appointment_slot_reservations', [
+            'appointment_item_id' => $addedItem->id,
+            'staff_id' => $staff->id,
+            'slot_index' => 2,
+        ]);
+    }
+
+    public function test_appointment_edit_page_can_remove_service_and_free_box(): void
+    {
+        $admin = $this->createAdmin();
+        $staff = $this->createStaff(['full_name' => 'Dr. Aqilah']);
+        $customer = Customer::query()->create([
+            'full_name' => 'Remove Service Customer',
+            'phone' => '0123336666',
+        ]);
+        $start = Carbon::parse('2026-04-29 11:00:00');
+        $group = AppointmentGroup::query()->create([
+            'customer_id' => $customer->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+            'status' => AppointmentStatus::Booked,
+        ]);
+        $service = Service::query()->create([
+            'service_code' => 'remove_edit_service',
+            'name' => 'Facial Treatment',
+            'category_key' => 'aesthetics',
+            'duration_minutes' => 60,
+            'is_active' => true,
+            'display_order' => 1,
+        ]);
+        $firstItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Facial Treatment',
+            'service_category_key_snapshot' => 'aesthetics',
+            'service_category_label_snapshot' => 'Aesthetic',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+        $secondItem = AppointmentItem::query()->create([
+            'appointment_group_id' => $group->id,
+            'service_id' => $service->id,
+            'service_name_snapshot' => 'Liver Detox',
+            'service_category_key_snapshot' => 'wellness',
+            'service_category_label_snapshot' => 'Wellness',
+            'staff_id' => $staff->id,
+            'staff_name_snapshot' => $staff->full_name,
+            'staff_role_snapshot' => 'doctor',
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addMinutes(45),
+        ]);
+
+        foreach ([[$firstItem, 1], [$secondItem, 2]] as [$item, $slotIndex]) {
+            AppointmentSlotReservation::query()->create([
+                'appointment_item_id' => $item->id,
+                'staff_id' => $staff->id,
+                'slot_date' => $start->toDateString(),
+                'start_time' => '11:00:00',
+                'slot_index' => $slotIndex,
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->patch(route('app.appointments.timing.update', $group), [
+                'date' => '2026-04-29',
+                'start_time' => '11:00',
+                'existing_items' => [
+                    $firstItem->id => ['keep' => '1'],
+                    $secondItem->id => ['keep' => '0'],
+                ],
+            ])
+            ->assertRedirect(route('app.appointments.edit', $group));
+
+        $this->assertSoftDeleted('appointment_items', ['id' => $secondItem->id]);
+        $this->assertDatabaseMissing('appointment_slot_reservations', [
+            'appointment_item_id' => $secondItem->id,
+        ]);
     }
 
     public function test_appointment_remark_edit_allows_other_customer_in_second_slot(): void
