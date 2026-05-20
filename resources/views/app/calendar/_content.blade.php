@@ -31,7 +31,7 @@
                         <button type="submit" class="btn btn-primary">Apply</button>
                     </form>
                     <a href="{{ route('app.calendar', ['date' => $nextDate, 'embedded' => !empty($embedded) ? 1 : null, 'compact' => !empty($compact) ? 1 : null]) }}" class="btn btn-secondary">Next day &rarr;</a>
-                    <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
+                    <button type="button" class="btn btn-secondary" data-calendar-print>Print</button>
                 </div>
             </div>
         </div>
@@ -672,6 +672,144 @@
         const details = document.getElementById('whatsapp-reminder-details');
         const copyBox = document.getElementById('whatsapp-reminder-copy');
         const copyButton = document.getElementById('whatsapp-reminder-copy-button');
+        const printButton = document.querySelector('[data-calendar-print]');
+
+        function printCalendarBoardOnly() {
+            const printHeader = document.querySelector('.print-header')?.outerHTML || '';
+            const scheduleSections = Array.from(document.querySelectorAll('.print-schedule-section'));
+            const referenceSections = Array.from(document.querySelectorAll('.calendar-reference-board .planner-staff-card'));
+            const printableSections = scheduleSections.length
+                ? scheduleSections.map((section) => section.outerHTML).join('')
+                : referenceSections.map((section) => section.outerHTML).join('');
+            const printWindow = window.open('', '_blank', 'width=1200,height=820');
+
+            if (!printWindow) {
+                window.alert('Please allow pop-ups so the clean printable calendar board can open.');
+                return;
+            }
+
+            printWindow.document.write(`
+                <!doctype html>
+                <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Daily Client Schedule</title>
+                        <style>
+                            @page { size: A4 landscape; margin: 10mm; }
+                            * { box-sizing: border-box; }
+                            body {
+                                margin: 0;
+                                color: #000;
+                                font-family: Inter, "Plus Jakarta Sans", Arial, sans-serif;
+                                background: #fff;
+                            }
+                            .print-header {
+                                display: block;
+                                margin-bottom: 14px;
+                                text-align: center;
+                            }
+                            .print-header__title {
+                                margin: 0;
+                                font-size: 21px;
+                                font-weight: 800;
+                            }
+                            .print-header__date {
+                                margin-top: 8px;
+                                font-size: 16px;
+                                font-weight: 800;
+                            }
+                            .panel,
+                            .panel-body,
+                            .table-shell,
+                            .table-wrap {
+                                border: 0 !important;
+                                box-shadow: none !important;
+                                padding: 0 !important;
+                                background: #fff !important;
+                            }
+                            .print-schedule-section,
+                            .planner-staff-card {
+                                margin: 0 0 12px;
+                                page-break-inside: avoid;
+                                break-inside: avoid;
+                            }
+                            .schedule-section-head,
+                            .planner-staff-card__head {
+                                display: flex;
+                                justify-content: space-between;
+                                gap: 12px;
+                                background: #e9eaee !important;
+                                border: 1px solid #000;
+                                border-bottom: 0;
+                                padding: 7px 9px;
+                                font-weight: 800;
+                            }
+                            table {
+                                width: 100%;
+                                min-width: 0 !important;
+                                border-collapse: collapse;
+                                table-layout: fixed;
+                                font-size: 10.5px;
+                            }
+                            th {
+                                background: #000 !important;
+                                color: #fff !important;
+                                border: 1px solid #000;
+                                padding: 6px 5px;
+                                text-align: left;
+                                text-transform: uppercase;
+                                letter-spacing: 0.04em;
+                            }
+                            td {
+                                border: 1px solid #000;
+                                padding: 6px 5px;
+                                vertical-align: top;
+                                overflow-wrap: anywhere;
+                            }
+                            td:nth-child(1),
+                            td:nth-child(2),
+                            td:nth-child(4) {
+                                white-space: nowrap;
+                            }
+                            td:nth-child(4) {
+                                background: #f8cf9f !important;
+                            }
+                            a {
+                                color: #000;
+                                text-decoration: none;
+                            }
+                            .calendar-edit-button,
+                            .small-note,
+                            .planner-slot-box__title + div {
+                                color: #000 !important;
+                            }
+                            .planner-slot-row {
+                                display: grid;
+                                grid-template-columns: 145px repeat(2, minmax(0, 1fr));
+                                border: 1px solid #000;
+                                border-top: 0;
+                                min-height: 54px;
+                            }
+                            .planner-slot-label,
+                            .planner-slot-box {
+                                padding: 9px;
+                                border-right: 1px solid #000;
+                            }
+                            .planner-slot-box:last-child {
+                                border-right: 0;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${printHeader}
+                        ${printableSections || '<div style="border:1px solid #000;padding:18px;text-align:center;font-weight:800;">No appointments scheduled.</div>'}
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+        }
 
         function closeReminder() {
             modal?.classList.add('hidden');
@@ -696,6 +834,7 @@
         });
 
         closeButtons.forEach((button) => button?.addEventListener('click', closeReminder));
+        printButton?.addEventListener('click', printCalendarBoardOnly);
         modal?.addEventListener('click', function (event) {
             if (event.target === modal || event.target === modal.firstElementChild) {
                 closeReminder();

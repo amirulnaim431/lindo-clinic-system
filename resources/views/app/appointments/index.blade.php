@@ -1551,6 +1551,9 @@
                     `;
                 }
 
+                trafficListPrint.dataset.printTitle = meta.title;
+                trafficListPrint.dataset.printSubtitle = meta.subtitle;
+
                 if (listKey === 'reschedule') {
                     const datePicker = trafficListContent.querySelector('#traffic-followup-date');
                     datePicker?.addEventListener('change', function () {
@@ -1725,6 +1728,109 @@
                 if (matchingService.category_key === 'consultations') {
                     activeConsultationDepartment = matchingService.consultation_category_key || activeConsultationDepartment;
                 }
+            }
+
+            function printTrafficListOnly() {
+                if (!trafficListContent) {
+                    return;
+                }
+
+                const printWindow = window.open('', '_blank', 'width=1100,height=760');
+
+                if (!printWindow) {
+                    window.alert('Please allow pop-ups so the clean printable list can open.');
+                    return;
+                }
+
+                printWindow.document.write(`
+                    <!doctype html>
+                    <html>
+                        <head>
+                            <meta charset="utf-8">
+                            <title>${escapeHtml(trafficListPrint?.dataset.printTitle || 'Customer traffic list')}</title>
+                            <style>
+                                @page { size: A4 landscape; margin: 10mm; }
+                                * { box-sizing: border-box; }
+                                body {
+                                    margin: 0;
+                                    color: #111;
+                                    font-family: Inter, "Plus Jakarta Sans", Arial, sans-serif;
+                                    background: #fff;
+                                }
+                                .traffic-print-header {
+                                    margin-bottom: 14px;
+                                    text-align: center;
+                                }
+                                .traffic-print-title {
+                                    font-size: 22px;
+                                    font-weight: 800;
+                                    letter-spacing: -0.01em;
+                                }
+                                .traffic-print-subtitle {
+                                    margin-top: 4px;
+                                    font-size: 12px;
+                                    color: #555;
+                                }
+                                .traffic-followup-tools,
+                                .traffic-booking-action,
+                                .screen-actions {
+                                    display: none !important;
+                                }
+                                .traffic-list-empty {
+                                    border: 1px solid #111;
+                                    padding: 18px;
+                                    text-align: center;
+                                    font-weight: 700;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    table-layout: fixed;
+                                    font-size: 10.5px;
+                                }
+                                th {
+                                    background: #000 !important;
+                                    color: #fff !important;
+                                    border: 1px solid #000;
+                                    padding: 7px 6px;
+                                    text-align: left;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.04em;
+                                }
+                                td {
+                                    border: 1px solid #111;
+                                    padding: 7px 6px;
+                                    vertical-align: top;
+                                    overflow-wrap: anywhere;
+                                }
+                                td:nth-child(1),
+                                td:nth-child(2),
+                                td:nth-child(4),
+                                td:nth-child(5) {
+                                    white-space: nowrap;
+                                }
+                                a {
+                                    color: #111;
+                                    text-decoration: none;
+                                    pointer-events: none;
+                                }
+                                input[type="checkbox"] {
+                                    appearance: none;
+                                    width: 10px;
+                                    height: 10px;
+                                    border: 1px solid #111;
+                                    vertical-align: middle;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            ${trafficListContent.innerHTML}
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
             }
 
             function renderCategoryTabs() {
@@ -2489,9 +2595,7 @@
                     button?.addEventListener('click', closeCheckinRemarkModal);
                 });
                 trafficListPrint?.addEventListener('click', function () {
-                    document.body.classList.add('is-printing-traffic');
-                    window.print();
-                    window.setTimeout(() => document.body.classList.remove('is-printing-traffic'), 250);
+                    printTrafficListOnly();
                 });
                 const requestedTrafficList = new URLSearchParams(window.location.search).get('status');
                 if (requestedTrafficList && trafficListMeta[requestedTrafficList]) {
