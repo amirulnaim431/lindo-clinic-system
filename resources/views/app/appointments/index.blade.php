@@ -3,6 +3,8 @@
     $isCheckInMode = $mode === 'checkin';
     $filters = $filters ?? ['date' => now()->format('Y-m-d')];
     $selectedDate = $filters['date'] ?? now()->format('Y-m-d');
+    $selectedDateFrom = $filters['date_from'] ?? $selectedDate;
+    $selectedDateTo = $filters['date_to'] ?? $selectedDate;
     $appointmentGroups = collect($appointmentGroups ?? []);
     $services = $services ?? collect();
     $serviceCategories = collect($serviceCategories ?? []);
@@ -1097,13 +1099,36 @@
 
         .traffic-followup-tools {
             display: flex;
-            align-items: center;
+            align-items: end;
             gap: 0.75rem;
+            flex-wrap: wrap;
             margin: 1rem 0;
         }
 
         .traffic-followup-tools .form-input {
             width: 180px;
+        }
+
+        .traffic-followup-warning {
+            margin: 0.75rem 0 1rem;
+            border: 1px solid rgba(191, 120, 147, 0.28);
+            border-radius: 18px;
+            padding: 0.85rem 1rem;
+            background: #fff8e8;
+            color: #6e4b10;
+        }
+
+        .traffic-followup-warning::before {
+            content: '!';
+            display: inline-grid;
+            place-items: center;
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-right: 0.45rem;
+            border-radius: 999px;
+            background: #f2c879;
+            color: #4a3104;
+            font-weight: 900;
         }
 
         .traffic-customer-link {
@@ -1502,8 +1527,18 @@
                 trafficListSubtitle.textContent = meta.subtitle;
                 const rescheduleDateControl = listKey === 'reschedule' ? `
                     <div class="traffic-followup-tools">
-                        <label class="field-label" for="traffic-followup-date">Follow-up date</label>
-                        <input id="traffic-followup-date" type="date" class="form-input" value="${escapeHtml(dateInput?.value || @json($selectedDate))}">
+                        <div>
+                            <label class="field-label" for="traffic-followup-from">From</label>
+                            <input id="traffic-followup-from" type="date" class="form-input" value="${escapeHtml(@json($selectedDateFrom))}">
+                        </div>
+                        <div>
+                            <label class="field-label" for="traffic-followup-to">To</label>
+                            <input id="traffic-followup-to" type="date" class="form-input" value="${escapeHtml(@json($selectedDateTo))}">
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="traffic-followup-apply">Apply range</button>
+                    </div>
+                    <div class="traffic-followup-warning" data-reschedule-warning hidden>
+                        <strong>Gentle reminder:</strong> <span data-reschedule-warning-count></span> customer(s) in this range are still not marked as followed up.
                     </div>
                 ` : '';
 
@@ -1564,12 +1599,16 @@
                 trafficListPrint.dataset.printSubtitle = meta.subtitle;
 
                 if (listKey === 'reschedule') {
-                    const datePicker = trafficListContent.querySelector('#traffic-followup-date');
-                    datePicker?.addEventListener('change', function () {
+                    const fromPicker = trafficListContent.querySelector('#traffic-followup-from');
+                    const toPicker = trafficListContent.querySelector('#traffic-followup-to');
+                    const applyRange = trafficListContent.querySelector('#traffic-followup-apply');
+                    applyRange?.addEventListener('click', function () {
                         const url = new URL(window.location.href);
                         url.searchParams.set('mode', 'checkin');
                         url.searchParams.set('status', 'reschedule');
-                        url.searchParams.set('date', datePicker.value);
+                        url.searchParams.set('date', fromPicker?.value || @json($selectedDate));
+                        url.searchParams.set('date_from', fromPicker?.value || @json($selectedDate));
+                        url.searchParams.set('date_to', toPicker?.value || fromPicker?.value || @json($selectedDate));
                         window.location.href = url.toString();
                     });
 
@@ -1585,8 +1624,10 @@
                             } else {
                                 window.localStorage.removeItem(storageKey);
                             }
+                            refreshRescheduleWarning();
                         });
                     });
+                    refreshRescheduleWarning();
                 }
 
                 trafficListModal.classList.remove('hidden');
@@ -1594,7 +1635,29 @@
                 document.body.classList.add('modal-open');
             }
 
+            function refreshRescheduleWarning() {
+                const warning = trafficListContent?.querySelector('[data-reschedule-warning]');
+                const countTarget = trafficListContent?.querySelector('[data-reschedule-warning-count]');
+                const unchecked = Array.from(trafficListContent?.querySelectorAll('[data-followup-id]') || [])
+                    .filter((checkbox) => !checkbox.checked)
+                    .length;
+
+                if (warning && countTarget) {
+                    countTarget.textContent = unchecked;
+                    warning.hidden = unchecked === 0;
+                }
+
+                return unchecked;
+            }
+
             function closeTrafficListModal() {
+                const isRescheduleList = trafficListTitle?.textContent?.toLowerCase().includes('rescheduled');
+                const unchecked = isRescheduleList ? refreshRescheduleWarning() : 0;
+
+                if (unchecked > 0 && !window.confirm(`Gentle reminder: ${unchecked} reschedule customer(s) are not marked as followed up yet. Close this list anyway?`)) {
+                    return;
+                }
+
                 trafficListModal?.classList.add('hidden');
                 trafficListModal?.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('modal-open', 'is-printing-traffic');

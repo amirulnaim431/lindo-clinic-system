@@ -5,6 +5,7 @@
         $editableServicePayload = $editableServices
             ->mapWithKeys(fn ($service) => [
                 (string) $service->id => [
+                    'id' => (string) $service->id,
                     'name' => $service->name,
                     'category' => $service->category_label,
                     'staff' => $service->staff
@@ -168,8 +169,10 @@
                         <div class="summary-card appointment-new-service-row" data-new-service-row="{{ $index }}">
                             <div class="appointment-new-service-grid">
                                 <div class="field-block">
-                                    <label class="field-label" for="new-service-{{ $index }}">Service</label>
-                                    <select id="new-service-{{ $index }}" name="new_items[{{ $index }}][service_id]" class="form-input appointment-service-select" data-row="{{ $index }}">
+                                    <label class="field-label" for="new-service-search-{{ $index }}">Service</label>
+                                    <input id="new-service-search-{{ $index }}" type="search" class="form-input appointment-service-search" data-row="{{ $index }}" placeholder="Search service name or category" autocomplete="off">
+                                    <div class="appointment-service-suggestions" data-service-suggestions="{{ $index }}" hidden></div>
+                                    <select id="new-service-{{ $index }}" name="new_items[{{ $index }}][service_id]" class="form-input appointment-service-select appointment-service-native" data-row="{{ $index }}">
                                         <option value="">No added service</option>
                                         @foreach ($editableServices as $service)
                                             <option value="{{ $service->id }}">{{ $service->category_label }} · {{ $service->name }}</option>
@@ -185,7 +188,10 @@
                                 </div>
 
                                 <div class="field-block">
-                                    <label class="field-label" for="new-box-{{ $index }}">Box</label>
+                                    <label class="field-label">Timeslot</label>
+                                    <button type="button" class="btn btn-secondary appointment-slot-button" data-row="{{ $index }}">Select timeslot</button>
+                                    <div class="small-note mt-2" data-slot-label="{{ $index }}">No slot selected</div>
+                                    <label class="field-label appointment-native-slot-label" for="new-box-{{ $index }}">Box</label>
                                     <select id="new-box-{{ $index }}" name="new_items[{{ $index }}][slot_index]" class="form-input">
                                         @for ($slotIndex = 1; $slotIndex <= $slotCapacity; $slotIndex++)
                                             <option value="{{ $slotIndex }}">Box {{ $slotIndex }}</option>
@@ -205,6 +211,32 @@
                 </div>
             </div>
         </form>
+    </div>
+
+    <div id="edit-slot-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage modal-stage--wide edit-slot-modal-stage" role="dialog" aria-modal="true" aria-labelledby="edit-slot-title">
+            <div class="modal-card">
+                <div class="modal-head">
+                    <div>
+                        <div class="modal-kicker">Staff availability</div>
+                        <h3 class="modal-title" id="edit-slot-title">Select timeslot</h3>
+                        <p class="modal-subtitle" id="edit-slot-subtitle">Pick an available box for the selected staff.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="edit-slot-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body stack">
+                    <div class="edit-slot-toolbar">
+                        <div class="field-block">
+                            <label class="field-label" for="edit-slot-date">View date</label>
+                            <input id="edit-slot-date" type="date" class="form-input" value="{{ $appointmentDate }}">
+                        </div>
+                        <button type="button" class="btn btn-primary" id="edit-slot-load">Apply</button>
+                    </div>
+                    <div id="edit-slot-board" class="edit-slot-board"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>
@@ -270,7 +302,7 @@
 
         .appointment-new-service-grid {
             display: grid;
-            grid-template-columns: minmax(260px, 1fr) minmax(240px, 1fr) minmax(120px, 160px);
+            grid-template-columns: minmax(320px, 1.1fr) minmax(240px, 1fr) minmax(180px, 220px);
             gap: 1rem;
             align-items: end;
         }
@@ -279,6 +311,116 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 1rem;
+        }
+
+        .appointment-service-native,
+        .appointment-native-slot-label,
+        .appointment-new-service-row select[name$="[slot_index]"] {
+            display: none;
+        }
+
+        .appointment-service-suggestions {
+            position: relative;
+            z-index: 20;
+            margin-top: 0.5rem;
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid rgba(99, 46, 62, 0.12);
+            border-radius: 22px;
+            background: #fff;
+            box-shadow: 0 18px 45px rgba(92, 58, 69, 0.14);
+        }
+
+        .appointment-service-suggestion {
+            display: block;
+            width: 100%;
+            border: 0;
+            border-bottom: 1px solid rgba(99, 46, 62, 0.07);
+            padding: 0.85rem 1rem;
+            background: transparent;
+            color: #2f1d26;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .appointment-service-suggestion:hover {
+            background: #fff7fa;
+        }
+
+        .appointment-service-suggestion strong {
+            display: block;
+        }
+
+        .appointment-slot-button {
+            width: 100%;
+            min-height: 58px;
+            justify-content: center;
+        }
+
+        .edit-slot-modal-stage {
+            width: min(1120px, calc(100vw - 32px));
+            max-height: calc(100vh - 40px);
+        }
+
+        .edit-slot-toolbar {
+            display: flex;
+            align-items: end;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .edit-slot-board {
+            max-height: min(68vh, 760px);
+            overflow: auto;
+            padding-right: 0.25rem;
+        }
+
+        .edit-slot-row {
+            display: grid;
+            grid-template-columns: 170px repeat(2, minmax(0, 1fr));
+            border-top: 1px solid rgba(99, 46, 62, 0.08);
+        }
+
+        .edit-slot-time {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            font-weight: 900;
+        }
+
+        .edit-slot-box {
+            margin: 0.75rem;
+            min-height: 78px;
+            border: 1px dashed rgba(99, 46, 62, 0.16);
+            border-radius: 20px;
+            background: #fffbfd;
+            color: #2f1d26;
+            text-align: left;
+            padding: 0.95rem 1rem;
+        }
+
+        .edit-slot-box.is-available {
+            cursor: pointer;
+        }
+
+        .edit-slot-box.is-available:hover {
+            border-color: rgba(198, 124, 154, 0.62);
+            background: #fff7fa;
+        }
+
+        .edit-slot-box.is-unavailable {
+            border-style: solid;
+            background: #f4eef1;
+            color: #8a6975;
+            cursor: not-allowed;
+        }
+
+        .edit-slot-box__time {
+            color: #bf7893;
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         @media (max-width: 720px) {
@@ -296,6 +438,19 @@
     <script>
         (() => {
             const services = @json($editableServicePayload);
+            const serviceList = Object.values(services);
+            const availabilityUrl = @json(route('app.appointments.availability-board'));
+            const dateInput = document.getElementById('date');
+            const startTimeInput = document.getElementById('start_time');
+            const slotModal = document.getElementById('edit-slot-modal');
+            const slotClose = document.getElementById('edit-slot-close');
+            const slotDate = document.getElementById('edit-slot-date');
+            const slotLoad = document.getElementById('edit-slot-load');
+            const slotBoard = document.getElementById('edit-slot-board');
+            const slotTitle = document.getElementById('edit-slot-title');
+            const slotSubtitle = document.getElementById('edit-slot-subtitle');
+            let activeSlotRow = null;
+            let activeAvailability = null;
 
             const escapeHtml = (value) => String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -320,6 +475,155 @@
                     '<option value="">Choose eligible staff</option>',
                     ...(service.staff || []).map((staff) => `<option value="${escapeHtml(staff.id)}">${escapeHtml(staff.name)}${staff.role ? ` (${escapeHtml(staff.role)})` : ''}</option>`),
                 ].join('');
+            };
+
+            const boxTimeLabel = (slotTime, slotIndex) => {
+                const [hour, minute] = String(slotTime || '00:00').split(':').map((value) => Number(value || 0));
+                const date = new Date();
+                date.setHours(hour, minute + ((Number(slotIndex) - 1) * 30), 0, 0);
+
+                return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            };
+
+            const renderServiceSuggestions = (row, query) => {
+                const target = document.querySelector(`[data-service-suggestions="${row}"]`);
+
+                if (!target) {
+                    return;
+                }
+
+                const term = String(query || '').trim().toLowerCase();
+
+                if (term.length < 2) {
+                    target.hidden = true;
+                    target.innerHTML = '';
+                    return;
+                }
+
+                const matches = serviceList
+                    .filter((service) => `${service.name} ${service.category}`.toLowerCase().includes(term))
+                    .slice(0, 18);
+
+                if (!matches.length) {
+                    target.hidden = false;
+                    target.innerHTML = '<div class="small-note" style="padding:1rem;">No matching services found.</div>';
+                    return;
+                }
+
+                target.hidden = false;
+                target.innerHTML = matches.map((service) => `
+                    <button type="button" class="appointment-service-suggestion" data-service-choice="${escapeHtml(service.id)}" data-row="${escapeHtml(row)}">
+                        <strong>${escapeHtml(service.name)}</strong>
+                        <span>${escapeHtml(service.category || 'Service')}</span>
+                    </button>
+                `).join('');
+            };
+
+            const selectService = (row, serviceId) => {
+                const service = services[serviceId] || null;
+                const nativeSelect = document.querySelector(`.appointment-service-select[data-row="${row}"]`);
+                const searchInput = document.querySelector(`.appointment-service-search[data-row="${row}"]`);
+                const suggestions = document.querySelector(`[data-service-suggestions="${row}"]`);
+
+                if (nativeSelect) {
+                    nativeSelect.value = serviceId || '';
+                }
+
+                if (searchInput) {
+                    searchInput.value = service ? `${service.name} - ${service.category}` : '';
+                }
+
+                if (suggestions) {
+                    suggestions.hidden = true;
+                    suggestions.innerHTML = '';
+                }
+
+                renderStaffOptions(row, service);
+                renderOptions(row, service);
+            };
+
+            const renderSlotBoard = (row) => {
+                const staffSelect = document.querySelector(`.appointment-staff-select[data-row="${row}"]`);
+                const staffId = staffSelect?.value || '';
+                const staffName = staffSelect?.selectedOptions?.[0]?.textContent || 'Selected staff';
+
+                if (!slotBoard || !activeAvailability) {
+                    return;
+                }
+
+                if (!staffId) {
+                    slotBoard.innerHTML = '<div class="empty-state empty-state--dashed"><div class="empty-state__title">Choose eligible staff first</div></div>';
+                    return;
+                }
+
+                const staff = (activeAvailability.staff || []).find((candidate) => candidate.id === staffId);
+                const occupancy = activeAvailability.occupancy?.[staffId] || {};
+                const capacity = Number(activeAvailability.capacity_per_slot || 2);
+                const slots = activeAvailability.slots || [];
+
+                slotTitle.textContent = staffName;
+                slotSubtitle.textContent = `Choose an available box on ${slotDate.value}.`;
+
+                if (!staff || !slots.length) {
+                    slotBoard.innerHTML = '<div class="empty-state empty-state--dashed"><div class="empty-state__title">No availability found</div></div>';
+                    return;
+                }
+
+                slotBoard.innerHTML = slots.map((slot) => {
+                    const slotOccupancy = occupancy?.[slot.time] || {};
+                    const appointments = Array.isArray(slotOccupancy.appointments) ? slotOccupancy.appointments : [];
+                    const blocks = Array.isArray(slotOccupancy.blocks) ? slotOccupancy.blocks : [];
+                    const boxes = [];
+
+                    for (let slotIndex = 1; slotIndex <= capacity; slotIndex++) {
+                        const appointment = appointments.find((item) => Number(item.slot_index || 1) === slotIndex);
+                        const block = blocks.find((item) => Number(item.slot_index || 1) === slotIndex);
+                        const label = boxTimeLabel(slot.time, slotIndex);
+
+                        if (appointment) {
+                            boxes.push(`<button type="button" class="edit-slot-box is-unavailable" disabled><div class="edit-slot-box__time">${escapeHtml(label)}</div><strong>${escapeHtml(appointment.customer_name)}</strong><div>${escapeHtml(appointment.service_name)}</div></button>`);
+                        } else if (block) {
+                            boxes.push(`<button type="button" class="edit-slot-box is-unavailable" disabled><div class="edit-slot-box__time">${escapeHtml(label)}</div><strong>Blocked</strong><div>${escapeHtml(block.reason || 'Break')}</div></button>`);
+                        } else {
+                            boxes.push(`<button type="button" class="edit-slot-box is-available" data-slot-time="${escapeHtml(slot.time)}" data-slot-index="${slotIndex}" data-slot-label="${escapeHtml(label)}"><div class="edit-slot-box__time">${escapeHtml(label)}</div><strong>Available</strong><div>Click to use this box</div></button>`);
+                        }
+                    }
+
+                    return `<div class="edit-slot-row"><div class="edit-slot-time">${escapeHtml(slot.label)}</div>${boxes.join('')}</div>`;
+                }).join('');
+            };
+
+            const loadAvailability = async () => {
+                if (!slotDate?.value) {
+                    return;
+                }
+
+                slotBoard.innerHTML = '<div class="small-note">Loading staff availability...</div>';
+                const url = new URL(availabilityUrl);
+                url.searchParams.set('date', slotDate.value);
+                const response = await fetch(url.toString(), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                activeAvailability = await response.json();
+                renderSlotBoard(activeSlotRow);
+            };
+
+            const openSlotModal = (row) => {
+                activeSlotRow = row;
+                slotDate.value = dateInput?.value || slotDate.value;
+                slotModal?.classList.remove('hidden');
+                slotModal?.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+                loadAvailability().catch(() => {
+                    slotBoard.innerHTML = '<div class="flash flash--error">Could not load availability. Please try again.</div>';
+                });
+            };
+
+            const closeSlotModal = () => {
+                slotModal?.classList.add('hidden');
+                slotModal?.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open');
             };
 
             const renderOptions = (row, service) => {
@@ -347,6 +651,32 @@
                 `).join('');
             };
 
+            document.querySelectorAll('.appointment-service-search').forEach((input) => {
+                input.addEventListener('input', () => {
+                    const nativeSelect = document.querySelector(`.appointment-service-select[data-row="${input.dataset.row}"]`);
+                    if (nativeSelect) {
+                        nativeSelect.value = '';
+                    }
+                    renderStaffOptions(input.dataset.row, null);
+                    renderOptions(input.dataset.row, null);
+                    renderServiceSuggestions(input.dataset.row, input.value);
+                });
+                input.addEventListener('focus', () => renderServiceSuggestions(input.dataset.row, input.value));
+            });
+
+            document.addEventListener('click', (event) => {
+                const choice = event.target.closest('[data-service-choice]');
+
+                if (choice) {
+                    selectService(choice.dataset.row, choice.dataset.serviceChoice);
+                    return;
+                }
+
+                if (!event.target.closest('.appointment-service-suggestions') && !event.target.closest('.appointment-service-search')) {
+                    document.querySelectorAll('.appointment-service-suggestions').forEach((target) => target.hidden = true);
+                }
+            });
+
             document.querySelectorAll('.appointment-service-select').forEach((select) => {
                 select.addEventListener('change', () => {
                     const row = select.dataset.row;
@@ -355,6 +685,56 @@
                     renderStaffOptions(row, service);
                     renderOptions(row, service);
                 });
+            });
+
+            document.querySelectorAll('.appointment-slot-button').forEach((button) => {
+                button.addEventListener('click', () => openSlotModal(button.dataset.row));
+            });
+
+            slotLoad?.addEventListener('click', () => loadAvailability());
+            slotClose?.addEventListener('click', closeSlotModal);
+            slotModal?.addEventListener('click', (event) => {
+                if (event.target === slotModal || event.target === slotModal.firstElementChild) {
+                    closeSlotModal();
+                }
+            });
+            slotBoard?.addEventListener('click', (event) => {
+                const box = event.target.closest('[data-slot-time]');
+
+                if (!box || activeSlotRow === null) {
+                    return;
+                }
+
+                const slotIndexInput = document.querySelector(`.appointment-slot-index[data-row="${activeSlotRow}"]`);
+                const nativeSlotSelect = document.querySelector(`select[name="new_items[${activeSlotRow}][slot_index]"]`);
+                const label = document.querySelector(`[data-slot-label="${activeSlotRow}"]`);
+                const button = document.querySelector(`.appointment-slot-button[data-row="${activeSlotRow}"]`);
+
+                if (dateInput) {
+                    dateInput.value = slotDate.value;
+                }
+
+                if (startTimeInput) {
+                    startTimeInput.value = box.dataset.slotTime;
+                }
+
+                if (slotIndexInput) {
+                    slotIndexInput.value = box.dataset.slotIndex;
+                }
+
+                if (nativeSlotSelect) {
+                    nativeSlotSelect.value = box.dataset.slotIndex;
+                }
+
+                if (label) {
+                    label.textContent = `${box.dataset.slotLabel} on ${slotDate.value}`;
+                }
+
+                if (button) {
+                    button.textContent = `Selected ${box.dataset.slotLabel}`;
+                }
+
+                closeSlotModal();
             });
         })();
     </script>

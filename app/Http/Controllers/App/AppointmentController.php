@@ -42,6 +42,8 @@ class AppointmentController extends Controller
             'staff_id' => $request->input('staff_id'),
             'status' => $this->normalizeStatusFilter($request->input('status')),
             'slot' => $this->sanitizeSlot($request->input('slot')),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
         ];
 
         $servicesQuery = Service::query()
@@ -99,13 +101,21 @@ class AppointmentController extends Controller
             ->get(['id', 'full_name', 'role_key', 'job_title', 'department', 'operational_role']);
         $staffList = Staff::sortForPicSelector($staffList);
 
-        $selectedDayStart = Carbon::parse($filters['date'])->startOfDay();
-        $selectedDayEnd = Carbon::parse($filters['date'])->endOfDay();
+        $rangeStart = $filters['status'] === 'reschedule' && filled($filters['date_from'])
+            ? Carbon::parse($filters['date_from'])->startOfDay()
+            : Carbon::parse($filters['date'])->startOfDay();
+        $rangeEnd = $filters['status'] === 'reschedule' && filled($filters['date_to'])
+            ? Carbon::parse($filters['date_to'])->endOfDay()
+            : Carbon::parse($filters['date'])->endOfDay();
+
+        if ($rangeEnd->lt($rangeStart)) {
+            [$rangeStart, $rangeEnd] = [$rangeEnd->copy()->startOfDay(), $rangeStart->copy()->endOfDay()];
+        }
 
         $appointmentGroupsQuery = AppointmentGroup::query()
             ->with(['customer', 'items.staff', 'items.service', 'items.optionSelections'])
-            ->where('starts_at', '<=', $selectedDayEnd)
-            ->where('ends_at', '>=', $selectedDayStart)
+            ->where('starts_at', '<=', $rangeEnd)
+            ->where('ends_at', '>=', $rangeStart)
             ->orderBy('starts_at');
 
         if (! empty($filters['staff_id'])) {
@@ -146,6 +156,20 @@ class AppointmentController extends Controller
             'statusOptions',
             'prefillCustomer',
         ));
+    }
+
+    public function availabilityBoard(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        $staffList = Staff::query()
+            ->where('is_active', true)
+            ->get(['id', 'full_name', 'role_key', 'job_title', 'department', 'operational_role']);
+        $staffList = Staff::sortForPicSelector($staffList);
+
+        return response()->json($this->buildPlannerBoard(Carbon::parse($validated['date']), $staffList));
     }
 
     public function store(Request $request)
