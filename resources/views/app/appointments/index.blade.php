@@ -440,6 +440,35 @@
         </div>
     </div>
 
+    <div id="reschedule-reminder-modal" class="modal-shell hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-stage">
+            <div class="modal-card confirm-remove-modal reschedule-reminder-modal">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-kicker">Follow-up reminder</div>
+                        <h3 class="modal-title">Unsettled reschedule customers</h3>
+                        <p class="modal-subtitle" id="reschedule-reminder-copy">Some customers are not marked as followed up yet.</p>
+                    </div>
+                    <button type="button" class="modal-close" id="reschedule-reminder-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="reschedule-reminder-card">
+                        <div class="reschedule-reminder-icon" aria-hidden="true">!</div>
+                        <div>
+                            <div class="selection-card__title">Still okay to close</div>
+                            <div class="small-note mt-2">This is just a gentle reminder so front desk does not accidentally miss anyone who needs a new booking.</div>
+                        </div>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="reschedule-reminder-stay">Review list</button>
+                        <button type="button" class="btn btn-secondary" id="reschedule-reminder-confirm">Close anyway</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="checkin-remark-modal" class="modal-shell hidden" aria-hidden="true">
         <div class="modal-backdrop"></div>
         <div class="modal-stage">
@@ -791,6 +820,33 @@
             gap: 1rem;
             margin-top: 1.25rem;
             justify-content: flex-start;
+        }
+
+        .reschedule-reminder-modal {
+            width: min(620px, calc(100vw - 32px));
+        }
+
+        .reschedule-reminder-card {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 1rem;
+            align-items: start;
+            border: 1px solid rgba(198, 139, 154, 0.18);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.88);
+            padding: 1.1rem;
+        }
+
+        .reschedule-reminder-icon {
+            display: grid;
+            place-items: center;
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f2c879, #f7e1a8);
+            color: #5b3700;
+            font-weight: 900;
+            box-shadow: 0 12px 26px rgba(156, 108, 28, 0.18);
         }
 
         .customer-suggestion-list {
@@ -1377,6 +1433,11 @@
             const trafficListClose = document.getElementById('traffic-list-close');
             const trafficListCancel = document.getElementById('traffic-list-cancel');
             const trafficListPrint = document.getElementById('traffic-list-print');
+            const rescheduleReminderModal = document.getElementById('reschedule-reminder-modal');
+            const rescheduleReminderCopy = document.getElementById('reschedule-reminder-copy');
+            const rescheduleReminderClose = document.getElementById('reschedule-reminder-close');
+            const rescheduleReminderStay = document.getElementById('reschedule-reminder-stay');
+            const rescheduleReminderConfirm = document.getElementById('reschedule-reminder-confirm');
             const checkinRemarkModal = document.getElementById('checkin-remark-modal');
             const checkinRemarkForm = document.getElementById('checkin-remark-form');
             const checkinRemarkStatus = document.getElementById('checkin-remark-status');
@@ -1654,13 +1715,34 @@
                 const isRescheduleList = trafficListTitle?.textContent?.toLowerCase().includes('rescheduled');
                 const unchecked = isRescheduleList ? refreshRescheduleWarning() : 0;
 
-                if (unchecked > 0 && !window.confirm(`Gentle reminder: ${unchecked} reschedule customer(s) are not marked as followed up yet. Close this list anyway?`)) {
+                if (unchecked > 0) {
+                    openRescheduleReminderModal(unchecked);
                     return;
                 }
 
+                closeTrafficListModalNow();
+            }
+
+            function closeTrafficListModalNow() {
                 trafficListModal?.classList.add('hidden');
                 trafficListModal?.setAttribute('aria-hidden', 'true');
                 document.body.classList.remove('modal-open', 'is-printing-traffic');
+            }
+
+            function openRescheduleReminderModal(unchecked) {
+                if (rescheduleReminderCopy) {
+                    rescheduleReminderCopy.textContent = `${unchecked} reschedule customer(s) are still not marked as followed up yet.`;
+                }
+
+                rescheduleReminderModal?.classList.remove('hidden');
+                rescheduleReminderModal?.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+            }
+
+            function closeRescheduleReminderModal() {
+                rescheduleReminderModal?.classList.add('hidden');
+                rescheduleReminderModal?.setAttribute('aria-hidden', 'true');
+                document.body.classList.add('modal-open');
             }
 
             function openCheckinRemarkModal(button) {
@@ -2678,6 +2760,13 @@
                 [trafficListClose, trafficListCancel].forEach((button) => {
                     button?.addEventListener('click', closeTrafficListModal);
                 });
+                [rescheduleReminderClose, rescheduleReminderStay].forEach((button) => {
+                    button?.addEventListener('click', closeRescheduleReminderModal);
+                });
+                rescheduleReminderConfirm?.addEventListener('click', function () {
+                    closeRescheduleReminderModal();
+                    closeTrafficListModalNow();
+                });
                 [checkinRemarkClose, checkinRemarkCancel].forEach((button) => {
                     button?.addEventListener('click', closeCheckinRemarkModal);
                 });
@@ -2702,6 +2791,11 @@
                 checkinRemarkModal?.addEventListener('click', function (event) {
                     if (event.target === checkinRemarkModal || event.target === checkinRemarkModal.firstElementChild) {
                         closeCheckinRemarkModal();
+                    }
+                });
+                rescheduleReminderModal?.addEventListener('click', function (event) {
+                    if (event.target === rescheduleReminderModal || event.target === rescheduleReminderModal.firstElementChild) {
+                        closeRescheduleReminderModal();
                     }
                 });
 
@@ -2734,6 +2828,10 @@
                 });
 
                 document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape' && rescheduleReminderModal && !rescheduleReminderModal.classList.contains('hidden')) {
+                        closeRescheduleReminderModal();
+                        return;
+                    }
                     if (event.key === 'Escape' && calendarBoardModal && !calendarBoardModal.classList.contains('hidden')) {
                         closeCalendarBoardModal();
                     }
