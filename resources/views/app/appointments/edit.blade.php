@@ -217,7 +217,7 @@
         <div class="modal-backdrop"></div>
         <div class="modal-stage modal-stage--wide edit-slot-modal-stage" role="dialog" aria-modal="true" aria-labelledby="edit-slot-title">
             <div class="modal-card">
-                <div class="modal-head">
+                <div class="modal-header edit-slot-modal__header">
                     <div>
                         <div class="modal-kicker">Staff availability</div>
                         <h3 class="modal-title" id="edit-slot-title">Select timeslot</h3>
@@ -225,7 +225,7 @@
                     </div>
                     <button type="button" class="modal-close" id="edit-slot-close" aria-label="Close">&times;</button>
                 </div>
-                <div class="modal-body stack">
+                <div class="modal-body stack edit-slot-modal__body">
                     <div class="edit-slot-toolbar">
                         <div class="field-block">
                             <label class="field-label" for="edit-slot-date">View date</label>
@@ -360,6 +360,45 @@
         .edit-slot-modal-stage {
             width: min(1120px, calc(100vw - 32px));
             max-height: calc(100vh - 40px);
+            min-height: auto;
+            padding: 1.25rem;
+            align-items: center;
+            justify-content: center;
+            margin: auto;
+        }
+
+        .edit-slot-modal-stage .modal-card {
+            width: 100%;
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .edit-slot-modal__header {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.25rem;
+            padding: 1.75rem 1.75rem 1.25rem;
+            border-bottom: 1px solid rgba(99, 46, 62, 0.08);
+        }
+
+        .edit-slot-modal__header .modal-title {
+            margin-top: 0.65rem;
+        }
+
+        .edit-slot-modal__header .modal-close {
+            flex: 0 0 auto;
+            margin-top: 0;
+            background: #fff;
+        }
+
+        .edit-slot-modal__body {
+            min-height: 0;
+            overflow: hidden;
+            padding: 1.25rem 1.75rem 1.5rem;
         }
 
         .edit-slot-toolbar {
@@ -430,6 +469,23 @@
             }
 
             .appointment-new-service-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .edit-slot-modal-stage {
+                width: min(96vw, 1120px);
+                padding: 0.75rem;
+            }
+
+            .edit-slot-modal__header {
+                padding: 1.35rem 1.25rem 1rem;
+            }
+
+            .edit-slot-modal__body {
+                padding: 1rem 1.25rem 1.25rem;
+            }
+
+            .edit-slot-row {
                 grid-template-columns: 1fr;
             }
         }
