@@ -36,6 +36,7 @@ class CalendarController extends Controller
                 'group.customer:id,full_name,phone,membership_type,membership_code,current_package',
                 'staff:id,full_name,role_key,job_title,department,operational_role',
                 'optionSelections',
+                'slotReservation',
             ])
             ->whereHas('group', fn ($query) => $query->whereIn('status', $this->activeAppointmentStatuses()))
             ->where('starts_at', '>=', $selectedDate->copy()->startOfDay())
@@ -206,7 +207,7 @@ class CalendarController extends Controller
                     ?: mb_strtolower(trim(($customer?->full_name ?: 'Customer').'|'.($customer?->phone ?: '')));
 
                 return implode('|', [
-                    $item->starts_at?->format('H:i') ?: 'unknown',
+                    $this->displayTimeForItem($item),
                     $customerKey,
                 ]);
             })
@@ -222,7 +223,7 @@ class CalendarController extends Controller
                 return [
                     'group_id' => (string) $first->appointment_group_id,
                     'item_id' => $group->pluck('id')->filter()->implode(','),
-                    'time' => $first->starts_at?->format('g:i A') ?: '-',
+                    'time' => $this->displayTimeForItem($first),
                     'client' => $customer?->full_name ?: 'Customer',
                     'phone' => $customer?->phone ?: '',
                     'date_label' => $first->starts_at?->format('j M Y') ?: $selectedDate->format('j M Y'),
@@ -256,6 +257,15 @@ class CalendarController extends Controller
             'Nur Farhanna Binti Abdul Malek' => 'Farhana',
             default => $normalized,
         };
+    }
+
+    private function displayTimeForItem(AppointmentItem $item): string
+    {
+        if (! $item->starts_at) {
+            return '-';
+        }
+
+        return $this->boxTimeLabel($item->starts_at, (int) ($item->slotReservation?->slot_index ?: 1));
     }
 
     private function picSortRank(Staff|string|null $staff): int
@@ -293,7 +303,7 @@ class CalendarController extends Controller
 
             $rows[] = [
                 'label' => $cursor->format('g:i A').' - '.$slotEnd->format('g:i A'),
-                'boxes' => $this->buildAvailabilityBoxes($slotItems, $slotBlocks, $capacity),
+                'boxes' => $this->buildAvailabilityBoxes($slotItems, $slotBlocks, $capacity, $cursor),
             ];
 
             $cursor->addMinutes($slotStep);
@@ -302,7 +312,7 @@ class CalendarController extends Controller
         return $rows;
     }
 
-    private function buildAvailabilityBoxes($slotItems, $slotBlocks, int $capacity): array
+    private function buildAvailabilityBoxes($slotItems, $slotBlocks, int $capacity, Carbon $slotStart): array
     {
         $occupiedBoxes = $slotItems
             ->groupBy(function (AppointmentItem $item) {
@@ -314,9 +324,11 @@ class CalendarController extends Controller
             ->values()
             ->map(function ($group) {
                 $first = $group->first();
+                $slotIndex = (int) ($first->slotReservation?->slot_index ?: 1);
 
                 return [
                     'type' => 'occupied',
+                    'time_label' => $this->boxTimeLabel($first->starts_at, $slotIndex),
                     'title' => $first->group?->customer?->full_name ?: 'Customer',
                     'body' => $group
                         ->map(fn (AppointmentItem $item) => $this->formatTreatmentCell($item))
@@ -335,20 +347,31 @@ class CalendarController extends Controller
 
             $occupiedBoxes->push([
                 'type' => 'blocked',
+                'time_label' => $this->boxTimeLabel($slotStart, (int) $block->slot_index),
                 'title' => 'Blocked',
                 'body' => $block->reason,
             ]);
         }
 
         while ($occupiedBoxes->count() < $capacity) {
+            $slotIndex = $occupiedBoxes->count() + 1;
             $occupiedBoxes->push([
                 'type' => 'empty',
+                'time_label' => $this->boxTimeLabel($slotStart, $slotIndex),
                 'title' => 'Empty box',
                 'body' => 'Available',
             ]);
         }
 
         return $occupiedBoxes->all();
+    }
+
+    private function boxTimeLabel(Carbon $slotStart, int $slotIndex): string
+    {
+        return $slotStart
+            ->copy()
+            ->addMinutes(max(0, $slotIndex - 1) * 30)
+            ->format('g:i A');
     }
 
     private function bookingWindowCount(Carbon $selectedDate, array $schedule): int

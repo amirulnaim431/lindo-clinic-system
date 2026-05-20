@@ -653,6 +653,15 @@
             color: #1a1317;
         }
 
+        .planner-slot-box__time {
+            margin-bottom: 0.35rem;
+            color: #bf7893;
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
         .booking-option-modal {
             width: min(960px, calc(100vw - 32px));
             max-height: calc(100vh - 48px);
@@ -2121,6 +2130,17 @@
                 return boxes;
             }
 
+            function boxTimeLabel(slot, slotIndex) {
+                const [hour, minute] = String(slot.time || '00:00').split(':').map((value) => Number(value || 0));
+                const date = new Date();
+                date.setHours(hour, minute + ((Number(slotIndex) - 1) * 30), 0, 0);
+
+                return date.toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                });
+            }
+
             function assignActiveServiceToBox(staff, slot, slotIndex) {
                 if (!activeInstanceId) {
                     window.alert('Choose a selected service first.');
@@ -2193,6 +2213,7 @@
                                 boxButton.className = 'planner-slot-box is-occupied';
                                 boxButton.disabled = true;
                                 boxButton.innerHTML = `
+                                    <div class="planner-slot-box__time">${boxTimeLabel(slot, box.slot_index)}</div>
                                     <div class="planner-slot-box__title">${box.appointment.customer_name}</div>
                                     <div>${box.appointment.service_name}</div>
                                 `;
@@ -2200,12 +2221,14 @@
                                 boxButton.className = 'planner-slot-box is-blocked';
                                 boxButton.disabled = true;
                                 boxButton.innerHTML = `
+                                    <div class="planner-slot-box__time">${boxTimeLabel(slot, box.slot_index)}</div>
                                     <div class="planner-slot-box__title">Blocked</div>
                                     <div>${escapeHtml(box.reason || 'Break')}</div>
                                 `;
                             } else if (box.type === 'assigned') {
                                 boxButton.className = 'planner-slot-box is-assigned';
                                 boxButton.innerHTML = `
+                                    <div class="planner-slot-box__time">${boxTimeLabel(slot, box.slot_index)}</div>
                                     <div class="planner-slot-box__title">${box.service?.display_label || 'Selected service'}</div>
                                     <div>${box.service?.selected_option_labels?.join(' | ') || 'Draft booking'}</div>
                                 `;
@@ -2263,6 +2286,7 @@
                             } else {
                                 boxButton.className = 'planner-slot-box is-empty';
                                 boxButton.innerHTML = `
+                                    <div class="planner-slot-box__time">${boxTimeLabel(slot, box.slot_index)}</div>
                                     <div class="planner-slot-box__title">Empty box</div>
                                     <div>${activeInstanceId ? 'Click to assign active service here' : 'Choose a selected service first'}</div>
                                 `;

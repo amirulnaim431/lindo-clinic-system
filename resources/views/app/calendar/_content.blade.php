@@ -78,6 +78,9 @@
                             <div class="planner-slot-label">{{ $row['label'] }}</div>
                             @foreach ($row['boxes'] as $box)
                                 <div class="planner-slot-box {{ $box['type'] === 'occupied' ? 'is-occupied' : ($box['type'] === 'blocked' ? 'is-blocked' : 'is-empty') }}">
+                                    @if (!empty($box['time_label']))
+                                        <div class="planner-slot-box__time">{{ $box['time_label'] }}</div>
+                                    @endif
                                     <div class="planner-slot-box__title">{{ $box['title'] }}</div>
                                     <div>{{ $box['body'] }}</div>
                                 </div>
@@ -404,6 +407,15 @@
     .planner-slot-box__title {
         font-weight: 700;
         color: #1a1317;
+    }
+
+    .planner-slot-box__time {
+        margin-bottom: 0.35rem;
+        color: #bf7893;
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
     }
 
     .screen-only {
